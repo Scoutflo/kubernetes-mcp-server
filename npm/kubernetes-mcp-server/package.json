@@ -1,7 +1,7 @@
 {
   "name": "kubernetes-mcp-server",
   "version": "0.0.0",
-  "description": "Model Context Protocol (MCP) server for Kubernetes and OpenShift",
+  "description": "Model Context Protocol (MCP) server for Kubernetes",
   "main": "./bin/index.js",
   "bin": {
     "kubernetes-mcp-server": "bin/index.js"
@@ -21,7 +21,6 @@
   "keywords": [
     "mcp",
     "kubernetes",
-    "openshift",
     "model context protocol",
     "model",
     "context",

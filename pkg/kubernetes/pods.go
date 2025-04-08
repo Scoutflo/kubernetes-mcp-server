@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/manusa/kubernetes-mcp-server/pkg/version"
+
+	"github.com/scoutflo/kubernetes-mcp-server/pkg/version"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -57,21 +58,6 @@ func (k *Kubernetes) PodsDelete(ctx context.Context, namespace, name string) (st
 				_ = k.clientSet.CoreV1().Services(namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
 			}
 		}
-	}
-
-	// Delete managed Route
-	if isManaged && k.supportsGroupVersion("route.openshift.io/v1") {
-		routeResources := k.dynamicClient.
-			Resource(schema.GroupVersionResource{Group: "route.openshift.io", Version: "v1", Resource: "routes"}).
-			Namespace(namespace)
-		if rl, _ := routeResources.List(ctx, metav1.ListOptions{
-			LabelSelector: managedLabelSelector.String(),
-		}); rl != nil {
-			for _, route := range rl.Items {
-				_ = routeResources.Delete(ctx, route.GetName(), metav1.DeleteOptions{})
-			}
-		}
-
 	}
 	return "Pod deleted successfully",
 		k.clientSet.CoreV1().Pods(namespace).Delete(ctx, name, metav1.DeleteOptions{})
@@ -126,34 +112,6 @@ func (k *Kubernetes) PodsRun(ctx context.Context, namespace, name, image string,
 				Ports:    []v1.ServicePort{{Port: port, TargetPort: intstr.FromInt32(port)}},
 			},
 		})
-	}
-	if port > 0 && k.supportsGroupVersion("route.openshift.io/v1") {
-		resources = append(resources, &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": "route.openshift.io/v1",
-				"kind":       "Route",
-				"metadata": map[string]interface{}{
-					"name":      name,
-					"namespace": namespaceOrDefault(namespace),
-					"labels":    labels,
-				},
-				"spec": map[string]interface{}{
-					"to": map[string]interface{}{
-						"kind":   "Service",
-						"name":   name,
-						"weight": 100,
-					},
-					"port": map[string]interface{}{
-						"targetPort": intstr.FromInt32(port),
-					},
-					"tls": map[string]interface{}{
-						"termination":                   "edge",
-						"insecureEdgeTerminationPolicy": "Redirect",
-					},
-				},
-			},
-		})
-
 	}
 
 	// Convert the objects to Unstructured and reuse resourcesCreateOrUpdate functionality

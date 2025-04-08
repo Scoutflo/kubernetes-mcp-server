@@ -4,16 +4,17 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/manusa/kubernetes-mcp-server/pkg/mcp"
-	"github.com/manusa/kubernetes-mcp-server/pkg/version"
+	"os"
+	"strconv"
+
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/scoutflo/kubernetes-mcp-server/pkg/mcp"
+	"github.com/scoutflo/kubernetes-mcp-server/pkg/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/net/context"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
-	"os"
-	"strconv"
 )
 
 var rootCmd = &cobra.Command{

@@ -3,17 +3,18 @@ package mcp
 import (
 	"context"
 	"fmt"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 func (s *Server) initEvents() []server.ServerTool {
 	return []server.ServerTool{
-		{mcp.NewTool("events_list",
+		{Tool: mcp.NewTool("events_list",
 			mcp.WithDescription("List all the Kubernetes events in the current cluster from all namespaces"),
 			mcp.WithString("namespace",
 				mcp.Description("Optional Namespace to retrieve the events from. If not provided, will list events from all namespaces")),
-		), s.eventsList},
+		), Handler: s.eventsList},
 	}
 }
 

@@ -1,11 +1,12 @@
 package mcp
 
 import (
-	"github.com/manusa/kubernetes-mcp-server/pkg/kubernetes"
-	"github.com/manusa/kubernetes-mcp-server/pkg/version"
+	"slices"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"slices"
+	"github.com/scoutflo/kubernetes-mcp-server/pkg/kubernetes"
+	"github.com/scoutflo/kubernetes-mcp-server/pkg/version"
 )
 
 type Server struct {

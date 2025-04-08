@@ -1,7 +1,7 @@
 {
   "name": "kubernetes-mcp-server-darwin-amd64",
   "version": "0.0.0",
-  "description": "Model Context Protocol (MCP) server for Kubernetes and OpenShift",
+  "description": "Model Context Protocol (MCP) server for Kubernetes",
   "os": [
     "darwin"
   ],

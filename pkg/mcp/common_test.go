@@ -4,6 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
+	"testing"
+	"time"
+
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -23,18 +30,12 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 	toolswatch "k8s.io/client-go/tools/watch"
 	"k8s.io/utils/ptr"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/env"
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/remote"
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/store"
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/versions"
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/workflows"
-	"testing"
-	"time"
 )
 
 // envTest has an expensive setup, so we only want to do it once per entire test run.
@@ -177,34 +178,6 @@ func (c *mcpContext) withKubeConfig(rc *rest.Config) *api.Config {
 // withEnvTest sets up the environment for kubeconfig to be used with envTest
 func (c *mcpContext) withEnvTest() {
 	c.withKubeConfig(envTestRestConfig)
-}
-
-// inOpenShift sets up the kubernetes environment to seem to be running OpenShift
-func (c *mcpContext) inOpenShift() func() {
-	c.withKubeConfig(envTestRestConfig)
-	crdTemplate := `
-          {
-            "apiVersion": "apiextensions.k8s.io/v1",
-            "kind": "CustomResourceDefinition",
-            "metadata": {"name": "%s"},
-            "spec": {
-              "group": "%s",
-              "versions": [{
-                "name": "v1","served": true,"storage": true,
-                "schema": {"openAPIV3Schema": {"type": "object","x-kubernetes-preserve-unknown-fields": true}}
-              }],
-              "scope": "%s",
-              "names": {"plural": "%s","singular": "%s","kind": "%s"}
-            }
-          }`
-	removeProjects := c.crdApply(fmt.Sprintf(crdTemplate, "projects.project.openshift.io", "project.openshift.io",
-		"Cluster", "projects", "project", "Project"))
-	removeRoutes := c.crdApply(fmt.Sprintf(crdTemplate, "routes.route.openshift.io", "route.openshift.io",
-		"Namespaced", "routes", "route", "Route"))
-	return func() {
-		removeProjects()
-		removeRoutes()
-	}
 }
 
 // newKubernetesClient creates a new Kubernetes client with the envTest kubeconfig

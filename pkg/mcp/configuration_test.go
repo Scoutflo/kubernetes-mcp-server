@@ -1,12 +1,13 @@
 package mcp
 
 import (
-	"github.com/manusa/kubernetes-mcp-server/pkg/kubernetes"
+	"testing"
+
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/scoutflo/kubernetes-mcp-server/pkg/kubernetes"
 	"k8s.io/client-go/rest"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"sigs.k8s.io/yaml"
-	"testing"
 )
 
 func TestConfigurationView(t *testing.T) {

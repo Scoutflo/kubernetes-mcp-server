@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -11,12 +12,9 @@ import (
 
 func (s *Server) initResources() []server.ServerTool {
 	commonApiVersion := "v1 Pod, v1 Service, apps/v1 Deployment, networking.k8s.io/v1 Ingress"
-	if s.k.IsOpenShift(context.Background()) {
-		commonApiVersion += ", route.openshift.io/v1 Route"
-	}
 	commonApiVersion = fmt.Sprintf("(common apiVersion and kind include: %s)", commonApiVersion)
 	return []server.ServerTool{
-		{mcp.NewTool("resources_list",
+		{Tool: mcp.NewTool("resources_list",
 			mcp.WithDescription("List Kubernetes resources and objects in the current cluster by providing their apiVersion and kind and optionally the namespace\n"+
 				commonApiVersion),
 			mcp.WithString("apiVersion",
@@ -28,8 +26,10 @@ func (s *Server) initResources() []server.ServerTool {
 				mcp.Required(),
 			),
 			mcp.WithString("namespace",
-				mcp.Description("Optional Namespace to retrieve the namespaced resources from (ignored in case of cluster scoped resources). If not provided, will list resources from all namespaces"))), s.resourcesList},
-		{mcp.NewTool("resources_get",
+				mcp.Description("Optional Namespace to retrieve the namespaced resources from (ignored in case of cluster scoped resources). If not provided, will list resources from all namespaces"))),
+			Handler: s.resourcesList,
+		},
+		{Tool: mcp.NewTool("resources_get",
 			mcp.WithDescription("Get a Kubernetes resource in the current cluster by providing its apiVersion, kind, optionally the namespace, and its name\n"+
 				commonApiVersion),
 			mcp.WithString("apiVersion",
@@ -44,16 +44,16 @@ func (s *Server) initResources() []server.ServerTool {
 				mcp.Description("Optional Namespace to retrieve the namespaced resource from (ignored in case of cluster scoped resources). If not provided, will get resource from configured namespace"),
 			),
 			mcp.WithString("name", mcp.Description("Name of the resource"), mcp.Required()),
-		), s.resourcesGet},
-		{mcp.NewTool("resources_create_or_update",
+		), Handler: s.resourcesGet},
+		{Tool: mcp.NewTool("resources_create_or_update",
 			mcp.WithDescription("Create or update a Kubernetes resource in the current cluster by providing a YAML or JSON representation of the resource\n"+
 				commonApiVersion),
 			mcp.WithString("resource",
 				mcp.Description("A JSON or YAML containing a representation of the Kubernetes resource. Should include top-level fields such as apiVersion,kind,metadata, and spec"),
 				mcp.Required(),
 			),
-		), s.resourcesCreateOrUpdate},
-		{mcp.NewTool("resources_delete",
+		), Handler: s.resourcesCreateOrUpdate},
+		{Tool: mcp.NewTool("resources_delete",
 			mcp.WithDescription("Delete a Kubernetes resource in the current cluster by providing its apiVersion, kind, optionally the namespace, and its name\n"+
 				commonApiVersion),
 			mcp.WithString("apiVersion",
@@ -68,7 +68,7 @@ func (s *Server) initResources() []server.ServerTool {
 				mcp.Description("Optional Namespace to delete the namespaced resource from (ignored in case of cluster scoped resources). If not provided, will delete resource from configured namespace"),
 			),
 			mcp.WithString("name", mcp.Description("Name of the resource"), mcp.Required()),
-		), s.resourcesDelete},
+		), Handler: s.resourcesDelete},
 	}
 }
 

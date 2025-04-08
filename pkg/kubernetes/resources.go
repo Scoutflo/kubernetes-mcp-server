@@ -2,14 +2,15 @@ package kubernetes
 
 import (
 	"context"
-	"github.com/manusa/kubernetes-mcp-server/pkg/version"
+	"regexp"
+	"strings"
+
+	"github.com/scoutflo/kubernetes-mcp-server/pkg/version"
 	authv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"regexp"
-	"strings"
 )
 
 const (

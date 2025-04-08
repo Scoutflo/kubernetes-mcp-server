@@ -1,16 +1,15 @@
 package mcp
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/yaml"
-	"strings"
-	"testing"
 )
 
 func TestPodsListInAllNamespaces(t *testing.T) {
@@ -417,63 +416,6 @@ func TestPodsDelete(t *testing.T) {
 	})
 }
 
-func TestPodsDeleteInOpenShift(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
-		// Managed Pod in OpenShift
-		defer c.inOpenShift()() // n.b. two sets of parentheses to invoke the first function
-		managedLabels := map[string]string{
-			"app.kubernetes.io/managed-by": "kubernetes-mcp-server",
-			"app.kubernetes.io/name":       "a-manged-pod-to-delete",
-		}
-		kc := c.newKubernetesClient()
-		_, _ = kc.CoreV1().Pods("default").Create(c.ctx, &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: "a-managed-pod-to-delete-in-openshift", Labels: managedLabels},
-			Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "nginx", Image: "nginx"}}},
-		}, metav1.CreateOptions{})
-		dynamicClient := dynamic.NewForConfigOrDie(envTestRestConfig)
-		_, _ = dynamicClient.Resource(schema.GroupVersionResource{Group: "route.openshift.io", Version: "v1", Resource: "routes"}).
-			Namespace("default").Create(c.ctx, &unstructured.Unstructured{Object: map[string]interface{}{
-			"apiVersion": "route.openshift.io/v1",
-			"kind":       "Route",
-			"metadata": map[string]interface{}{
-				"name":   "a-managed-route-to-delete",
-				"labels": managedLabels,
-			},
-		}}, metav1.CreateOptions{})
-		podsDeleteManagedOpenShift, err := c.callTool("pods_delete", map[string]interface{}{
-			"name": "a-managed-pod-to-delete-in-openshift",
-		})
-		t.Run("pods_delete with managed pod in OpenShift returns success", func(t *testing.T) {
-			if err != nil {
-				t.Errorf("call tool failed %v", err)
-				return
-			}
-			if podsDeleteManagedOpenShift.IsError {
-				t.Errorf("call tool failed")
-				return
-			}
-			if podsDeleteManagedOpenShift.Content[0].(mcp.TextContent).Text != "Pod deleted successfully" {
-				t.Errorf("invalid tool result content, got %v", podsDeleteManagedOpenShift.Content[0].(mcp.TextContent).Text)
-				return
-			}
-		})
-		t.Run("pods_delete with managed pod in OpenShift deletes Pod and Route", func(t *testing.T) {
-			p, pErr := kc.CoreV1().Pods("default").Get(c.ctx, "a-managed-pod-to-delete-in-openshift", metav1.GetOptions{})
-			if pErr == nil && p != nil && p.ObjectMeta.DeletionTimestamp == nil {
-				t.Errorf("Pod not deleted")
-				return
-			}
-			r, rErr := dynamicClient.
-				Resource(schema.GroupVersionResource{Group: "route.openshift.io", Version: "v1", Resource: "routes"}).
-				Namespace("default").Get(c.ctx, "a-managed-route-to-delete", metav1.GetOptions{})
-			if rErr == nil && r != nil && r.GetDeletionTimestamp() == nil {
-				t.Errorf("Route not deleted")
-				return
-			}
-		})
-	})
-}
-
 func TestPodsLog(t *testing.T) {
 	testCase(t, func(c *mcpContext) {
 		c.withEnvTest()
@@ -673,42 +615,6 @@ func TestPodsRun(t *testing.T) {
 			}
 			if selector["app.kubernetes.io/part-of"] != "kubernetes-mcp-server-run-sandbox" {
 				t.Errorf("invalid service selector, expected app.kubernetes.io/part-of, got %v", selector)
-				return
-			}
-		})
-	})
-}
-
-func TestPodsRunInOpenShift(t *testing.T) {
-	testCase(t, func(c *mcpContext) {
-		defer c.inOpenShift()() // n.b. two sets of parentheses to invoke the first function
-		t.Run("pods_run with image, namespace, and port returns route with port", func(t *testing.T) {
-			podsRunInOpenShift, err := c.callTool("pods_run", map[string]interface{}{"image": "nginx", "port": 80})
-			if err != nil {
-				t.Errorf("call tool failed %v", err)
-				return
-			}
-			if podsRunInOpenShift.IsError {
-				t.Errorf("call tool failed")
-				return
-			}
-			var decodedPodServiceRoute []unstructured.Unstructured
-			err = yaml.Unmarshal([]byte(podsRunInOpenShift.Content[0].(mcp.TextContent).Text), &decodedPodServiceRoute)
-			if err != nil {
-				t.Errorf("invalid tool result content %v", err)
-				return
-			}
-			if len(decodedPodServiceRoute) != 3 {
-				t.Errorf("invalid pods count, expected 3, got %v", len(decodedPodServiceRoute))
-				return
-			}
-			if decodedPodServiceRoute[2].GetKind() != "Route" {
-				t.Errorf("invalid route kind, expected Route, got %v", decodedPodServiceRoute[2].GetKind())
-				return
-			}
-			targetPort := decodedPodServiceRoute[2].Object["spec"].(map[string]interface{})["port"].(map[string]interface{})["targetPort"].(int64)
-			if targetPort != 80 {
-				t.Errorf("invalid route target port, expected 80, got %v", targetPort)
 				return
 			}
 		})

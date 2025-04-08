@@ -4,30 +4,31 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 func (s *Server) initPods() []server.ServerTool {
 	return []server.ServerTool{
-		{mcp.NewTool("pods_list",
+		{Tool: mcp.NewTool("pods_list",
 			mcp.WithDescription("List all the Kubernetes pods in the current cluster from all namespaces"),
-		), s.podsListInAllNamespaces},
-		{mcp.NewTool("pods_list_in_namespace",
+		), Handler: s.podsListInAllNamespaces},
+		{Tool: mcp.NewTool("pods_list_in_namespace",
 			mcp.WithDescription("List all the Kubernetes pods in the specified namespace in the current cluster"),
 			mcp.WithString("namespace", mcp.Description("Namespace to list pods from"), mcp.Required()),
-		), s.podsListInNamespace},
-		{mcp.NewTool("pods_get",
+		), Handler: s.podsListInNamespace},
+		{Tool: mcp.NewTool("pods_get",
 			mcp.WithDescription("Get a Kubernetes Pod in the current or provided namespace with the provided name"),
 			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
 			mcp.WithString("name", mcp.Description("Name of the Pod"), mcp.Required()),
-		), s.podsGet},
-		{mcp.NewTool("pods_delete",
+		), Handler: s.podsGet},
+		{Tool: mcp.NewTool("pods_delete",
 			mcp.WithDescription("Delete a Kubernetes Pod in the current or provided namespace with the provided name"),
 			mcp.WithString("namespace", mcp.Description("Namespace to delete the Pod from")),
 			mcp.WithString("name", mcp.Description("Name of the Pod to delete"), mcp.Required()),
-		), s.podsDelete},
-		{mcp.NewTool("pods_exec",
+		), Handler: s.podsDelete},
+		{Tool: mcp.NewTool("pods_exec",
 			mcp.WithDescription("Execute a command in a Kubernetes Pod in the current or provided namespace with the provided name and command"),
 			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod logs from")),
 			mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
@@ -44,19 +45,19 @@ func (s *Server) initPods() []server.ServerTool {
 				},
 				mcp.Required(),
 			),
-		), s.podsExec},
-		{mcp.NewTool("pods_log",
+		), Handler: s.podsExec},
+		{Tool: mcp.NewTool("pods_log",
 			mcp.WithDescription("Get the logs of a Kubernetes Pod in the current or provided namespace with the provided name"),
 			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod logs from")),
 			mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
-		), s.podsLog},
-		{mcp.NewTool("pods_run",
+		), Handler: s.podsLog},
+		{Tool: mcp.NewTool("pods_run",
 			mcp.WithDescription("Run a Kubernetes Pod in the current or provided namespace with the provided container image and optional name"),
 			mcp.WithString("namespace", mcp.Description("Namespace to run the Pod in")),
 			mcp.WithString("name", mcp.Description("Name of the Pod (Optional, random name if not provided)")),
 			mcp.WithString("image", mcp.Description("Container Image to run in the Pod"), mcp.Required()),
 			mcp.WithNumber("port", mcp.Description("TCP/IP port to expose from the Pod container (Optional, no port exposed if not provided)")),
-		), s.podsRun},
+		), Handler: s.podsRun},
 	}
 }
 
