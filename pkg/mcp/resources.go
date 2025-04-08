@@ -11,7 +11,7 @@ import (
 )
 
 func (s *Server) initResources() []server.ServerTool {
-	commonApiVersion := "v1 Pod, v1 Service, apps/v1 Deployment, networking.k8s.io/v1 Ingress"
+	commonApiVersion := "v1 Pod, v1 Service, v1 Node, apps/v1 Deployment, networking.k8s.io/v1 Ingress"
 	commonApiVersion = fmt.Sprintf("(common apiVersion and kind include: %s)", commonApiVersion)
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("resources_list",
