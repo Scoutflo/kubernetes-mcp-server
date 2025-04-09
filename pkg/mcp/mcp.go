@@ -44,6 +44,7 @@ func (s *Server) reloadKubernetesClient() error {
 		s.initNamespaces(),
 		s.initPods(),
 		s.initResources(),
+		s.initPortForward(),
 	)...)
 	return nil
 }
