@@ -1,6 +1,10 @@
 package kubernetes
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/fsnotify/fsnotify"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -49,7 +53,7 @@ func NewKubernetes() (*Kubernetes, error) {
 	if err != nil {
 		return nil, err
 	}
-	k8s.kubeConfigFiles = resolveConfig().ConfigAccess().GetLoadingPrecedence()
+	k8s.kubeConfigFiles = getKubeConfigFiles()
 	k8s.clientSet, err = kubernetes.NewForConfig(k8s.cfg)
 	if err != nil {
 		return nil, err
@@ -131,10 +135,61 @@ func marshal(v any) (string, error) {
 	return string(ret), nil
 }
 
+// getKubeConfigFiles returns all kubeconfig files to watch
+func getKubeConfigFiles() []string {
+	// Check for KUBECONFIG environment variable
+	kubeconfig := os.Getenv("KUBECONFIG")
+	if kubeconfig != "" {
+		// KUBECONFIG can contain multiple paths separated by : (Linux/Mac) or ; (Windows)
+		var separator string
+		if os.PathSeparator == '\\' { // Windows
+			separator = ";"
+		} else { // Linux/Mac
+			separator = ":"
+		}
+
+		paths := strings.Split(kubeconfig, separator)
+		// Clean up paths and make sure they exist
+		validPaths := make([]string, 0, len(paths))
+		for _, path := range paths {
+			if path = strings.TrimSpace(path); path != "" {
+				// Check if file exists
+				if _, err := os.Stat(path); err == nil {
+					validPaths = append(validPaths, path)
+				}
+			}
+		}
+		return validPaths
+	}
+
+	// Default path if KUBECONFIG is not set
+	home := os.Getenv("HOME")
+	if home == "" {
+		home = os.Getenv("USERPROFILE") // Windows
+	}
+	if home != "" {
+		defaultPath := filepath.Join(home, ".kube", "config")
+		if _, err := os.Stat(defaultPath); err == nil {
+			return []string{defaultPath}
+		}
+	}
+
+	return nil
+}
+
 func resolveConfig() clientcmd.ClientConfig {
-	pathOptions := clientcmd.NewDefaultPathOptions()
+	// Check for KUBECONFIG environment variable
+	kubeconfig := os.Getenv("KUBECONFIG")
+
+	var loadingRules *clientcmd.ClientConfigLoadingRules
+	if kubeconfig != "" {
+		loadingRules = &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfig}
+	} else {
+		loadingRules = clientcmd.NewDefaultClientConfigLoadingRules()
+	}
+
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: pathOptions.GetDefaultFilename()},
+		loadingRules,
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: ""}})
 }
 
