@@ -18,6 +18,9 @@ func (s *Server) initConfiguration() []server.ServerTool {
 				"If set to false, all contexts, clusters, auth-infos, and users are returned in the configuration. "+
 				"(Optional, default true)")),
 		), Handler: configurationView},
+		{Tool: mcp.NewTool("get_available_API_resources",
+			mcp.WithDescription("Get all available and supported API resources in the Kubernetes cluster"),
+		), Handler: s.getAvailableAPIResources},
 	}
 }
 
@@ -30,6 +33,14 @@ func configurationView(_ context.Context, ctr mcp.CallToolRequest) (*mcp.CallToo
 	ret, err := kubernetes.ConfigurationView(minify)
 	if err != nil {
 		err = fmt.Errorf("failed to get configuration: %v", err)
+	}
+	return NewTextResult(ret, err), nil
+}
+
+func (s *Server) getAvailableAPIResources(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	ret, err := kubernetes.GetAvailableAPIResources(ctx)
+	if err != nil {
+		err = fmt.Errorf("failed to get available API resources: %v", err)
 	}
 	return NewTextResult(ret, err), nil
 }

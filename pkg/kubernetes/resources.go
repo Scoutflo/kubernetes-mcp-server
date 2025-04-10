@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
@@ -156,4 +158,43 @@ func (k *Kubernetes) canIUse(ctx context.Context, gvr *schema.GroupVersionResour
 		return false
 	}
 	return response.Status.Allowed
+}
+
+func (k *Kubernetes) ResourcesPatch(ctx context.Context, gvk *schema.GroupVersionKind, namespace, name, patchType string, patchData []byte) (string, error) {
+	gvr, err := k.resourceFor(gvk)
+	if err != nil {
+		return "", err
+	}
+
+	// If it's a namespaced resource and namespace wasn't provided, try to use the default configured one
+	if namespaced, nsErr := k.isNamespaced(gvk); nsErr == nil && namespaced {
+		namespace = namespaceOrDefault(namespace)
+	}
+
+	// Determine the patch type
+	var pt types.PatchType
+	switch patchType {
+	case "json":
+		pt = types.JSONPatchType
+	case "merge":
+		pt = types.MergePatchType
+	case "strategic":
+		pt = types.StrategicMergePatchType
+	default:
+		return "", fmt.Errorf("invalid patch type: %s", patchType)
+	}
+
+	// Apply the patch
+	result, err := k.dynamicClient.Resource(*gvr).Namespace(namespace).Patch(ctx, name, pt, patchData, metav1.PatchOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	// Convert the result to YAML
+	output, err := marshal(result)
+	if err != nil {
+		return "", err
+	}
+
+	return output, nil
 }
