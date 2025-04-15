@@ -52,6 +52,7 @@ func (s *Server) reloadKubernetesClient() error {
 		s.initLabels(),
 		s.initConnectivity(),
 		s.initHelm(),
+		s.initArgoCD(),
 	)...)
 	return nil
 }
