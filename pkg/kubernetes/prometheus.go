@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/scoutflo/kubernetes-mcp-server/pkg/llm"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -69,18 +70,28 @@ func (k *Kubernetes) getPrometheusURL() (string, error) {
 }
 
 // QueryPrometheus sends an instant query to Prometheus
-func (k *Kubernetes) QueryPrometheus(query string) (string, error) {
+func (k *Kubernetes) QueryPrometheus(query string, queryTime *time.Time, timeout string) (string, error) {
 	// Get Prometheus URL using service discovery
 	prometheusURL, err := k.getPrometheusURL()
 	if err != nil {
 		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
 	}
 
-	// Build the API query URL
-	apiURL := fmt.Sprintf("%s/api/v1/query?query=%s", prometheusURL, url.QueryEscape(query))
+	// Build the API query URL with additional parameters
+	baseURL := fmt.Sprintf("%s/api/v1/query?query=%s", prometheusURL, url.QueryEscape(query))
+
+	// Add timestamp if provided
+	if queryTime != nil && !queryTime.IsZero() {
+		baseURL = fmt.Sprintf("%s&time=%d", baseURL, queryTime.Unix())
+	}
+
+	// Add timeout if provided
+	if timeout != "" {
+		baseURL = fmt.Sprintf("%s&timeout=%s", baseURL, url.QueryEscape(timeout))
+	}
 
 	// Send the request
-	resp, err := http.Get(apiURL)
+	resp, err := http.Get(baseURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to query Prometheus: %v", err)
 	}
@@ -90,6 +101,38 @@ func (k *Kubernetes) QueryPrometheus(query string) (string, error) {
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Check for no data
+	if data, ok := result["data"].(map[string]interface{}); ok {
+		if resultArr, ok := data["result"].([]interface{}); ok && len(resultArr) == 0 {
+			// Return a specific message for no data rather than an error
+			emptyResult := map[string]interface{}{
+				"status": "success",
+				"data": map[string]interface{}{
+					"resultType": "vector",
+					"result":     []interface{}{},
+				},
+				"info": "No data found for the query. This could be due to an incorrect metric name or no data points available in the specified time range.",
+			}
+
+			resultJSON, err := json.MarshalIndent(emptyResult, "", "  ")
+			if err != nil {
+				return "", fmt.Errorf("failed to marshal empty result: %v", err)
+			}
+			return string(resultJSON), nil
+		}
 	}
 
 	// Convert result to JSON string
@@ -102,7 +145,7 @@ func (k *Kubernetes) QueryPrometheus(query string) (string, error) {
 }
 
 // QueryPrometheusRange sends a range query to Prometheus
-func (k *Kubernetes) QueryPrometheusRange(query string, start, end time.Time, step string) (string, error) {
+func (k *Kubernetes) QueryPrometheusRange(query string, start, end time.Time, step string, timeout string) (string, error) {
 	// Get Prometheus URL using service discovery
 	prometheusURL, err := k.getPrometheusURL()
 	if err != nil {
@@ -114,11 +157,16 @@ func (k *Kubernetes) QueryPrometheusRange(query string, start, end time.Time, st
 	endTS := end.Unix()
 
 	// Build the API query URL for range queries
-	apiURL := fmt.Sprintf("%s/api/v1/query_range?query=%s&start=%d&end=%d&step=%s",
+	baseURL := fmt.Sprintf("%s/api/v1/query_range?query=%s&start=%d&end=%d&step=%s",
 		prometheusURL, url.QueryEscape(query), startTS, endTS, url.QueryEscape(step))
 
+	// Add timeout if provided
+	if timeout != "" {
+		baseURL = fmt.Sprintf("%s&timeout=%s", baseURL, url.QueryEscape(timeout))
+	}
+
 	// Send the request
-	resp, err := http.Get(apiURL)
+	resp, err := http.Get(baseURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to query Prometheus: %v", err)
 	}
@@ -128,6 +176,38 @@ func (k *Kubernetes) QueryPrometheusRange(query string, start, end time.Time, st
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Check for no data
+	if data, ok := result["data"].(map[string]interface{}); ok {
+		if resultArr, ok := data["result"].([]interface{}); ok && len(resultArr) == 0 {
+			// Return a specific message for no data rather than an error
+			emptyResult := map[string]interface{}{
+				"status": "success",
+				"data": map[string]interface{}{
+					"resultType": "matrix",
+					"result":     []interface{}{},
+				},
+				"info": "No data found for the query. This could be due to an incorrect metric name or no data points available in the specified time range.",
+			}
+
+			resultJSON, err := json.MarshalIndent(emptyResult, "", "  ")
+			if err != nil {
+				return "", fmt.Errorf("failed to marshal empty result: %v", err)
+			}
+			return string(resultJSON), nil
+		}
 	}
 
 	// Convert result to JSON string
@@ -259,4 +339,21 @@ func (k *Kubernetes) getMetricStatistics(prometheusURL, metricName string) (map[
 	}
 
 	return stats, nil
+}
+
+// GeneratePromQLQuery generates a PromQL query from a natural language description
+func (k *Kubernetes) GeneratePromQLQuery(description string) (string, error) {
+	// Create a new LLM client
+	llmClient, err := llm.NewDefaultClient()
+	if err != nil {
+		return "", fmt.Errorf("failed to create LLM client: %v", err)
+	}
+
+	// Make the LLM API call with the PromQL prompt and the description
+	response, err := llmClient.Call(llm.PromQLPrompt, description)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate PromQL query: %v", err)
+	}
+
+	return response, nil
 }
