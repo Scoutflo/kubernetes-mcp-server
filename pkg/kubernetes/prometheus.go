@@ -357,3 +357,388 @@ func (k *Kubernetes) GeneratePromQLQuery(description string) (string, error) {
 
 	return response, nil
 }
+
+// QueryPrometheusSeries queries series from Prometheus
+func (k *Kubernetes) QueryPrometheusSeries(match []string, start, end *time.Time, limit int) (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the base URL
+	baseURL := fmt.Sprintf("%s/api/v1/series", prometheusURL)
+
+	// Build query parameters
+	queryParams := url.Values{}
+
+	// Add match parameters (can be multiple)
+	for _, m := range match {
+		queryParams.Add("match[]", m)
+	}
+
+	// Add start time if provided
+	if start != nil && !start.IsZero() {
+		queryParams.Add("start", fmt.Sprintf("%d", start.Unix()))
+	}
+
+	// Add end time if provided
+	if end != nil && !end.IsZero() {
+		queryParams.Add("end", fmt.Sprintf("%d", end.Unix()))
+	}
+
+	// Add limit if provided and valid
+	if limit > 0 {
+		queryParams.Add("limit", fmt.Sprintf("%d", limit))
+	}
+
+	// Combine base URL with query parameters
+	requestURL := fmt.Sprintf("%s?%s", baseURL, queryParams.Encode())
+
+	// Send the request
+	resp, err := http.Get(requestURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to query Prometheus series: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Check for no data
+	if data, ok := result["data"].([]interface{}); ok && len(data) == 0 {
+		// Return a specific message for no data rather than an error
+		emptyResult := map[string]interface{}{
+			"status": "success",
+			"data":   []interface{}{},
+			"info":   "No series found matching the criteria.",
+		}
+
+		resultJSON, err := json.MarshalIndent(emptyResult, "", "  ")
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal empty result: %v", err)
+		}
+		return string(resultJSON), nil
+	}
+
+	// Convert result to JSON string
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}
+
+// GetPrometheusTargets retrieves information about Prometheus targets
+func (k *Kubernetes) GetPrometheusTargets(state, scrapePool string) (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the base URL
+	baseURL := fmt.Sprintf("%s/api/v1/targets", prometheusURL)
+
+	// Build query parameters
+	queryParams := url.Values{}
+
+	// Add state filter if provided
+	if state != "" {
+		// Validate state
+		if state != "active" && state != "dropped" && state != "any" {
+			return "", fmt.Errorf("invalid state parameter: %s (must be one of: active, dropped, any)", state)
+		}
+		queryParams.Add("state", state)
+	}
+
+	// Add scrape pool filter if provided
+	if scrapePool != "" {
+		queryParams.Add("scrape_pool", scrapePool)
+	}
+
+	// Combine base URL with query parameters
+	requestURL := fmt.Sprintf("%s?%s", baseURL, queryParams.Encode())
+
+	// Send the request
+	resp, err := http.Get(requestURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Prometheus targets: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Convert result to JSON string
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}
+
+// GetPrometheusTargetMetadata retrieves metadata about metrics exposed by targets
+func (k *Kubernetes) GetPrometheusTargetMetadata(matchTarget, metric string, limit int) (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the base URL
+	baseURL := fmt.Sprintf("%s/api/v1/targets/metadata", prometheusURL)
+
+	// Build query parameters
+	queryParams := url.Values{}
+
+	// Add match_target parameter if provided
+	if matchTarget != "" {
+		queryParams.Add("match_target", matchTarget)
+	}
+
+	// Add metric parameter if provided
+	if metric != "" {
+		queryParams.Add("metric", metric)
+	}
+
+	// Add limit parameter if provided and valid
+	if limit > 0 {
+		queryParams.Add("limit", fmt.Sprintf("%d", limit))
+	}
+
+	// Combine base URL with query parameters
+	requestURL := fmt.Sprintf("%s?%s", baseURL, queryParams.Encode())
+
+	// Send the request
+	resp, err := http.Get(requestURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Prometheus target metadata: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Check for no data
+	if data, ok := result["data"].([]interface{}); ok && len(data) == 0 {
+		// Return a specific message for no data rather than an error
+		emptyResult := map[string]interface{}{
+			"status": "success",
+			"data":   []interface{}{},
+			"info":   "No metadata found matching the criteria.",
+		}
+
+		resultJSON, err := json.MarshalIndent(emptyResult, "", "  ")
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal empty result: %v", err)
+		}
+		return string(resultJSON), nil
+	}
+
+	// Convert result to JSON string
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}
+
+// GetPrometheusAlerts retrieves all currently firing alerts from Prometheus
+func (k *Kubernetes) GetPrometheusAlerts() (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the API URL for alerts endpoint
+	alertsURL := fmt.Sprintf("%s/api/v1/alerts", prometheusURL)
+
+	// Send the request
+	resp, err := http.Get(alertsURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Prometheus alerts: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Format the result with additional information for no alerts case
+	if data, ok := result["data"].(map[string]interface{}); ok {
+		if alerts, ok := data["alerts"].([]interface{}); ok && len(alerts) == 0 {
+			result["info"] = "No alerts are currently firing."
+		}
+	}
+
+	// Convert result to JSON string
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}
+
+// GetPrometheusRules retrieves information about configured alerting and recording rules
+func (k *Kubernetes) GetPrometheusRules(ruleType, groupLimit string, ruleNames, ruleGroups, files []string, excludeAlerts bool, matchLabels []string) (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the API URL for rules endpoint
+	baseURL := fmt.Sprintf("%s/api/v1/rules", prometheusURL)
+
+	// Build query parameters
+	queryParams := url.Values{}
+
+	// Add rule type filter if provided
+	if ruleType != "" {
+		queryParams.Add("type", ruleType)
+	}
+
+	// Add rule names filter if provided
+	for _, name := range ruleNames {
+		if name != "" {
+			queryParams.Add("rule_name[]", name)
+		}
+	}
+
+	// Add rule group filter if provided
+	for _, group := range ruleGroups {
+		if group != "" {
+			queryParams.Add("rule_group[]", group)
+		}
+	}
+
+	// Add file paths filter if provided
+	for _, file := range files {
+		if file != "" {
+			queryParams.Add("file[]", file)
+		}
+	}
+
+	// Add exclude_alerts flag if true
+	if excludeAlerts {
+		queryParams.Add("exclude_alerts", "true")
+	}
+
+	// Add match label selectors if provided
+	for _, match := range matchLabels {
+		if match != "" {
+			queryParams.Add("match[]", match)
+		}
+	}
+
+	// Add group limit if provided
+	if groupLimit != "" {
+		queryParams.Add("group_limit", groupLimit)
+	}
+
+	// Combine base URL with query parameters if any
+	requestURL := baseURL
+	if len(queryParams) > 0 {
+		requestURL = fmt.Sprintf("%s?%s", baseURL, queryParams.Encode())
+	}
+
+	// Send the request
+	resp, err := http.Get(requestURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Prometheus rules: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Format the result with additional information for no rules case
+	if data, ok := result["data"].(map[string]interface{}); ok {
+		if groups, ok := data["groups"].([]interface{}); ok && len(groups) == 0 {
+			result["info"] = "No rules found matching the criteria."
+		}
+	}
+
+	// Convert result to JSON string
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}

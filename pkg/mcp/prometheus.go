@@ -39,6 +39,65 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			mcp.WithString("metric", mcp.Description("Name of the metric to get information about"), mcp.Required()),
 			mcp.WithBoolean("include_statistics", mcp.Description("Include count, min, max, and avg statistics for this metric. May be slower for metrics with many time series.")),
 		), Handler: s.prometheusMetricInfo},
+		{Tool: mcp.NewTool("prometheus_series_query",
+			mcp.WithDescription("Tool for querying Prometheus series. Finds time series that match certain label selectors in Prometheus. Use this tool to discover which metrics exist and their label combinations. You can specify time ranges to limit the search scope and set a maximum number of results."),
+			mcp.WithArray("match", mcp.Description("Series selector arguments"), mcp.Required()),
+			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format (optional)")),
+			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format (optional)")),
+			mcp.WithNumber("limit", mcp.Description("Maximum number of returned items (optional)")),
+		), Handler: s.prometheusSeries},
+		{Tool: mcp.NewTool("prometheus_targets",
+			mcp.WithDescription("Tool for getting Prometheus target discovery state. Provides information about all Prometheus scrape targets and their current state. Use this tool to monitor which targets are being scraped successfully and which are failing. You can filter targets by state (active/dropped) and scrape pool."),
+			mcp.WithString("state", mcp.Description("Target state filter, must be one of: active, dropped, any (optional)")),
+			mcp.WithString("scrape_pool", mcp.Description("Scrape pool name (optional)")),
+		), Handler: s.prometheusTargets},
+		{Tool: mcp.NewTool("prometheus_targets_metadata",
+			mcp.WithDescription("Tool for getting Prometheus target metadata. Retrieves metadata about metrics exposed by specific Prometheus targets. Use this tool to understand metric types, help texts, and units. You can filter by target labels and specific metric names."),
+			mcp.WithString("match_target", mcp.Description("Target label selectors (optional)")),
+			mcp.WithString("metric", mcp.Description("Metric name (optional)")),
+			mcp.WithNumber("limit", mcp.Description("Maximum number of targets (optional)")),
+		), Handler: s.prometheusTargetMetadata},
+		{Tool: mcp.NewTool("prometheus_get_alerts",
+			mcp.WithDescription("Tool for getting active Prometheus alerts. Retrieves all currently firing alerts in the Prometheus server. Use this tool to monitor the current alert state and identify ongoing issues. Returns details about alert names, labels, and when they started firing."),
+		), Handler: s.prometheusGetAlerts},
+		{Tool: mcp.NewTool("prometheus_get_rules",
+			mcp.WithDescription("Tool for getting Prometheus alerting and recording rules. Retrieves information about configured alerting and recording rules in Prometheus. Use this tool to understand what alerts are defined and what metrics are being pre-computed. You can filter rules by type, name, group, and other criteria."),
+			mcp.WithString("type", mcp.Description("Rule type filter")),
+			mcp.WithArray("rule_name", mcp.Description("Rule names filter")),
+			mcp.WithArray("rule_group", mcp.Description("Rule group names filter")),
+			mcp.WithArray("file", mcp.Description("File paths filter")),
+			mcp.WithBoolean("exclude_alerts", mcp.Description("Exclude alerts flag")),
+			mcp.WithArray("match", mcp.Description("Label selectors")),
+			mcp.WithNumber("group_limit", mcp.Description("Group limit")),
+		), Handler: s.prometheusGetRules},
+		{Tool: mcp.NewTool("prometheus_create_alert",
+			mcp.WithDescription("Create a new Prometheus alert rule. This tool allows you to define alerting rules that will trigger notifications when specific conditions are met. You can customize the alert with annotations, labels, and evaluation intervals."),
+			mcp.WithString("alertname", mcp.Description("Name of the alert to create"), mcp.Required()),
+			mcp.WithString("expression", mcp.Description("PromQL expression that defines the alert condition"), mcp.Required()),
+			mcp.WithString("applabel", mcp.Description("Application label used to identify the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
+			mcp.WithString("namespace", mcp.Description("Kubernetes namespace to create the alert in"), mcp.Required()),
+			mcp.WithString("interval", mcp.Description("Evaluation interval for the alert group (e.g., '30s', '1m', '5m')")),
+			mcp.WithString("for", mcp.Description("Duration for which the condition must be true before firing (e.g., '5m')")),
+			mcp.WithObject("annotations", mcp.Description("Map of annotations to add to the alert (description, summary, etc.)")),
+			mcp.WithObject("alertlabels", mcp.Description("Map of labels to attach to the alert")),
+		), Handler: s.prometheusCreateAlert},
+		{Tool: mcp.NewTool("prometheus_update_alert",
+			mcp.WithDescription("Update an existing Prometheus alert rule. This tool allows you to modify the properties of an existing alert without having to delete and recreate it. You can update the condition, annotations, labels, and other attributes."),
+			mcp.WithString("alertname", mcp.Description("Name of the alert to update"), mcp.Required()),
+			mcp.WithString("applabel", mcp.Description("Application label that identifies the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
+			mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert"), mcp.Required()),
+			mcp.WithString("expression", mcp.Description("New PromQL expression for the alert condition")),
+			mcp.WithString("interval", mcp.Description("New evaluation interval for the alert group (e.g., '30s', '1m', '5m')")),
+			mcp.WithString("for", mcp.Description("New duration for which the condition must be true before firing (e.g., '5m')")),
+			mcp.WithObject("annotations", mcp.Description("New or updated annotations for the alert")),
+			mcp.WithObject("alertlabels", mcp.Description("New or updated labels for the alert")),
+		), Handler: s.prometheusUpdateAlert},
+		{Tool: mcp.NewTool("prometheus_delete_alert",
+			mcp.WithDescription("Delete a Prometheus alert rule. This tool removes an existing alert rule from the system. You can either delete a specific alert within a rule group or the entire PrometheusRule resource."),
+			mcp.WithString("applabel", mcp.Description("Application label that identifies the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
+			mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert"), mcp.Required()),
+			mcp.WithString("alertname", mcp.Description("Name of the specific alert to delete within the rule group (optional)")),
+		), Handler: s.prometheusDeleteAlert},
 	}
 }
 
@@ -195,4 +254,378 @@ func parseTime(timeStr string, defaultTime time.Time) time.Time {
 
 	// Return default time if parsing fails
 	return defaultTime
+}
+
+// prometheusSeries handles the prometheus_series_query tool request
+func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract the match parameter (required)
+	matchArg := ctr.Params.Arguments["match"]
+	if matchArg == nil {
+		return NewTextResult("", errors.New("missing required parameter: match")), nil
+	}
+
+	// Convert the match parameter to a string slice
+	matchSlice, ok := matchArg.([]interface{})
+	if !ok {
+		return NewTextResult("", errors.New("match parameter must be a string array")), nil
+	}
+
+	// Convert the match slice to a string slice
+	match := make([]string, len(matchSlice))
+	for i, m := range matchSlice {
+		match[i], ok = m.(string)
+		if !ok {
+			return NewTextResult("", errors.New("match parameter must contain only strings")), nil
+		}
+	}
+
+	// Extract optional start parameter
+	var startTime *time.Time
+	if startArg := ctr.Params.Arguments["start"]; startArg != nil {
+		parsed := parseTime(startArg.(string), time.Time{})
+		if !parsed.IsZero() {
+			startTime = &parsed
+		}
+	}
+
+	// Extract optional end parameter
+	var endTime *time.Time
+	if endArg := ctr.Params.Arguments["end"]; endArg != nil {
+		parsed := parseTime(endArg.(string), time.Time{})
+		if !parsed.IsZero() {
+			endTime = &parsed
+		}
+	}
+
+	// Extract optional limit parameter
+	limit := 1000 // Default limit
+	if limitArg := ctr.Params.Arguments["limit"]; limitArg != nil {
+		if limitVal, ok := limitArg.(float64); ok {
+			limit = int(limitVal)
+		}
+	}
+
+	// Call the Kubernetes function
+	ret, err := s.k.QueryPrometheusSeries(match, startTime, endTime, limit)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to query Prometheus series: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
+}
+
+// prometheusTargets handles the prometheus_targets tool request
+func (s *Server) prometheusTargets(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract optional state parameter
+	state := ""
+	if stateArg := ctr.Params.Arguments["state"]; stateArg != nil {
+		state = stateArg.(string)
+	}
+
+	// Extract optional scrape_pool parameter
+	scrapePool := ""
+	if scrapePoolArg := ctr.Params.Arguments["scrape_pool"]; scrapePoolArg != nil {
+		scrapePool = scrapePoolArg.(string)
+	}
+
+	// Call the Kubernetes function
+	ret, err := s.k.GetPrometheusTargets(state, scrapePool)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to get Prometheus targets: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
+}
+
+// prometheusTargetMetadata handles the prometheus_targets_metadata tool request
+func (s *Server) prometheusTargetMetadata(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract optional match_target parameter
+	matchTarget := ""
+	if matchTargetArg := ctr.Params.Arguments["match_target"]; matchTargetArg != nil {
+		matchTarget = matchTargetArg.(string)
+	}
+
+	// Extract optional metric parameter
+	metric := ""
+	if metricArg := ctr.Params.Arguments["metric"]; metricArg != nil {
+		metric = metricArg.(string)
+	}
+
+	// Extract optional limit parameter
+	limit := 0 // Default is no limit
+	if limitArg := ctr.Params.Arguments["limit"]; limitArg != nil {
+		if limitVal, ok := limitArg.(float64); ok {
+			limit = int(limitVal)
+		}
+	}
+
+	// Call the Kubernetes function
+	ret, err := s.k.GetPrometheusTargetMetadata(matchTarget, metric, limit)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to get Prometheus target metadata: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
+}
+
+// Handler for creating Prometheus alerts
+func (s *Server) prometheusCreateAlert(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract and validate required parameters
+	alertName := ctr.Params.Arguments["alertname"]
+	if alertName == nil {
+		return NewTextResult("", errors.New("missing required parameter: alertname")), nil
+	}
+
+	expression := ctr.Params.Arguments["expression"]
+	if expression == nil {
+		return NewTextResult("", errors.New("missing required parameter: expression")), nil
+	}
+
+	appLabel := ctr.Params.Arguments["applabel"]
+	if appLabel == nil {
+		return NewTextResult("", errors.New("missing required parameter: applabel")), nil
+	}
+
+	namespace := ctr.Params.Arguments["namespace"]
+	if namespace == nil {
+		return NewTextResult("", errors.New("missing required parameter: namespace")), nil
+	}
+
+	// Extract optional parameters with defaults
+	var interval string
+	if intervalArg := ctr.Params.Arguments["interval"]; intervalArg != nil {
+		interval = intervalArg.(string)
+	} else {
+		interval = "1m" // Default to 1 minute
+	}
+
+	var forDuration string
+	if forArg := ctr.Params.Arguments["for"]; forArg != nil {
+		forDuration = forArg.(string)
+	} else {
+		forDuration = "5m" // Default to 5 minutes
+	}
+
+	// Convert annotations from interface{} to map[string]string
+	var annotations map[string]string
+	if annotationsRaw, exists := ctr.Params.Arguments["annotations"]; exists && annotationsRaw != nil {
+		annotations = make(map[string]string)
+		if annotationsMap, ok := annotationsRaw.(map[string]interface{}); ok {
+			for k, v := range annotationsMap {
+				if str, ok := v.(string); ok {
+					annotations[k] = str
+				}
+			}
+		}
+	}
+
+	// Convert alertlabels from interface{} to map[string]string
+	var alertLabels map[string]string
+	if alertLabelsRaw, exists := ctr.Params.Arguments["alertlabels"]; exists && alertLabelsRaw != nil {
+		alertLabels = make(map[string]string)
+		if alertLabelsMap, ok := alertLabelsRaw.(map[string]interface{}); ok {
+			for k, v := range alertLabelsMap {
+				if str, ok := v.(string); ok {
+					alertLabels[k] = str
+				}
+			}
+		}
+	}
+
+	// Call the Kubernetes function
+	result, err := s.k.CreatePrometheusAlert(alertName.(string), expression.(string), appLabel.(string), namespace.(string), interval, forDuration, annotations, alertLabels)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to create Prometheus alert: %v", err)), nil
+	}
+
+	return NewTextResult(result, nil), nil
+}
+
+// Handler for updating Prometheus alerts
+func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract and validate required parameters
+	alertName := ctr.Params.Arguments["alertname"]
+	if alertName == nil {
+		return NewTextResult("", errors.New("missing required parameter: alertname")), nil
+	}
+
+	appLabel := ctr.Params.Arguments["applabel"]
+	if appLabel == nil {
+		return NewTextResult("", errors.New("missing required parameter: applabel")), nil
+	}
+
+	namespace := ctr.Params.Arguments["namespace"]
+	if namespace == nil {
+		return NewTextResult("", errors.New("missing required parameter: namespace")), nil
+	}
+
+	// Extract optional parameters
+	var expression string
+	if expressionArg := ctr.Params.Arguments["expression"]; expressionArg != nil {
+		expression = expressionArg.(string)
+	}
+
+	var interval string
+	if intervalArg := ctr.Params.Arguments["interval"]; intervalArg != nil {
+		interval = intervalArg.(string)
+	}
+
+	var forDuration string
+	if forArg := ctr.Params.Arguments["for"]; forArg != nil {
+		forDuration = forArg.(string)
+	}
+
+	// Convert annotations from interface{} to map[string]string
+	var annotations map[string]string
+	if annotationsRaw, exists := ctr.Params.Arguments["annotations"]; exists && annotationsRaw != nil {
+		annotations = make(map[string]string)
+		if annotationsMap, ok := annotationsRaw.(map[string]interface{}); ok {
+			for k, v := range annotationsMap {
+				if str, ok := v.(string); ok {
+					annotations[k] = str
+				}
+			}
+		}
+	}
+
+	// Convert alertlabels from interface{} to map[string]string
+	var alertLabels map[string]string
+	if alertLabelsRaw, exists := ctr.Params.Arguments["alertlabels"]; exists && alertLabelsRaw != nil {
+		alertLabels = make(map[string]string)
+		if alertLabelsMap, ok := alertLabelsRaw.(map[string]interface{}); ok {
+			for k, v := range alertLabelsMap {
+				if str, ok := v.(string); ok {
+					alertLabels[k] = str
+				}
+			}
+		}
+	}
+
+	// Call the Kubernetes function
+	result, err := s.k.UpdatePrometheusAlert(alertName.(string), expression, appLabel.(string), namespace.(string), interval, forDuration, annotations, alertLabels)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to update Prometheus alert: %v", err)), nil
+	}
+
+	return NewTextResult(result, nil), nil
+}
+
+// Handler for deleting Prometheus alerts
+func (s *Server) prometheusDeleteAlert(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract and validate required parameters
+	appLabel := ctr.Params.Arguments["applabel"]
+	if appLabel == nil {
+		return NewTextResult("", errors.New("missing required parameter: applabel")), nil
+	}
+
+	namespace := ctr.Params.Arguments["namespace"]
+	if namespace == nil {
+		return NewTextResult("", errors.New("missing required parameter: namespace")), nil
+	}
+
+	// Extract optional alertname parameter
+	var alertName string
+	if alertNameArg := ctr.Params.Arguments["alertname"]; alertNameArg != nil {
+		alertName = alertNameArg.(string)
+	}
+
+	// Call the Kubernetes function
+	result, err := s.k.DeletePrometheusAlert(appLabel.(string), namespace.(string), alertName)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to delete Prometheus alert: %v", err)), nil
+	}
+
+	return NewTextResult(result, nil), nil
+}
+
+// prometheusGetAlerts handles the prometheus_get_alerts tool request
+func (s *Server) prometheusGetAlerts(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Call the Kubernetes function
+	ret, err := s.k.GetPrometheusAlerts()
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to get Prometheus alerts: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
+}
+
+// prometheusGetRules handles the prometheus_get_rules tool request
+func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract optional parameters
+	ruleType := ""
+	if typeArg := ctr.Params.Arguments["type"]; typeArg != nil {
+		ruleType = typeArg.(string)
+	}
+
+	// Extract rule_name parameter (string array)
+	var ruleNames []string
+	if ruleNamesArg := ctr.Params.Arguments["rule_name"]; ruleNamesArg != nil {
+		if ruleNamesArr, ok := ruleNamesArg.([]interface{}); ok {
+			for _, name := range ruleNamesArr {
+				if nameStr, ok := name.(string); ok {
+					ruleNames = append(ruleNames, nameStr)
+				}
+			}
+		}
+	}
+
+	// Extract rule_group parameter (string array)
+	var ruleGroups []string
+	if ruleGroupsArg := ctr.Params.Arguments["rule_group"]; ruleGroupsArg != nil {
+		if ruleGroupsArr, ok := ruleGroupsArg.([]interface{}); ok {
+			for _, group := range ruleGroupsArr {
+				if groupStr, ok := group.(string); ok {
+					ruleGroups = append(ruleGroups, groupStr)
+				}
+			}
+		}
+	}
+
+	// Extract file parameter (string array)
+	var files []string
+	if filesArg := ctr.Params.Arguments["file"]; filesArg != nil {
+		if filesArr, ok := filesArg.([]interface{}); ok {
+			for _, file := range filesArr {
+				if fileStr, ok := file.(string); ok {
+					files = append(files, fileStr)
+				}
+			}
+		}
+	}
+
+	// Extract exclude_alerts parameter (boolean)
+	excludeAlerts := false
+	if excludeAlertsArg := ctr.Params.Arguments["exclude_alerts"]; excludeAlertsArg != nil {
+		if excludeAlertsBool, ok := excludeAlertsArg.(bool); ok {
+			excludeAlerts = excludeAlertsBool
+		}
+	}
+
+	// Extract match parameter (string array)
+	var matchLabels []string
+	if matchArg := ctr.Params.Arguments["match"]; matchArg != nil {
+		if matchArr, ok := matchArg.([]interface{}); ok {
+			for _, match := range matchArr {
+				if matchStr, ok := match.(string); ok {
+					matchLabels = append(matchLabels, matchStr)
+				}
+			}
+		}
+	}
+
+	// Extract group_limit parameter (string)
+	groupLimit := ""
+	if groupLimitArg := ctr.Params.Arguments["group_limit"]; groupLimitArg != nil {
+		if limitVal, ok := groupLimitArg.(float64); ok {
+			groupLimit = fmt.Sprintf("%d", int(limitVal))
+		}
+	}
+
+	// Call the Kubernetes function
+	ret, err := s.k.GetPrometheusRules(ruleType, groupLimit, ruleNames, ruleGroups, files, excludeAlerts, matchLabels)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to get Prometheus rules: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
 }
