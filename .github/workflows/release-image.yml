@@ -53,31 +53,57 @@ jobs:
       - name: Get latest Docker tag
         id: get_latest_tag
         run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-          tags=$(docker image ls --format "{{.Tag}}" ${{ secrets.DOCKERHUB_USERNAME }}/kubernetes_mcp_server | grep -E '\s*(prod-v[0-9]+\.[0-9]+|pre-prod-v[0-9]+\.[0-9]+)\s*' | sort -V)
-          echo "$tags"
-          if [[ -z "$tags" ]]; then
-            echo "No tags found. Fallback to version 1.0."
-            new_version="1.0"
-          else
-            latest_tag=$(echo "$tags" | tail -n 1)
-            echo "Latest Docker tag: $latest_tag"
-            echo "::set-output name=latest_tag::$latest_tag"
-
+          docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" -p "${{ secrets.DOCKERHUB_TOKEN }}"
+          
+          # Use DockerHub API to get existing tags instead of local images
+          REPO="${{ secrets.DOCKERHUB_USERNAME }}/kubernetes_mcp_server"
+          TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${REPO}/tags?page_size=100" | jq -r '.results[].name' | grep -E '^(prod-v[0-9]+\.[0-9]+|pre-prod-v[0-9]+\.[0-9]+)$' || echo "")
+          
+          echo "Available tags: $TAGS"
+          
+          # Set default versions
+          default_prod_version="prod-v1.0"
+          default_preprod_version="pre-prod-v1.0"
+          
+          if [[ -z "$TAGS" ]]; then
+            echo "No tags found. Using default version."
+            
             if [[ "${{ github.ref }}" == "refs/heads/release/dev" ]]; then
-              if [[ $latest_tag =~ pre-prod-v([0-9]+)\.([0-9]+) ]]; then
-                major="${BASH_REMATCH[1]}"
-                minor="${BASH_REMATCH[2]}"
-                new_version="pre-prod-v$major.$((minor + 1))"
+              new_version="$default_preprod_version"
+            elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+              new_version="$default_prod_version"
+            fi
+          else
+            # Find the latest tag based on branch
+            if [[ "${{ github.ref }}" == "refs/heads/release/dev" ]]; then
+              latest_tag=$(echo "$TAGS" | grep "^pre-prod-v" | sort -V | tail -n 1)
+              if [[ -z "$latest_tag" ]]; then
+                new_version="$default_preprod_version"
+              else
+                if [[ $latest_tag =~ pre-prod-v([0-9]+)\.([0-9]+) ]]; then
+                  major="${BASH_REMATCH[1]}"
+                  minor="${BASH_REMATCH[2]}"
+                  new_version="pre-prod-v$major.$((minor + 1))"
+                else
+                  new_version="$default_preprod_version"
+                fi
               fi
             elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-              if [[ $latest_tag =~ prod-v([0-9]+)\.([0-9]+) ]]; then
-                major="${BASH_REMATCH[1]}"
-                minor="${BASH_REMATCH[2]}"
-                new_version="prod-v$major.$((minor + 1))"
+              latest_tag=$(echo "$TAGS" | grep "^prod-v" | sort -V | tail -n 1)
+              if [[ -z "$latest_tag" ]]; then
+                new_version="$default_prod_version"
+              else
+                if [[ $latest_tag =~ prod-v([0-9]+)\.([0-9]+) ]]; then
+                  major="${BASH_REMATCH[1]}"
+                  minor="${BASH_REMATCH[2]}"
+                  new_version="prod-v$major.$((minor + 1))"
+                else
+                  new_version="$default_prod_version"
+                fi
               fi
             fi
           fi
+          
           echo "New version: $new_version"
           echo "::set-output name=new_version::$new_version"
 
