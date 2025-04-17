@@ -582,7 +582,7 @@ func (s *Server) argocdDeleteApplication(ctx context.Context, ctr mcp.CallToolRe
 	}
 
 	result := fmt.Sprintf("Successfully deleted application '%s'%s%s", name, cascadeMsg, propagationMsg)
-	log.Infof(result)
+	log.Info(result)
 
 	return NewTextResult(result, nil), nil
 }
