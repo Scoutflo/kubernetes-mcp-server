@@ -98,6 +98,32 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert"), mcp.Required()),
 			mcp.WithString("alertname", mcp.Description("Name of the specific alert to delete within the rule group (optional)")),
 		), Handler: s.prometheusDeleteAlert},
+		{Tool: mcp.NewTool("prometheus_clean_tombstones",
+			mcp.WithDescription("Tool for cleaning Prometheus tombstones. Removes tombstone files created during Prometheus data deletion operations. Use this tool to maintain database cleanliness and recover storage space. Tombstones are markers for deleted data and can be safely removed after their retention period."),
+		), Handler: s.prometheusCleanTombstones},
+		{Tool: mcp.NewTool("prometheus_create_snapshot",
+			mcp.WithDescription("Tool for creating Prometheus snapshots. Creates a snapshot of the current Prometheus TSDB data. Use this tool for backup purposes or creating point-in-time copies of the data. You can optionally skip snapshotting the head block (latest, incomplete data)."),
+			mcp.WithBoolean("skip_head", mcp.Description("Skip head block flag")),
+		), Handler: s.prometheusCreateSnapshot},
+		{Tool: mcp.NewTool("prometheus_delete_series",
+			mcp.WithDescription("Tool for deleting Prometheus series data. Deletes time series data matching specific criteria in Prometheus. Use this tool carefully to remove obsolete data or free up storage space. Deleted data cannot be recovered. You can specify time ranges and series selectors."),
+			mcp.WithArray("match", mcp.Description("Series selectors"), mcp.Required()),
+			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format (optional)")),
+			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format (optional)")),
+		), Handler: s.prometheusDeleteSeries},
+		{Tool: mcp.NewTool("prometheus_alert_manager",
+			mcp.WithDescription("Provides information about the Alertmanager instances known to Prometheus. Use this tool to verify the connection status between Prometheus and its Alertmanagers. Shows both active and dropped Alertmanager instances."),
+		), Handler: s.prometheusAlertManagers},
+		{Tool: mcp.NewTool("prometheus_runtimeinfo",
+			mcp.WithDescription("Tool for getting Prometheus runtime information. Provides detailed information about the Prometheus server's runtime state. Use this tool to monitor server health and performance through details about garbage collection, memory usage, and other runtime metrics."),
+		), Handler: s.prometheusRuntimeInfo},
+		{Tool: mcp.NewTool("prometheus_TSDB_status",
+			mcp.WithDescription("Provides information about the time series database (TSDB) status in Prometheus. Use this tool to monitor database health through details about data storage, head blocks, WAL status, and other TSDB metrics."),
+			mcp.WithNumber("limit", mcp.Description("Number of items limit")),
+		), Handler: s.prometheusTSDBStatus},
+		{Tool: mcp.NewTool("prometheus_WALReplay",
+			mcp.WithDescription("Tool for getting Prometheus WAL replay status. Retrieves the status of Write-Ahead Log (WAL) replay operations in Prometheus. Use this tool to monitor the progress of WAL replay during server startup or recovery. Helps track data durability and recovery progress."),
+		), Handler: s.prometheusWALReplay},
 	}
 }
 
@@ -625,6 +651,138 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 	ret, err := s.k.GetPrometheusRules(ruleType, groupLimit, ruleNames, ruleGroups, files, excludeAlerts, matchLabels)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to get Prometheus rules: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
+}
+
+// prometheusCleanTombstones handles the prometheus_clean_tombstones tool request
+func (s *Server) prometheusCleanTombstones(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Call the Kubernetes function
+	ret, err := s.k.CleanPrometheusTombstones()
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to clean Prometheus tombstones: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
+}
+
+// prometheusCreateSnapshot handles the prometheus_create_snapshot tool request
+func (s *Server) prometheusCreateSnapshot(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract optional skip_head parameter
+	skipHead := false
+	if skipHeadArg := ctr.Params.Arguments["skip_head"]; skipHeadArg != nil {
+		if skipHeadBool, ok := skipHeadArg.(bool); ok {
+			skipHead = skipHeadBool
+		}
+	}
+
+	// Call the Kubernetes function
+	ret, err := s.k.CreatePrometheusSnapshot(skipHead)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to create Prometheus snapshot: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
+}
+
+// prometheusDeleteSeries handles the prometheus_delete_series tool request
+func (s *Server) prometheusDeleteSeries(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract required match parameter
+	matchArg := ctr.Params.Arguments["match"]
+	if matchArg == nil {
+		return NewTextResult("", errors.New("missing required parameter: match")), nil
+	}
+
+	// Convert the match parameter to a string slice
+	matchSlice, ok := matchArg.([]interface{})
+	if !ok {
+		return NewTextResult("", errors.New("match parameter must be a string array")), nil
+	}
+
+	// Convert the match slice to a string slice
+	match := make([]string, len(matchSlice))
+	for i, m := range matchSlice {
+		match[i], ok = m.(string)
+		if !ok {
+			return NewTextResult("", errors.New("match parameter must contain only strings")), nil
+		}
+	}
+
+	// Extract optional start parameter
+	var startTime *time.Time
+	if startArg := ctr.Params.Arguments["start"]; startArg != nil {
+		parsed := parseTime(startArg.(string), time.Time{})
+		if !parsed.IsZero() {
+			startTime = &parsed
+		}
+	}
+
+	// Extract optional end parameter
+	var endTime *time.Time
+	if endArg := ctr.Params.Arguments["end"]; endArg != nil {
+		parsed := parseTime(endArg.(string), time.Time{})
+		if !parsed.IsZero() {
+			endTime = &parsed
+		}
+	}
+
+	// Call the Kubernetes function
+	ret, err := s.k.DeletePrometheusSeries(match, startTime, endTime)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to delete Prometheus series: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
+}
+
+// prometheusAlertManagers handles the prometheus_alert_manager tool request
+func (s *Server) prometheusAlertManagers(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Call the Kubernetes function
+	ret, err := s.k.GetPrometheusAlertManagers()
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to get Prometheus alertmanagers: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
+}
+
+// prometheusRuntimeInfo handles the prometheus_runtimeinfo tool request
+func (s *Server) prometheusRuntimeInfo(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Call the Kubernetes function
+	ret, err := s.k.GetPrometheusRuntimeInfo()
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to get Prometheus runtime info: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
+}
+
+// prometheusTSDBStatus handles the prometheus_TSDB_status tool request
+func (s *Server) prometheusTSDBStatus(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract optional limit parameter
+	limit := 0 // Default is no limit
+	if limitArg := ctr.Params.Arguments["limit"]; limitArg != nil {
+		if limitVal, ok := limitArg.(float64); ok {
+			limit = int(limitVal)
+		}
+	}
+
+	// Call the Kubernetes function
+	ret, err := s.k.GetPrometheusTSDBStatus(limit)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to get Prometheus TSDB status: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
+}
+
+// prometheusWALReplay handles the prometheus_WALReplay tool request
+func (s *Server) prometheusWALReplay(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Call the Kubernetes function
+	ret, err := s.k.GetPrometheusWALReplayStatus()
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to get Prometheus WAL replay status: %v", err)), nil
 	}
 
 	return NewTextResult(ret, nil), nil

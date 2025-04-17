@@ -742,3 +742,405 @@ func (k *Kubernetes) GetPrometheusRules(ruleType, groupLimit string, ruleNames, 
 
 	return string(resultJSON), nil
 }
+
+// CleanPrometheusTombstones removes tombstone files created during Prometheus data deletion operations
+func (k *Kubernetes) CleanPrometheusTombstones() (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the API URL for admin endpoint to clean tombstones
+	adminURL := fmt.Sprintf("%s/api/v1/admin/tsdb/clean_tombstones", prometheusURL)
+
+	// Create a POST request
+	req, err := http.NewRequest("POST", adminURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request to clean tombstones: %v", err)
+	}
+
+	// Send the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to clean Prometheus tombstones: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Convert result to JSON string with success message
+	result["message"] = "Prometheus tombstones have been successfully cleaned."
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}
+
+// CreatePrometheusSnapshot creates a snapshot of the current Prometheus TSDB data
+func (k *Kubernetes) CreatePrometheusSnapshot(skipHead bool) (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the API URL for admin endpoint to create snapshot
+	adminURL := fmt.Sprintf("%s/api/v1/admin/tsdb/snapshot", prometheusURL)
+
+	// Add skip_head parameter if true
+	if skipHead {
+		adminURL = fmt.Sprintf("%s?skip_head=true", adminURL)
+	}
+
+	// Create a POST request
+	req, err := http.NewRequest("POST", adminURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request for snapshot: %v", err)
+	}
+
+	// Send the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to create Prometheus snapshot: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Convert result to JSON string with additional information
+	if data, ok := result["data"].(map[string]interface{}); ok {
+		if name, ok := data["name"].(string); ok {
+			result["message"] = fmt.Sprintf("Prometheus snapshot '%s' created successfully.", name)
+		}
+	}
+
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}
+
+// DeletePrometheusSeries deletes time series data matching specific criteria
+func (k *Kubernetes) DeletePrometheusSeries(match []string, start, end *time.Time) (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the API URL for admin endpoint to delete series
+	baseURL := fmt.Sprintf("%s/api/v1/admin/tsdb/delete_series", prometheusURL)
+
+	// Build query parameters
+	queryParams := url.Values{}
+
+	// Add match parameters (required)
+	for _, m := range match {
+		queryParams.Add("match[]", m)
+	}
+
+	// Add start time if provided
+	if start != nil && !start.IsZero() {
+		queryParams.Add("start", fmt.Sprintf("%d", start.Unix()))
+	}
+
+	// Add end time if provided
+	if end != nil && !end.IsZero() {
+		queryParams.Add("end", fmt.Sprintf("%d", end.Unix()))
+	}
+
+	// Combine base URL with query parameters
+	requestURL := fmt.Sprintf("%s?%s", baseURL, queryParams.Encode())
+
+	// Create a POST request
+	req, err := http.NewRequest("POST", requestURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request to delete series: %v", err)
+	}
+
+	// Send the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to delete Prometheus series: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Add success message to the result
+	matchStr := strings.Join(match, ", ")
+	timeInfo := ""
+	if start != nil && !start.IsZero() {
+		if end != nil && !end.IsZero() {
+			timeInfo = fmt.Sprintf(" between %s and %s", start.String(), end.String())
+		} else {
+			timeInfo = fmt.Sprintf(" from %s onwards", start.String())
+		}
+	} else if end != nil && !end.IsZero() {
+		timeInfo = fmt.Sprintf(" up to %s", end.String())
+	}
+
+	result["message"] = fmt.Sprintf("Successfully deleted time series matching: %s%s", matchStr, timeInfo)
+
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}
+
+// GetPrometheusAlertManagers retrieves information about Alertmanager instances known to Prometheus
+func (k *Kubernetes) GetPrometheusAlertManagers() (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the API URL for alertmanagers endpoint
+	alertManagersURL := fmt.Sprintf("%s/api/v1/alertmanagers", prometheusURL)
+
+	// Send the request
+	resp, err := http.Get(alertManagersURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Prometheus alertmanagers: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Add a note if no alertmanagers are found
+	if data, ok := result["data"].(map[string]interface{}); ok {
+		activeCount := 0
+		droppedCount := 0
+
+		if active, ok := data["activeAlertmanagers"].([]interface{}); ok {
+			activeCount = len(active)
+		}
+
+		if dropped, ok := data["droppedAlertmanagers"].([]interface{}); ok {
+			droppedCount = len(dropped)
+		}
+
+		if activeCount == 0 && droppedCount == 0 {
+			result["info"] = "No Alertmanager instances are currently connected to Prometheus."
+		} else {
+			result["info"] = fmt.Sprintf("Found %d active and %d dropped Alertmanager instances.",
+				activeCount, droppedCount)
+		}
+	}
+
+	// Convert result to JSON string
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}
+
+// GetPrometheusRuntimeInfo retrieves detailed information about the Prometheus server's runtime state
+func (k *Kubernetes) GetPrometheusRuntimeInfo() (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the API URL for runtime info endpoint
+	runtimeInfoURL := fmt.Sprintf("%s/api/v1/status/runtimeinfo", prometheusURL)
+
+	// Send the request
+	resp, err := http.Get(runtimeInfoURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Prometheus runtime info: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Convert result to JSON string
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}
+
+// GetPrometheusTSDBStatus retrieves information about the time series database (TSDB) status in Prometheus
+func (k *Kubernetes) GetPrometheusTSDBStatus(limit int) (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the API URL for TSDB status endpoint
+	tsdbStatusURL := fmt.Sprintf("%s/api/v1/status/tsdb", prometheusURL)
+
+	// Add limit parameter if provided
+	if limit > 0 {
+		tsdbStatusURL = fmt.Sprintf("%s?limit=%d", tsdbStatusURL, limit)
+	}
+
+	// Send the request
+	resp, err := http.Get(tsdbStatusURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Prometheus TSDB status: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Convert result to JSON string
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}
+
+// GetPrometheusWALReplayStatus retrieves the status of Write-Ahead Log (WAL) replay operations in Prometheus
+func (k *Kubernetes) GetPrometheusWALReplayStatus() (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the API URL for WAL replay status endpoint
+	walReplayURL := fmt.Sprintf("%s/api/v1/status/walreplay", prometheusURL)
+
+	// Send the request
+	resp, err := http.Get(walReplayURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Prometheus WAL replay status: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Convert result to JSON string
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}
