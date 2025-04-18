@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "k8s-mcp-server.fullname" . }}-np
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "k8s-mcp-server.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      k8s-app: metrics-server
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespace.name }}
+          podSelector:
+            matchLabels:
+              {{- include "k8s-mcp-server.selectorLabels" . | nindent 14 }}
+  policyTypes:
+    - Ingress

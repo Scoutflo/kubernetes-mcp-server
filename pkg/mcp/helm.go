@@ -119,9 +119,21 @@ func (s *Server) initHelm() []server.ServerTool {
 			),
 			mcp.WithArray("set",
 				mcp.Description("A list of key-value pairs to set on the release (e.g., [\"key1=val1\", \"key2=val2\"])"),
+				func(schema map[string]interface{}) {
+					schema["type"] = "array"
+					schema["items"] = map[string]interface{}{
+						"type": "string",
+					}
+				},
 			),
 			mcp.WithArray("values",
 				mcp.Description("A list of files to use as the value source (e.g., [\"myvalues.yaml\", \"override.yaml\"])"),
+				func(schema map[string]interface{}) {
+					schema["type"] = "array"
+					schema["items"] = map[string]interface{}{
+						"type": "string",
+					}
+				},
 			),
 			mcp.WithString("repo_url",
 				mcp.Description("Chart repository url where to locate the requested chart"),
@@ -175,9 +187,21 @@ func (s *Server) initHelm() []server.ServerTool {
 			),
 			mcp.WithArray("set",
 				mcp.Description("A list of key-value pairs to set on the release (e.g., [\"key1=val1\", \"key2=val2\"])"),
+				func(schema map[string]interface{}) {
+					schema["type"] = "array"
+					schema["items"] = map[string]interface{}{
+						"type": "string",
+					}
+				},
 			),
 			mcp.WithArray("values",
 				mcp.Description("A list of files to use as the value source (e.g., [\"myvalues.yaml\", \"override.yaml\"])"),
+				func(schema map[string]interface{}) {
+					schema["type"] = "array"
+					schema["items"] = map[string]interface{}{
+						"type": "string",
+					}
+				},
 			),
 			mcp.WithString("repo_url",
 				mcp.Description("Chart repository url where to locate the requested chart"),

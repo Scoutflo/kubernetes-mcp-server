@@ -1,0 +1,56 @@
+# Default values for k8s-mcp-server
+nameOverride: ""
+fullnameOverride: ""
+
+# Namespace configuration
+namespace:
+  name: "k8s-mcp-server"
+  create: false 
+
+# Ingress configuration
+ingress:
+  className: nginx
+  hostname: "k8s-mcp-server.scoutflo.agency"
+  tls:
+    enabled: true
+    wildcardHostname: "*.scoutflo.agency"
+    secretName: "scoutflo-agency-wildcard-tls"  
+
+# Image configuration
+image:
+  repository: scoutflo/kubernetes_mcp_server
+  tag: pre-prod-18
+  pullPolicy: IfNotPresent
+  dockerConfigSecret: "eyJhdXRocyI6eyJodHRwczovL2luZGV4LmRvY2tlci5pby92MS8iOnsidXNlcm5hbWUiOiJzY291dGZsbyIsInBhc3N3b3JkIjoiZGNrcl9wYXRfNFlNLUZuZWNYTklnUS1ZVVpxV1pKeEFUUTZ3IiwiZW1haWwiOiJjb250YWN0QHNjb3V0ZmxvLmNvbSIsImF1dGgiOiJjMk52ZFhSbWJHODZaR05yY2w5d1lYUmZORmxOTFVadVpXTllUa2xuVVMxWlZWcHhWMXBLZUVGVVVUWjMifX19"
+
+
+# Resource configuration
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+
+# Service configuration
+service:
+  type: ClusterIP
+  httpPort: 80
+  httpsPort: 443
+  targetPort: 8081
+
+# Replicas configuration
+replicas: 1
+
+# RBAC configuration
+rbac:
+  create: true
+  
+# OpenAI credentials
+openai:
+  apiKey: ""
+  endpoint: ""
+  deploymentName: ""
+  apiVersion: ""  

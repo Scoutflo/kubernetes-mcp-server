@@ -75,6 +75,12 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				),
 				mcp.WithArray("resources",
 					mcp.Description("List of specific resources to sync (optional), format: [\"group:kind:name\"]"),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
 				),
 			),
 			Handler: s.argocdSyncApplication,

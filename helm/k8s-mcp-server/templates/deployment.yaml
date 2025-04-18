@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "k8s-mcp-server.fullname" . }}-deployment
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "k8s-mcp-server.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "k8s-mcp-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "k8s-mcp-server.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "k8s-mcp-server.fullname" . }}-sa
+      containers:
+        - name: {{ include "k8s-mcp-server.fullname" . }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+          - containerPort: {{ .Values.service.targetPort }}
+          envFrom:
+          - secretRef:
+              name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- if .Values.image.dockerConfigSecret }}
+      imagePullSecrets:
+        - name: {{ include "k8s-mcp-server.fullname" . }}-docker-config-secret
+      {{- end }} 

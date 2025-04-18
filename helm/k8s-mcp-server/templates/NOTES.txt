@@ -1,0 +1,14 @@
+Thank you for installing {{ .Chart.Name }}.
+
+Your release is named {{ .Release.Name }}.
+
+To access the Kubernetes MCP Server:
+
+{{- if .Values.ingress.hostname }}
+  Access the MCP Server at: https://{{ .Values.ingress.hostname }}
+{{- else }}
+  Run the following commands to find the service in your cluster:
+  kubectl --namespace {{ .Values.namespace.name }} get services {{ .Release.Name }}-svc
+{{- end }}
+
+For more information about using the MCP Server, please refer to the documentation. 

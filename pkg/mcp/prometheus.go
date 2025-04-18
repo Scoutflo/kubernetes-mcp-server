@@ -41,7 +41,14 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusMetricInfo},
 		{Tool: mcp.NewTool("prometheus_series_query",
 			mcp.WithDescription("Tool for querying Prometheus series. Finds time series that match certain label selectors in Prometheus. Use this tool to discover which metrics exist and their label combinations. You can specify time ranges to limit the search scope and set a maximum number of results."),
-			mcp.WithArray("match", mcp.Description("Series selector arguments"), mcp.Required()),
+			mcp.WithArray("match", mcp.Description("Series selector arguments"),
+				func(schema map[string]interface{}) {
+					schema["type"] = "array"
+					schema["items"] = map[string]interface{}{
+						"type": "string",
+					}
+				},
+				mcp.Required()),
 			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format (optional)")),
 			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format (optional)")),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of returned items (optional)")),
@@ -63,11 +70,39 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		{Tool: mcp.NewTool("prometheus_get_rules",
 			mcp.WithDescription("Tool for getting Prometheus alerting and recording rules. Retrieves information about configured alerting and recording rules in Prometheus. Use this tool to understand what alerts are defined and what metrics are being pre-computed. You can filter rules by type, name, group, and other criteria."),
 			mcp.WithString("type", mcp.Description("Rule type filter")),
-			mcp.WithArray("rule_name", mcp.Description("Rule names filter")),
-			mcp.WithArray("rule_group", mcp.Description("Rule group names filter")),
-			mcp.WithArray("file", mcp.Description("File paths filter")),
+			mcp.WithArray("rule_name", mcp.Description("Rule names filter"),
+				func(schema map[string]interface{}) {
+					schema["type"] = "array"
+					schema["items"] = map[string]interface{}{
+						"type": "string",
+					}
+				},
+			),
+			mcp.WithArray("rule_group", mcp.Description("Rule group names filter"),
+				func(schema map[string]interface{}) {
+					schema["type"] = "array"
+					schema["items"] = map[string]interface{}{
+						"type": "string",
+					}
+				},
+			),
+			mcp.WithArray("file", mcp.Description("File paths filter"),
+				func(schema map[string]interface{}) {
+					schema["type"] = "array"
+					schema["items"] = map[string]interface{}{
+						"type": "string",
+					}
+				},
+			),
 			mcp.WithBoolean("exclude_alerts", mcp.Description("Exclude alerts flag")),
-			mcp.WithArray("match", mcp.Description("Label selectors")),
+			mcp.WithArray("match", mcp.Description("Label selectors"),
+				func(schema map[string]interface{}) {
+					schema["type"] = "array"
+					schema["items"] = map[string]interface{}{
+						"type": "string",
+					}
+				},
+			),
 			mcp.WithNumber("group_limit", mcp.Description("Group limit")),
 		), Handler: s.prometheusGetRules},
 		{Tool: mcp.NewTool("prometheus_create_alert",
