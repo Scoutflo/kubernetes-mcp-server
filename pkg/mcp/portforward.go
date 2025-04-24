@@ -9,22 +9,34 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/scoutflo/kubernetes-mcp-server/pkg/kubernetes"
 )
 
+// PortForwardState tracks details about an active port forward
+type PortForwardState struct {
+	Namespace    string
+	ResourceName string
+	Kind         string
+	LocalPorts   []string
+	RemotePorts  []string
+	StopChan     chan struct{}
+	StartTime    time.Time
+}
+
 // activePortForwards keeps track of active port forwarding sessions
 var (
-	activePortForwards = make(map[string]chan struct{})
+	activePortForwards = make(map[string]*PortForwardState)
 	portForwardMutex   = &sync.Mutex{}
 )
 
 func (s *Server) initPortForward() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("create_port_forward",
-			mcp.WithDescription("Forward ports from a Kubernetes resource (currently only pods supported) to the local machine"),
+			mcp.WithDescription("Forward ports from a Kubernetes resource (currently only pods supported) to the local machine. Only available in STDIO mode."),
 			mcp.WithString("namespace", mcp.Description("Namespace where the resource is located")),
 			mcp.WithString("resource_name", mcp.Description("Name of the resource to port forward"), mcp.Required()),
 			mcp.WithString("api_version", mcp.Description("API version of the resource (e.g., 'v1' for pods)")),
@@ -32,10 +44,13 @@ func (s *Server) initPortForward() []server.ServerTool {
 			mcp.WithString("ports", mcp.Description("Port mapping in format 'localPort[:remotePort]'. If remotePort is not specified, it will use the same as localPort. Multiple port pairs can be separated by commas.")),
 		), Handler: s.portForwardCreate},
 		{Tool: mcp.NewTool("cancel_port_forward",
-			mcp.WithDescription("Cancel an active port forwarding session"),
+			mcp.WithDescription("Cancel an active port forwarding session. Only available in STDIO mode."),
 			mcp.WithString("namespace", mcp.Description("Namespace where the resource is located")),
 			mcp.WithString("resource_name", mcp.Description("Name of the resource to stop port forwarding"), mcp.Required()),
 		), Handler: s.portForwardCancel},
+		{Tool: mcp.NewTool("list_port_forward",
+			mcp.WithDescription("List all active port forwarding sessions. Only available in STDIO mode."),
+		), Handler: s.portForwardList},
 	}
 }
 
@@ -43,7 +58,20 @@ func getPortForwardKey(namespace, resourceName string) string {
 	return fmt.Sprintf("%s/%s", namespace, resourceName)
 }
 
+// checkSTDIOMode returns an error if not running in STDIO mode
+func (s *Server) checkSTDIOMode(ctx context.Context) error {
+	if !s.IsStdioMode() {
+		return errors.New("port forwarding is only available in STDIO mode")
+	}
+	return nil
+}
+
 func (s *Server) portForwardCreate(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if running in STDIO mode
+	if err := s.checkSTDIOMode(ctx); err != nil {
+		return NewTextResult("", err), nil
+	}
+
 	// Extract parameters
 	namespace := ctr.Params.Arguments["namespace"]
 	if namespace == nil {
@@ -138,9 +166,9 @@ func (s *Server) portForwardCreate(ctx context.Context, ctr mcp.CallToolRequest)
 	// Check if there's already an active port forward for this resource
 	portForwardMutex.Lock()
 	portForwardKey := getPortForwardKey(namespace.(string), resourceName.(string))
-	if _, exists := activePortForwards[portForwardKey]; exists {
+	if existingState, exists := activePortForwards[portForwardKey]; exists {
 		// Close existing port forward
-		close(activePortForwards[portForwardKey])
+		close(existingState.StopChan)
 		delete(activePortForwards, portForwardKey)
 	}
 
@@ -148,8 +176,32 @@ func (s *Server) portForwardCreate(ctx context.Context, ctr mcp.CallToolRequest)
 	stopChan := make(chan struct{})
 	readyChan := make(chan struct{}, 1)
 
-	// Store the stopChan for later use
-	activePortForwards[portForwardKey] = stopChan
+	// Extract local and remote ports for tracking
+	var localPorts []string
+	var remotePorts []string
+	for _, mapping := range portMappings {
+		parts := strings.Split(mapping, ":")
+		localPorts = append(localPorts, parts[0])
+		if len(parts) > 1 {
+			remotePorts = append(remotePorts, parts[1])
+		} else {
+			remotePorts = append(remotePorts, parts[0])
+		}
+	}
+
+	// Create port forward state
+	portForwardState := &PortForwardState{
+		Namespace:    namespace.(string),
+		ResourceName: resourceName.(string),
+		Kind:         kind.(string),
+		LocalPorts:   localPorts,
+		RemotePorts:  remotePorts,
+		StopChan:     stopChan,
+		StartTime:    time.Now(),
+	}
+
+	// Store the port forward state
+	activePortForwards[portForwardKey] = portForwardState
 	portForwardMutex.Unlock()
 
 	// Set up output streams
@@ -205,6 +257,11 @@ func (s *Server) portForwardCreate(ctx context.Context, ctr mcp.CallToolRequest)
 }
 
 func (s *Server) portForwardCancel(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if running in STDIO mode
+	if err := s.checkSTDIOMode(ctx); err != nil {
+		return NewTextResult("", err), nil
+	}
+
 	// Extract parameters
 	namespace := ctr.Params.Arguments["namespace"]
 	if namespace == nil {
@@ -221,18 +278,52 @@ func (s *Server) portForwardCancel(ctx context.Context, ctr mcp.CallToolRequest)
 	defer portForwardMutex.Unlock()
 
 	portForwardKey := getPortForwardKey(namespace.(string), resourceName.(string))
-	stopChan, exists := activePortForwards[portForwardKey]
+	state, exists := activePortForwards[portForwardKey]
 	if !exists {
 		return NewTextResult("", fmt.Errorf("no active port forwarding found for %s", portForwardKey)), nil
 	}
 
 	// Cancel the port forwarding
-	close(stopChan)
+	close(state.StopChan)
 	delete(activePortForwards, portForwardKey)
 
 	return NewTextResult(
 		fmt.Sprintf("Port forwarding canceled for %s", portForwardKey),
 		nil), nil
+}
+
+func (s *Server) portForwardList(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Check if running in STDIO mode
+	if err := s.checkSTDIOMode(ctx); err != nil {
+		return NewTextResult("", err), nil
+	}
+
+	portForwardMutex.Lock()
+	defer portForwardMutex.Unlock()
+
+	if len(activePortForwards) == 0 {
+		return NewTextResult("No active port forwarding sessions found.", nil), nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString("Active port forwarding sessions:\n\n")
+	sb.WriteString(fmt.Sprintf("%-20s %-20s %-10s %-15s %-15s %-15s\n",
+		"NAMESPACE", "RESOURCE", "KIND", "LOCAL PORTS", "REMOTE PORTS", "AGE"))
+	sb.WriteString(fmt.Sprintf("%-20s %-20s %-10s %-15s %-15s %-15s\n",
+		"----------", "--------", "----", "-----------", "------------", "---"))
+
+	for _, state := range activePortForwards {
+		age := time.Since(state.StartTime).Round(time.Second)
+		sb.WriteString(fmt.Sprintf("%-20s %-20s %-10s %-15s %-15s %-15s\n",
+			state.Namespace,
+			state.ResourceName,
+			state.Kind,
+			strings.Join(state.LocalPorts, ","),
+			strings.Join(state.RemotePorts, ","),
+			formatDuration(age)))
+	}
+
+	return NewTextResult(sb.String(), nil), nil
 }
 
 // Helper function to guess the API version based on the kind
@@ -248,4 +339,17 @@ func guessAPIVersionForKind(kind string) string {
 	default:
 		return "v1" // Default fallback
 	}
+}
+
+// formatDuration formats duration in a human-readable form
+func formatDuration(d time.Duration) string {
+	if d.Hours() > 24 {
+		days := int(d.Hours() / 24)
+		return fmt.Sprintf("%dd", days)
+	} else if d.Hours() >= 1 {
+		return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
+	} else if d.Minutes() >= 1 {
+		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
+	}
+	return fmt.Sprintf("%ds", int(d.Seconds()))
 }
