@@ -218,3 +218,8 @@ func namespaceOrDefault(namespace string) string {
 	}
 	return namespace
 }
+
+// GetRESTConfig returns the Kubernetes REST config
+func (k *Kubernetes) GetRESTConfig() *rest.Config {
+	return k.cfg
+}

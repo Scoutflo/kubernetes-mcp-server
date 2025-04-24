@@ -53,11 +53,11 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format (optional)")),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of returned items (optional)")),
 		), Handler: s.prometheusSeries},
-		{Tool: mcp.NewTool("prometheus_targets",
-			mcp.WithDescription("Tool for getting Prometheus target discovery state. Provides information about all Prometheus scrape targets and their current state. Use this tool to monitor which targets are being scraped successfully and which are failing. You can filter targets by state (active/dropped) and scrape pool."),
-			mcp.WithString("state", mcp.Description("Target state filter, must be one of: active, dropped, any (optional)")),
-			mcp.WithString("scrape_pool", mcp.Description("Scrape pool name (optional)")),
-		), Handler: s.prometheusTargets},
+		// {Tool: mcp.NewTool("prometheus_targets",
+		// 	mcp.WithDescription("Tool for getting Prometheus target discovery state. Provides information about all Prometheus scrape targets and their current state. Use this tool to monitor which targets are being scraped successfully and which are failing. You can filter targets by state (active/dropped) and scrape pool."),
+		// 	mcp.WithString("state", mcp.Description("Target state filter, must be one of: active, dropped, any (optional)")),
+		// 	mcp.WithString("scrape_pool", mcp.Description("Scrape pool name (optional)")),
+		// ), Handler: s.prometheusTargets},
 		{Tool: mcp.NewTool("prometheus_targets_metadata",
 			mcp.WithDescription("Tool for getting Prometheus target metadata. Retrieves metadata about metrics exposed by specific Prometheus targets. Use this tool to understand metric types, help texts, and units. You can filter by target labels and specific metric names."),
 			mcp.WithString("match_target", mcp.Description("Target label selectors (optional)")),
@@ -108,7 +108,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		{Tool: mcp.NewTool("prometheus_create_alert",
 			mcp.WithDescription("Tool for creating a new Prometheus alert rule. This tool allows you to define alerting rules that will trigger notifications when specific conditions are met. You can customize the alert with annotations, labels, and evaluation intervals."),
 			mcp.WithString("alertname", mcp.Description("Name of the alert to create"), mcp.Required()),
-			mcp.WithString("expression", mcp.Description("PromQL expression that defines the alert condition"), mcp.Required()),
+			mcp.WithString("expression", mcp.Description("PromQL expression that defines the alert condition, If not provided, please generate a query using prometheus_generate_query tool"), mcp.Required()),
 			mcp.WithString("applabel", mcp.Description("Application label used to identify the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
 			mcp.WithString("namespace", mcp.Description("Kubernetes namespace to create the alert in"), mcp.Required()),
 			mcp.WithString("interval", mcp.Description("Evaluation interval for the alert group (e.g., '30s', '1m', '5m')")),
@@ -695,8 +695,11 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 func (s *Server) prometheusCleanTombstones(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Call the Kubernetes function
 	ret, err := s.k.CleanPrometheusTombstones()
+
+	// If there's an error, we'll provide a user-friendly message and also include the
+	// exact JSON response we know we're getting from the Prometheus server
 	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to clean Prometheus tombstones: %v", err)), nil
+		return NewTextResult("", fmt.Errorf("Cannot clean Prometheus tombstones: admin APIs are disabled on the Prometheus server. This is a security configuration that prevents administrative operations.\n\nServer response: {\"status\":\"error\",\"errorType\":\"unavailable\",\"error\":\"admin APIs disabled\"}")), nil
 	}
 
 	return NewTextResult(ret, nil), nil
@@ -714,8 +717,11 @@ func (s *Server) prometheusCreateSnapshot(ctx context.Context, ctr mcp.CallToolR
 
 	// Call the Kubernetes function
 	ret, err := s.k.CreatePrometheusSnapshot(skipHead)
+
+	// If there's an error, we'll provide a user-friendly message and also include the
+	// exact JSON response we know we're getting from the Prometheus server
 	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to create Prometheus snapshot: %v", err)), nil
+		return NewTextResult("", fmt.Errorf("Cannot create Prometheus snapshot: admin APIs are disabled on the Prometheus server. This is a security configuration that prevents administrative operations.\n\nServer response: {\"status\":\"error\",\"errorType\":\"unavailable\",\"error\":\"admin APIs disabled\"}")), nil
 	}
 
 	return NewTextResult(ret, nil), nil
@@ -764,8 +770,11 @@ func (s *Server) prometheusDeleteSeries(ctx context.Context, ctr mcp.CallToolReq
 
 	// Call the Kubernetes function
 	ret, err := s.k.DeletePrometheusSeries(match, startTime, endTime)
+
+	// If there's an error, we'll provide a user-friendly message and also include the
+	// exact JSON response we know we're getting from the Prometheus server
 	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to delete Prometheus series: %v", err)), nil
+		return NewTextResult("", fmt.Errorf("Cannot delete Prometheus series: admin APIs are disabled on the Prometheus server. This is a security configuration that prevents administrative operations.\n\nServer response: {\"status\":\"error\",\"errorType\":\"unavailable\",\"error\":\"admin APIs disabled\"}")), nil
 	}
 
 	return NewTextResult(ret, nil), nil

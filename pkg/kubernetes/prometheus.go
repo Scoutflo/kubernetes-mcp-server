@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -743,6 +744,50 @@ func (k *Kubernetes) GetPrometheusRules(ruleType, groupLimit string, ruleNames, 
 	return string(resultJSON), nil
 }
 
+// handlePrometheusResponse is a helper function to handle Prometheus API responses
+func handlePrometheusResponse(bodyBytes []byte) (map[string]interface{}, error) {
+	// Check for specific plain text error responses
+	bodyStr := string(bodyBytes)
+	if strings.Contains(bodyStr, "Method Not Allowed") {
+		return nil, fmt.Errorf("Prometheus error: Method Not Allowed. The server does not support this operation or it's configured to reject it.")
+	}
+
+	// Try to parse the response as JSON
+	var result map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		// If we can't parse as JSON, return the raw response for debugging
+		return nil, fmt.Errorf("failed to decode response as JSON: %v, raw response: %s", err, bodyStr)
+	}
+
+	// Check for error status in the JSON response
+	if status, ok := result["status"].(string); ok && status == "error" {
+		errorType := "unknown"
+		if et, ok := result["errorType"].(string); ok {
+			errorType = et
+		}
+
+		errorMsg := "no error message provided"
+		if em, ok := result["error"].(string); ok {
+			errorMsg = em
+
+			// Special handling for admin APIs disabled error
+			if em == "admin APIs disabled" {
+				// Just return the standard error message, the MCP handlers will add the JSON
+				return nil, fmt.Errorf("Prometheus error: admin APIs are disabled on this server. This is a security configuration that prevents administrative operations.")
+			}
+		}
+
+		return nil, fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+	}
+
+	// For non-success status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		return nil, fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	return result, nil
+}
+
 // CleanPrometheusTombstones removes tombstone files created during Prometheus data deletion operations
 func (k *Kubernetes) CleanPrometheusTombstones() (string, error) {
 	// Get Prometheus URL using service discovery
@@ -768,21 +813,16 @@ func (k *Kubernetes) CleanPrometheusTombstones() (string, error) {
 	}
 	defer resp.Body.Close()
 
-	// Parse the response
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	// Read the entire response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	// Check for error status
-	if status, ok := result["status"].(string); ok && status != "success" {
-		if errorType, ok := result["errorType"].(string); ok {
-			if errorMsg, ok := result["error"].(string); ok {
-				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
-			}
-			return "", fmt.Errorf("Prometheus error: %s", errorType)
-		}
-		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	// Handle the response using the helper function
+	result, err := handlePrometheusResponse(bodyBytes)
+	if err != nil {
+		return "", err
 	}
 
 	// Convert result to JSON string with success message
@@ -825,24 +865,26 @@ func (k *Kubernetes) CreatePrometheusSnapshot(skipHead bool) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	// Parse the response
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	// Read the entire response body first
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	// Check for error status
-	if status, ok := result["status"].(string); ok && status != "success" {
-		if errorType, ok := result["errorType"].(string); ok {
-			if errorMsg, ok := result["error"].(string); ok {
-				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
-			}
-			return "", fmt.Errorf("Prometheus error: %s", errorType)
-		}
-		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	// Check if this is an admin APIs disabled error
+	bodyStr := string(bodyBytes)
+	if strings.Contains(bodyStr, "admin APIs disabled") {
+		// Return the exact error with the raw JSON response embedded
+		return "", fmt.Errorf("admin API error: %s", bodyStr)
 	}
 
-	// Convert result to JSON string with additional information
+	// Handle the response using the helper function
+	result, err := handlePrometheusResponse(bodyBytes)
+	if err != nil {
+		return "", err
+	}
+
+	// Success case - Convert result to JSON string with additional information
 	if data, ok := result["data"].(map[string]interface{}); ok {
 		if name, ok := data["name"].(string); ok {
 			result["message"] = fmt.Sprintf("Prometheus snapshot '%s' created successfully.", name)
@@ -903,20 +945,42 @@ func (k *Kubernetes) DeletePrometheusSeries(match []string, start, end *time.Tim
 	}
 	defer resp.Body.Close()
 
-	// Parse the response
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	// Read the entire response body first
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	// Check for error status
-	if status, ok := result["status"].(string); ok && status != "success" {
-		if errorType, ok := result["errorType"].(string); ok {
-			if errorMsg, ok := result["error"].(string); ok {
-				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
-			}
-			return "", fmt.Errorf("Prometheus error: %s", errorType)
+	// Check for specific plain text error responses
+	bodyStr := string(bodyBytes)
+	if strings.Contains(bodyStr, "Method Not Allowed") {
+		return "", fmt.Errorf("Prometheus error: Method Not Allowed. The server does not support this operation or it's configured to reject it.")
+	}
+
+	// Try to parse the response as JSON
+	var result map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		// If we can't parse as JSON, return the raw response for debugging
+		return "", fmt.Errorf("failed to decode response as JSON: %v, raw response: %s", err, bodyStr)
+	}
+
+	// Check for error status in the JSON response
+	if status, ok := result["status"].(string); ok && status == "error" {
+		errorType := "unknown"
+		if et, ok := result["errorType"].(string); ok {
+			errorType = et
 		}
+
+		errorMsg := "no error message provided"
+		if em, ok := result["error"].(string); ok {
+			errorMsg = em
+		}
+
+		return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+	}
+
+	// For non-success status
+	if status, ok := result["status"].(string); ok && status != "success" {
 		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
 	}
 

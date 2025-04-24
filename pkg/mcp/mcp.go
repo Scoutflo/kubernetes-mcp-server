@@ -9,9 +9,22 @@ import (
 	"github.com/scoutflo/kubernetes-mcp-server/pkg/version"
 )
 
+// ServerMode represents the mode the server is running in
+type ServerMode int
+
+const (
+	// UnknownMode is the default mode before the server starts
+	UnknownMode ServerMode = iota
+	// StdioMode indicates the server is running in STDIO mode
+	StdioMode
+	// SseMode indicates the server is running in SSE mode
+	SseMode
+)
+
 type Server struct {
 	server *server.MCPServer
 	k      *kubernetes.Kubernetes
+	mode   ServerMode
 }
 
 func NewSever() (*Server, error) {
@@ -24,6 +37,7 @@ func NewSever() (*Server, error) {
 			server.WithToolCapabilities(true),
 			server.WithLogging(),
 		),
+		mode: UnknownMode,
 	}
 	if err := s.reloadKubernetesClient(); err != nil {
 		return nil, err
@@ -53,15 +67,28 @@ func (s *Server) reloadKubernetesClient() error {
 		s.initConnectivity(),
 		s.initHelm(),
 		s.initArgoCD(),
+		s.initArgoRollouts(),
 	)...)
 	return nil
 }
 
+// GetServerMode returns the current server mode
+func (s *Server) GetServerMode() ServerMode {
+	return s.mode
+}
+
+// IsStdioMode returns true if the server is running in STDIO mode
+func (s *Server) IsStdioMode() bool {
+	return s.mode == StdioMode
+}
+
 func (s *Server) ServeStdio() error {
+	s.mode = StdioMode
 	return server.ServeStdio(s.server)
 }
 
 func (s *Server) ServeSse(baseUrl string) *server.SSEServer {
+	s.mode = SseMode
 	options := make([]server.SSEOption, 0)
 	if baseUrl != "" {
 		options = append(options, server.WithBaseURL(baseUrl))
