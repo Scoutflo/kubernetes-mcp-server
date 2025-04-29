@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -104,12 +105,17 @@ func (s *Server) Close() {
 
 func NewTextResult(content string, err error) *mcp.CallToolResult {
 	if err != nil {
+		errMsg := err.Error()
+		// If the error doesn't already have an ERROR prefix, add one to make it more obvious
+		if !strings.HasPrefix(errMsg, "ERROR:") {
+			errMsg = "ERROR: " + errMsg
+		}
 		return &mcp.CallToolResult{
 			IsError: true,
 			Content: []mcp.Content{
 				mcp.TextContent{
 					Type: "text",
-					Text: err.Error(),
+					Text: errMsg,
 				},
 			},
 		}

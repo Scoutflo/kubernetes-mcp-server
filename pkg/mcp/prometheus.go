@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -53,11 +54,11 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format (optional)")),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of returned items (optional)")),
 		), Handler: s.prometheusSeries},
-		// {Tool: mcp.NewTool("prometheus_targets",
-		// 	mcp.WithDescription("Tool for getting Prometheus target discovery state. Provides information about all Prometheus scrape targets and their current state. Use this tool to monitor which targets are being scraped successfully and which are failing. You can filter targets by state (active/dropped) and scrape pool."),
-		// 	mcp.WithString("state", mcp.Description("Target state filter, must be one of: active, dropped, any (optional)")),
-		// 	mcp.WithString("scrape_pool", mcp.Description("Scrape pool name (optional)")),
-		// ), Handler: s.prometheusTargets},
+		{Tool: mcp.NewTool("prometheus_targets",
+			mcp.WithDescription("Tool for getting Prometheus target discovery state. Provides information about all Prometheus scrape targets and their current state. Use this tool to monitor which targets are being scraped successfully and which are failing. You can filter targets by state (active/dropped) and scrape pool."),
+			mcp.WithString("state", mcp.Description("Target state filter, must be one of: active, dropped, any (optional)")),
+			mcp.WithString("scrape_pool", mcp.Description("Scrape pool name (optional)")),
+		), Handler: s.prometheusTargets},
 		{Tool: mcp.NewTool("prometheus_targets_metadata",
 			mcp.WithDescription("Tool for getting Prometheus target metadata. Retrieves metadata about metrics exposed by specific Prometheus targets. Use this tool to understand metric types, help texts, and units. You can filter by target labels and specific metric names."),
 			mcp.WithString("match_target", mcp.Description("Target label selectors (optional)")),
@@ -189,8 +190,25 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 	// Execute the instant query with the provided parameters
 	ret, err := s.k.QueryPrometheus(query, queryTime, timeout)
 	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to execute Prometheus instant query: %v", err)), nil
+		errMsg := err.Error()
+		// Check for common error patterns and provide more helpful messages
+		if strings.Contains(errMsg, "unknown by name") || strings.Contains(errMsg, "metrics not found") {
+			return NewTextResult("", fmt.Errorf("ERROR: Metric not found. The specified metric '%s' does not exist in Prometheus. Please check the metric name and ensure it's correctly spelled.", query)), nil
+		} else if strings.Contains(errMsg, "parse error") {
+			return NewTextResult("", fmt.Errorf("ERROR: Invalid PromQL query syntax in '%s'. Please check your query format.", query)), nil
+		} else if strings.Contains(errMsg, "failed to discover Prometheus") {
+			return NewTextResult("", fmt.Errorf("ERROR: Cannot connect to Prometheus server. The server may be unavailable or misconfigured.")), nil
+		}
+		// For other errors, return a clear error message
+		return NewTextResult("", fmt.Errorf("ERROR: Failed to execute Prometheus query: %v", err)), nil
 	}
+
+	// Check if the response contains an ERROR_TYPE that indicates a conclusive empty result
+	if strings.Contains(ret, "ERROR_TYPE") && (strings.Contains(ret, "NO_DATA_POINTS") || strings.Contains(ret, "NO_MATCHING_SERIES") || strings.Contains(ret, "METRIC_NOT_FOUND")) {
+		// This is to ensure the model treats this as a definitive answer
+		ret = "IMPORTANT - CONCLUSIVE RESULT: " + ret
+	}
+
 	return NewTextResult(ret, nil), nil
 }
 
@@ -243,8 +261,29 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 	// Execute the range query with the provided parameters
 	ret, err := s.k.QueryPrometheusRange(query, startTime, endTime, step, timeout)
 	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to execute Prometheus range query: %v", err)), nil
+		errMsg := err.Error()
+		// Check for common error patterns and provide more helpful messages
+		if strings.Contains(errMsg, "unknown by name") || strings.Contains(errMsg, "metrics not found") {
+			return NewTextResult("", fmt.Errorf("ERROR: Metric not found. The specified metric '%s' does not exist in Prometheus. Please check the metric name and ensure it's correctly spelled.", query)), nil
+		} else if strings.Contains(errMsg, "parse error") {
+			return NewTextResult("", fmt.Errorf("ERROR: Invalid PromQL query syntax in '%s'. Please check your query format.", query)), nil
+		} else if strings.Contains(errMsg, "failed to discover Prometheus") {
+			return NewTextResult("", fmt.Errorf("ERROR: Cannot connect to Prometheus server. The server may be unavailable or misconfigured.")), nil
+		} else if strings.Contains(errMsg, "invalid step") {
+			return NewTextResult("", fmt.Errorf("ERROR: Invalid step parameter '%s'. Step must be a valid duration (e.g., '15s', '1m', '1h').", step)), nil
+		} else if strings.Contains(errMsg, "resolution") || strings.Contains(errMsg, "step") {
+			return NewTextResult("", fmt.Errorf("ERROR: Step parameter issue: %v. Adjust the step size or time range.", err)), nil
+		}
+		// For other errors, return a clear error message
+		return NewTextResult("", fmt.Errorf("ERROR: Failed to execute Prometheus range query: %v", err)), nil
 	}
+
+	// Check if the response contains an ERROR_TYPE that indicates a conclusive empty result
+	if strings.Contains(ret, "ERROR_TYPE") && (strings.Contains(ret, "NO_DATA_POINTS") || strings.Contains(ret, "NO_MATCHING_SERIES") || strings.Contains(ret, "METRIC_NOT_FOUND")) {
+		// This is to ensure the model treats this as a definitive answer
+		ret = "IMPORTANT - CONCLUSIVE RESULT: " + ret
+	}
+
 	return NewTextResult(ret, nil), nil
 }
 
@@ -276,8 +315,15 @@ func (s *Server) prometheusMetricInfo(ctx context.Context, ctr mcp.CallToolReque
 
 	ret, err := s.k.GetPrometheusMetricInfo(metric, includeStats)
 	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to get information for metric '%s': %v", metric, err)), nil
+		return NewTextResult("", fmt.Errorf("ERROR: Failed to get information for metric '%s': %v", metric, err)), nil
 	}
+
+	// Check if the response contains an ERROR_TYPE that indicates a conclusive empty result
+	if strings.Contains(ret, "ERROR_TYPE") && (strings.Contains(ret, "METRIC_NOT_FOUND")) {
+		// This is to ensure the model treats this as a definitive answer
+		ret = "IMPORTANT - CONCLUSIVE RESULT: " + ret
+	}
+
 	return NewTextResult(ret, nil), nil
 }
 
@@ -293,7 +339,18 @@ func (s *Server) prometheusGenerateQuery(ctx context.Context, ctr mcp.CallToolRe
 	// Generate the PromQL query
 	query, err := s.k.GeneratePromQLQuery(description)
 	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to generate PromQL query: %v", err)), nil
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "failed to create LLM client") {
+			return NewTextResult("", fmt.Errorf("ERROR: Could not connect to LLM service to generate PromQL query. The service may be unavailable.")), nil
+		} else if strings.Contains(errMsg, "context deadline exceeded") || strings.Contains(errMsg, "timeout") {
+			return NewTextResult("", fmt.Errorf("ERROR: Timeout occurred while generating the PromQL query. Please try again with a simpler description or try later.")), nil
+		}
+		return NewTextResult("", fmt.Errorf("ERROR: Failed to generate PromQL query from description: %v", err)), nil
+	}
+
+	// Check if the response is empty or too short to be a valid query
+	if len(query) < 5 {
+		return NewTextResult("", fmt.Errorf("ERROR: The generated query is too short or empty. Please provide a more specific description of the metric you're looking for.")), nil
 	}
 
 	return NewTextResult(query, nil), nil
@@ -369,7 +426,23 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 	// Call the Kubernetes function
 	ret, err := s.k.QueryPrometheusSeries(match, startTime, endTime, limit)
 	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to query Prometheus series: %v", err)), nil
+		errMsg := err.Error()
+		// Check for common error patterns and provide more helpful messages
+		if strings.Contains(errMsg, "unknown by name") || strings.Contains(errMsg, "metrics not found") {
+			return NewTextResult("", fmt.Errorf("ERROR: No series found matching the provided selectors. The metrics may not exist in Prometheus or may have different labels than specified.")), nil
+		} else if strings.Contains(errMsg, "parse error") || strings.Contains(errMsg, "bad_data") {
+			return NewTextResult("", fmt.Errorf("ERROR: Invalid series selector syntax in one of the match patterns: %v. Please check your selector format.", match)), nil
+		} else if strings.Contains(errMsg, "failed to discover Prometheus") {
+			return NewTextResult("", fmt.Errorf("ERROR: Cannot connect to Prometheus server. The server may be unavailable or misconfigured.")), nil
+		}
+		// For other errors, return a clear error message
+		return NewTextResult("", fmt.Errorf("ERROR: Failed to query Prometheus series: %v", err)), nil
+	}
+
+	// Check if the response contains an ERROR_TYPE that indicates a conclusive empty result
+	if strings.Contains(ret, "ERROR_TYPE") && (strings.Contains(ret, "NO_DATA_POINTS") || strings.Contains(ret, "NO_MATCHING_SERIES") || strings.Contains(ret, "METRIC_NOT_FOUND")) {
+		// This is to ensure the model treats this as a definitive answer
+		ret = "IMPORTANT - CONCLUSIVE RESULT: " + ret
 	}
 
 	return NewTextResult(ret, nil), nil
@@ -829,5 +902,11 @@ func (s *Server) prometheusWALReplay(ctx context.Context, _ mcp.CallToolRequest)
 		return NewTextResult("", fmt.Errorf("failed to get Prometheus WAL replay status: %v", err)), nil
 	}
 
-	return NewTextResult(ret, nil), nil
+	// Check if we have empty data values (common case)
+	if strings.Contains(ret, `"current": 0`) && strings.Contains(ret, `"max": 0`) && strings.Contains(ret, `"min": 0`) {
+		return NewTextResult("WAL REPLAY STATUS: No active Write-Ahead Log (WAL) replay operations in progress. The 'current', 'max', and 'min' values are all 0, which indicates normal operation with no ongoing WAL replay activity. so no need to check for WAL replay status again.\n\n"+ret, nil), nil
+	}
+
+	// Add context to the response if there are active operations
+	return NewTextResult("WAL REPLAY STATUS: Write-Ahead Log (WAL) replay status shows the progress of WAL replay operations. 'current' represents the current replay position, 'max' is the highest position, and 'min' is the lowest position.\n\n"+ret, nil), nil
 }

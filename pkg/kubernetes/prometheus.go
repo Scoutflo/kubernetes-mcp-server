@@ -118,14 +118,16 @@ func (k *Kubernetes) QueryPrometheus(query string, queryTime *time.Time, timeout
 	// Check for no data
 	if data, ok := result["data"].(map[string]interface{}); ok {
 		if resultArr, ok := data["result"].([]interface{}); ok && len(resultArr) == 0 {
-			// Return a specific message for no data rather than an error
+			// Make it clear this is a conclusive result, not a failure
 			emptyResult := map[string]interface{}{
 				"status": "success",
 				"data": map[string]interface{}{
 					"resultType": "vector",
 					"result":     []interface{}{},
 				},
-				"info": "No data found for the query. This could be due to an incorrect metric name or no data points available in the specified time range.",
+				"ERROR_TYPE": "NO_DATA_POINTS",
+				"info":       "CONCLUSIVE RESULT: No data found for the query. This is a definitive answer, not an error - the query '" + query + "' executed successfully but returned no data points. This could mean the metric doesn't exist or no data points are available in the specified time range.",
+				"query_used": query,
 			}
 
 			resultJSON, err := json.MarshalIndent(emptyResult, "", "  ")
@@ -193,14 +195,22 @@ func (k *Kubernetes) QueryPrometheusRange(query string, start, end time.Time, st
 	// Check for no data
 	if data, ok := result["data"].(map[string]interface{}); ok {
 		if resultArr, ok := data["result"].([]interface{}); ok && len(resultArr) == 0 {
-			// Return a specific message for no data rather than an error
+			// Make it clear this is a conclusive result, not a failure
+			timeRange := fmt.Sprintf("from %s to %s with step %s",
+				time.Unix(startTS, 0).Format(time.RFC3339),
+				time.Unix(endTS, 0).Format(time.RFC3339),
+				step)
+
 			emptyResult := map[string]interface{}{
 				"status": "success",
 				"data": map[string]interface{}{
 					"resultType": "matrix",
 					"result":     []interface{}{},
 				},
-				"info": "No data found for the query. This could be due to an incorrect metric name or no data points available in the specified time range.",
+				"ERROR_TYPE": "NO_DATA_POINTS_IN_RANGE",
+				"info":       "CONCLUSIVE RESULT: No data found for the query. This is a definitive answer, not an error - the query '" + query + "' executed successfully but returned no data points in the specified time range " + timeRange + ". This could mean the metric doesn't exist or no data points are available in this range.",
+				"query_used": query,
+				"time_range": timeRange,
 			}
 
 			resultJSON, err := json.MarshalIndent(emptyResult, "", "  ")
@@ -273,6 +283,27 @@ func (k *Kubernetes) GetPrometheusMetricInfo(metricName string, includeStats boo
 	var metadataResult map[string]interface{}
 	if err := json.NewDecoder(metadataResp.Body).Decode(&metadataResult); err != nil {
 		return "", fmt.Errorf("failed to decode Prometheus metadata response: %v", err)
+	}
+
+	// Check if metadata is empty (indicating the metric doesn't exist)
+	if data, ok := metadataResult["data"].(map[string]interface{}); ok && len(data) == 0 {
+		// Make it clear this is a conclusive result about the metric not existing
+		emptyResult := map[string]interface{}{
+			"name":       metricName,
+			"status":     "success",
+			"ERROR_TYPE": "METRIC_NOT_FOUND",
+			"info":       "CONCLUSIVE RESULT: No metadata found for metric '" + metricName + "'. This is a definitive answer that this metric does not exist in Prometheus.",
+			"metadata": map[string]interface{}{
+				"status": "success",
+				"data":   map[string]interface{}{},
+			},
+		}
+
+		resultJSON, err := json.MarshalIndent(emptyResult, "", "  ")
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal empty result: %v", err)
+		}
+		return string(resultJSON), nil
 	}
 
 	result := map[string]interface{}{
@@ -422,11 +453,13 @@ func (k *Kubernetes) QueryPrometheusSeries(match []string, start, end *time.Time
 
 	// Check for no data
 	if data, ok := result["data"].([]interface{}); ok && len(data) == 0 {
-		// Return a specific message for no data rather than an error
+		// Return a specific message for no data with ERROR_TYPE field to make it clearer
 		emptyResult := map[string]interface{}{
-			"status": "success",
-			"data":   []interface{}{},
-			"info":   "No series found matching the criteria.",
+			"status":        "success",
+			"data":          []interface{}{},
+			"ERROR_TYPE":    "NO_MATCHING_SERIES",
+			"info":          "CONCLUSIVE RESULT: No series found matching the criteria. This means there are no metrics matching the provided selector patterns. This is a definitive answer, not a failure - the query executed successfully but found no matching series.",
+			"selector_used": match,
 		}
 
 		resultJSON, err := json.MarshalIndent(emptyResult, "", "  ")
