@@ -1,11 +1,14 @@
 package mcp
 
 import (
+	"fmt"
+	"net/http"
 	"slices"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/scoutflo/kubernetes-mcp-server/pkg/health"
 	"github.com/scoutflo/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/scoutflo/kubernetes-mcp-server/pkg/version"
 )
@@ -20,12 +23,17 @@ const (
 	StdioMode
 	// SseMode indicates the server is running in SSE mode
 	SseMode
+
+	// HealthPort is the port used for health checks
+	HealthPort = 8082
 )
 
 type Server struct {
-	server *server.MCPServer
-	k      *kubernetes.Kubernetes
-	mode   ServerMode
+	server       *server.MCPServer
+	k            *kubernetes.Kubernetes
+	mode         ServerMode
+	healthCheck  *health.HealthChecker
+	healthServer *http.Server
 }
 
 func NewSever() (*Server, error) {
@@ -38,7 +46,8 @@ func NewSever() (*Server, error) {
 			server.WithToolCapabilities(true),
 			server.WithLogging(),
 		),
-		mode: UnknownMode,
+		mode:        UnknownMode,
+		healthCheck: health.NewHealthChecker(),
 	}
 	if err := s.reloadKubernetesClient(); err != nil {
 		return nil, err
@@ -94,12 +103,45 @@ func (s *Server) ServeSse(baseUrl string) *server.SSEServer {
 	if baseUrl != "" {
 		options = append(options, server.WithBaseURL(baseUrl))
 	}
+
+	// Start the health check server on the health port
+	go s.startHealthServer()
+
+	// Mark as ready after a short delay to allow server to initialize
+	go func() {
+		// Set ready status after server starts
+		s.healthCheck.SetReady(true)
+	}()
+
 	return server.NewSSEServer(s.server, options...)
+}
+
+// startHealthServer starts a separate HTTP server for health checks
+func (s *Server) startHealthServer() {
+	mux := http.NewServeMux()
+	health.AttachHealthEndpoints(mux, s.healthCheck)
+
+	// Create health server on the health port
+	s.healthServer = &http.Server{
+		Addr:    fmt.Sprintf(":%d", HealthPort),
+		Handler: mux,
+	}
+
+	// Start server
+	if err := s.healthServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		// Log error but don't crash (could use a proper logger here)
+		println("Health server error:", err.Error())
+	}
 }
 
 func (s *Server) Close() {
 	if s.k != nil {
 		s.k.Close()
+	}
+
+	// Close health server if it exists
+	if s.healthServer != nil {
+		s.healthServer.Close()
 	}
 }
 

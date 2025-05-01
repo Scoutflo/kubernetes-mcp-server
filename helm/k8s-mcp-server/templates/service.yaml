@@ -18,6 +18,10 @@ spec:
     port: {{ .Values.service.httpsPort }}
     targetPort: {{ .Values.service.targetPort }}
     protocol: TCP
+  - name: health
+    port: {{ .Values.service.healthPort }}
+    targetPort: {{ .Values.service.healthPort }}
+    protocol: TCP
   {{- if .Values.metrics.enabled }}
   - name: metrics
     port: {{ .Values.metrics.port }}

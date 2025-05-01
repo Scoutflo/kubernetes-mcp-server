@@ -38,7 +38,7 @@ ingress:
 ## @param image.dockerConfigSecret Docker config secret for private registry
 image:
   repository: scoutflo/kubernetes_mcp_server
-  tag: pre-prod-18
+  tag: pre-prod-22
   pullPolicy: IfNotPresent
   dockerConfigSecret: "eyJhdXRocyI6eyJodHRwczovL2luZGV4LmRvY2tlci5pby92MS8iOnsidXNlcm5hbWUiOiJzY291dGZsbyIsInBhc3N3b3JkIjoiZGNrcl9wYXRfNFlNLUZuZWNYTklnUS1ZVVpxV1pKeEFUUTZ3IiwiZW1haWwiOiJjb250YWN0QHNjb3V0ZmxvLmNvbSIsImF1dGgiOiJjMk52ZFhSbWJHODZaR05yY2w5d1lYUmZORmxOTFVadVpXTllUa2xuVVMxWlZWcHhWMXBLZUVGVVVUWjMifX19"
 
@@ -60,11 +60,13 @@ resources:
 ## @param service.httpPort HTTP port
 ## @param service.httpsPort HTTPS port
 ## @param service.targetPort Container target port
+## @param service.healthPort Health check port
 service:
   type: ClusterIP
   httpPort: 80
   httpsPort: 443
   targetPort: 8081
+  healthPort: 8082
 
 ## @section Replicas parameters
 ## @param replicaCount Number of replicas
@@ -110,14 +112,16 @@ podDisruptionBudget:
 ## @param probes.readiness.successThreshold Success threshold for readiness probe
 probes:
   liveness:
-    enabled: false
+    enabled: true
+    path: /healthz
     initialDelaySeconds: 30
     periodSeconds: 10
     timeoutSeconds: 5
     failureThreshold: 6
     successThreshold: 1
   readiness:
-    enabled: false
+    enabled: true
+    path: /readyz
     initialDelaySeconds: 10
     periodSeconds: 10
     timeoutSeconds: 5
