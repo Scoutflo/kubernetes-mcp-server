@@ -2,8 +2,15 @@ apiVersion: v2
 name: k8s-mcp-server
 description: A Helm chart for Kubernetes MCP Server
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "1.0.0"
+keywords:
+  - kubernetes
+  - mcp
+  - server
+home: https://github.com/scoutflo/kubernetes-mcp-server
+sources:
+  - https://github.com/scoutflo/kubernetes-mcp-server/tree/main/helm/k8s-mcp-server
 maintainers:
   - name: Sanskar
     email: sanskar@scoutflo.io 

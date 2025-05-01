@@ -138,3 +138,25 @@ make build
 # Run the Kubernetes MCP server with mcp-inspector
 npx @modelcontextprotocol/inspector@latest $(pwd)/kubernetes-mcp-server
 ```
+
+
+
+## Image naming convention for k8s-mcp-server
+Docker image: `scoutflo/kubernetes_mcp_server`
+
+## Tagging Strategy
+- Pre-production (release/dev branch):
+  - pre-prod-v{major}.{minor} (e.g., pre-prod-v1.0, pre-prod-v1.1)
+  - pre-prod-{run_number} (build number tracking)
+- Production (main branch):
+  - prod-v{major}.{minor} (e.g., prod-v1.0, prod-v1.1)
+  - production-{run_number} (build number tracking)
+
+## Pipeline Image Upgrade Logic
+The workflow fetches the latest Docker tags
+For pre-prod (release/dev branch):
+- Extracts major and minor versions from latest pre-prod-v{major}.{minor} tag
+- Increments the minor version: pre-prod-v{major}.{minor+1}
+For production (master branch):
+- Extracts major and minor from latest prod-v{major}.{minor} tag
+- Increments the minor version: prod-v{major}.{minor+1}

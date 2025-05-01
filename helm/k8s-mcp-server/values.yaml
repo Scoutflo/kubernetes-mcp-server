@@ -1,13 +1,28 @@
 # Default values for k8s-mcp-server
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+## @section Global parameters
+## Global Docker image parameters
+## Please, note that this will override the image parameters, including dependencies, configured to use the global value
+## @param nameOverride String to partially override k8s-mcp-server.fullname
+## @param fullnameOverride String to fully override k8s-mcp-server.fullname
 nameOverride: ""
 fullnameOverride: ""
 
-# Namespace configuration
+## @section Namespace parameters
+## @param namespace.name Namespace name
+## @param namespace.create Create the namespace
 namespace:
   name: "k8s-mcp-server"
   create: false 
 
-# Ingress configuration
+## @section Ingress parameters
+## @param ingress.className Ingress class name
+## @param ingress.hostname Hostname for the ingress
+## @param ingress.tls.enabled Enable TLS for ingress
+## @param ingress.tls.wildcardHostname Wildcard hostname for TLS
+## @param ingress.tls.secretName Secret name for TLS
 ingress:
   className: nginx
   hostname: "k8s-mcp-server.scoutflo.agency"
@@ -16,15 +31,22 @@ ingress:
     wildcardHostname: "*.scoutflo.agency"
     secretName: "scoutflo-agency-wildcard-tls"  
 
-# Image configuration
+## @section Image parameters
+## @param image.repository K8s MCP Server image repository
+## @param image.tag K8s MCP Server image tag
+## @param image.pullPolicy K8s MCP Server image pull policy
+## @param image.dockerConfigSecret Docker config secret for private registry
 image:
   repository: scoutflo/kubernetes_mcp_server
   tag: pre-prod-18
   pullPolicy: IfNotPresent
   dockerConfigSecret: "eyJhdXRocyI6eyJodHRwczovL2luZGV4LmRvY2tlci5pby92MS8iOnsidXNlcm5hbWUiOiJzY291dGZsbyIsInBhc3N3b3JkIjoiZGNrcl9wYXRfNFlNLUZuZWNYTklnUS1ZVVpxV1pKeEFUUTZ3IiwiZW1haWwiOiJjb250YWN0QHNjb3V0ZmxvLmNvbSIsImF1dGgiOiJjMk52ZFhSbWJHODZaR05yY2w5d1lYUmZORmxOTFVadVpXTllUa2xuVVMxWlZWcHhWMXBLZUVGVVVUWjMifX19"
 
-
-# Resource configuration
+## @section Resource parameters
+## @param resources.limits.cpu CPU limits for the container
+## @param resources.limits.memory Memory limits for the container
+## @param resources.requests.cpu CPU requests for the container
+## @param resources.requests.memory Memory requests for the container
 resources:
   limits:
     cpu: 500m
@@ -33,24 +55,95 @@ resources:
     cpu: 100m
     memory: 128Mi
 
-
-# Service configuration
+## @section Service parameters
+## @param service.type Service type
+## @param service.httpPort HTTP port
+## @param service.httpsPort HTTPS port
+## @param service.targetPort Container target port
 service:
   type: ClusterIP
   httpPort: 80
   httpsPort: 443
   targetPort: 8081
 
-# Replicas configuration
-replicas: 1
+## @section Replicas parameters
+## @param replicaCount Number of replicas
+replicaCount: 1
 
-# RBAC configuration
+## @section RBAC parameters
+## @param rbac.create Create RBAC resources
 rbac:
   create: true
   
-# OpenAI credentials
+## @section OpenAI parameters
+## @param openai.apiKey OpenAI API Key
+## @param openai.endpoint OpenAI endpoint
+## @param openai.deploymentName OpenAI deployment name
+## @param openai.apiVersion OpenAI API version
 openai:
   apiKey: ""
   endpoint: ""
   deploymentName: ""
-  apiVersion: ""  
+  apiVersion: ""
+
+## @section Pod Disruption Budget parameters
+## @param podDisruptionBudget.enabled Enable Pod Disruption Budget
+## @param podDisruptionBudget.minAvailable Minimum number of pods that must be available
+## @param podDisruptionBudget.maxUnavailable Maximum number of pods that can be unavailable
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+## @section Probes parameters
+## @param probes.liveness.enabled Enable liveness probe
+## @param probes.liveness.initialDelaySeconds Initial delay seconds for liveness probe
+## @param probes.liveness.periodSeconds Period seconds for liveness probe
+## @param probes.liveness.timeoutSeconds Timeout seconds for liveness probe
+## @param probes.liveness.failureThreshold Failure threshold for liveness probe
+## @param probes.liveness.successThreshold Success threshold for liveness probe
+## @param probes.readiness.enabled Enable readiness probe
+## @param probes.readiness.initialDelaySeconds Initial delay seconds for readiness probe
+## @param probes.readiness.periodSeconds Period seconds for readiness probe
+## @param probes.readiness.timeoutSeconds Timeout seconds for readiness probe
+## @param probes.readiness.failureThreshold Failure threshold for readiness probe
+## @param probes.readiness.successThreshold Success threshold for readiness probe
+probes:
+  liveness:
+    enabled: false
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+  readiness:
+    enabled: false
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+
+## @section Metrics parameters
+## @param metrics.enabled Enable metrics
+## @param metrics.port Metrics port
+## @param metrics.serviceMonitor.enabled Enable ServiceMonitor for Prometheus operator
+## @param metrics.serviceMonitor.namespace Namespace in which ServiceMonitor is created
+## @param metrics.serviceMonitor.interval Interval at which metrics should be scraped
+## @param metrics.serviceMonitor.scrapeTimeout Timeout after which the scrape is ended
+metrics:
+  enabled: false
+  port: 9090
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    interval: 30s
+    scrapeTimeout: 10s
+
+## @section Pod annotations parameters
+## @param podAnnotations Additional annotations for pods
+podAnnotations: {}
+
+## @section Pod labels parameters
+## @param podLabels Additional labels for pods
+podLabels: {}  
