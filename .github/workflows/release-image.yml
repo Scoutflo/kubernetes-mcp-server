@@ -8,10 +8,6 @@ on:
     tags:
       - '*'
 
-# env:
-#   IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/kubernetes_mcp_server
-#   TAG: ${{ github.ref_name == 'main' && 'latest' || github.ref_type == 'tag' && github.ref_name && startsWith(github.ref_name, 'v') && github.ref_name || 'unknown' }}
-
 jobs:
   test:
     name: Tests the build and caches the layers
@@ -41,74 +37,8 @@ jobs:
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-
-  increment-version:
-    runs-on: ubuntu-latest
-    outputs:
-      new_version: ${{ steps.increment-version.outputs.new_version }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Get latest Docker tag
-        id: get_latest_tag
-        run: |
-          docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" -p "${{ secrets.DOCKERHUB_TOKEN }}"
-          
-          # Use DockerHub API to get existing tags instead of local images
-          REPO="${{ secrets.DOCKERHUB_USERNAME }}/kubernetes_mcp_server"
-          TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${REPO}/tags?page_size=100" | jq -r '.results[].name' | grep -E '^(prod-v[0-9]+\.[0-9]+|pre-prod-v[0-9]+\.[0-9]+)$' || echo "")
-          
-          echo "Available tags: $TAGS"
-          
-          # Set default versions
-          default_prod_version="prod-v1.0"
-          default_preprod_version="pre-prod-v1.0"
-          
-          if [[ -z "$TAGS" ]]; then
-            echo "No tags found. Using default version."
-            
-            if [[ "${{ github.ref }}" == "refs/heads/release/dev" ]]; then
-              new_version="$default_preprod_version"
-            elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-              new_version="$default_prod_version"
-            fi
-          else
-            # Find the latest tag based on branch
-            if [[ "${{ github.ref }}" == "refs/heads/release/dev" ]]; then
-              latest_tag=$(echo "$TAGS" | grep "^pre-prod-v" | sort -V | tail -n 1)
-              if [[ -z "$latest_tag" ]]; then
-                new_version="$default_preprod_version"
-              else
-                if [[ $latest_tag =~ pre-prod-v([0-9]+)\.([0-9]+) ]]; then
-                  major="${BASH_REMATCH[1]}"
-                  minor="${BASH_REMATCH[2]}"
-                  new_version="pre-prod-v$major.$((minor + 1))"
-                else
-                  new_version="$default_preprod_version"
-                fi
-              fi
-            elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-              latest_tag=$(echo "$TAGS" | grep "^prod-v" | sort -V | tail -n 1)
-              if [[ -z "$latest_tag" ]]; then
-                new_version="$default_prod_version"
-              else
-                if [[ $latest_tag =~ prod-v([0-9]+)\.([0-9]+) ]]; then
-                  major="${BASH_REMATCH[1]}"
-                  minor="${BASH_REMATCH[2]}"
-                  new_version="prod-v$major.$((minor + 1))"
-                else
-                  new_version="$default_prod_version"
-                fi
-              fi
-            fi
-          fi
-          
-          echo "New version: $new_version"
-          echo "::set-output name=new_version::$new_version"
-
   build-pre-prod:
-    needs: [test, increment-version]
+    needs: [test]
     name: Build and push the pre-prod image to the Docker registry
     runs-on: ubuntu-latest
     permissions:
@@ -131,7 +61,6 @@ jobs:
             org.opencontainers.image.source=${{ github.repositoryUrl }}
             org.opencontainers.image.documentation=${{ github.repositoryUrl }}/blob/release/dev/README.md
           tags: |
-            type=raw,value=${{ needs.increment-version.outputs.new_version }}
             type=raw,value=pre-prod-${{ github.run_number }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -162,9 +91,81 @@ jobs:
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-
+  helm-package-push-pre-prod:
+    name: Package and push Helm chart (dev)
+    runs-on: ubuntu-latest
+    needs: [build-pre-prod]
+    permissions:
+      contents: read
+      packages: write
+    if: github.ref == 'refs/heads/release/dev'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+          
+      - name: Set version
+        id: set_version
+        run: |
+          # Use run_number for chart version
+          echo "chart_version=0.1.${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "image_tag=pre-prod-${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "Chart version: 0.1.${{ github.run_number }}"
+          echo "Image tag: pre-prod-${{ github.run_number }}"
+            
+      - name: Update Chart.yaml version
+        run: |
+          echo "Updating Chart.yaml with version: ${{ steps.set_version.outputs.chart_version }}"
+          echo "Docker image tag: ${{ steps.set_version.outputs.image_tag }}"
+          
+          # Print the current Chart.yaml
+          echo "Before update:"
+          cat helm/k8s-mcp-server/Chart.yaml
+          
+          # Update with flexible pattern matching
+          sed -i "s/version:.*$/version: ${{ steps.set_version.outputs.chart_version }}/" helm/k8s-mcp-server/Chart.yaml
+          sed -i "s/appVersion:.*$/appVersion: \"${{ steps.set_version.outputs.image_tag }}\"/" helm/k8s-mcp-server/Chart.yaml
+          
+          echo "After update:"
+          cat helm/k8s-mcp-server/Chart.yaml
+          
+      - name: Update values.yaml with new image tag
+        run: |
+          echo "Updating values.yaml with image tag: ${{ steps.set_version.outputs.image_tag }}"
+          
+          # Print the current values.yaml image section
+          echo "Before update:"
+          grep -A 3 "image:" helm/k8s-mcp-server/values.yaml
+          
+          # Update the image tag in values.yaml
+          sed -i "/image:/,/tag:/ s/tag:.*$/tag: ${{ steps.set_version.outputs.image_tag }}/" helm/k8s-mcp-server/values.yaml
+          
+          echo "After update:"
+          grep -A 3 "image:" helm/k8s-mcp-server/values.yaml
+          
+      - name: Package Helm chart
+        run: |
+          helm package helm/k8s-mcp-server
+          
+      - name: Login to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+          
+      - name: Push Helm chart to GitHub Container Registry
+        run: |
+          version="${{ steps.set_version.outputs.chart_version }}"
+          repo_owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          
+          # Push the chart
+          echo "Pushing Helm chart version $version to GitHub Container Registry"
+          helm push --debug kubernetes-mcp-server-${version}.tgz oci://ghcr.io/${repo_owner}/kubernetes-mcp-server
+          
   build-prod:
-    needs: [test, increment-version]
+    needs: [test]
     name: Build and push the production image to the Docker registry
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -184,7 +185,6 @@ jobs:
             org.opencontainers.image.source=${{ github.repositoryUrl }}
             org.opencontainers.image.documentation=${{ github.repositoryUrl }}/blob/main/README.md
           tags: |
-            type=raw,value=${{ needs.increment-version.outputs.new_version }}
             type=raw,value=production-${{ github.run_number }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -209,54 +209,77 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  # publish-platform-images:
-  #   name: 'Publish: linux-${{ matrix.platform.tag }}'
-  #   strategy:
-  #     fail-fast: true
-  #     matrix:
-  #       platform:
-  #         - runner: ubuntu-latest
-  #           tag: amd64
-  #         - runner: ubuntu-24.04-arm
-  #           tag: arm64
-  #   runs-on: ${{ matrix.platform.runner }}
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #     - name: Install Podman # Not available in arm64 image
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y podman
-  #     - name: Quay Login
-  #       run: |
-  #         echo ${{ secrets.QUAY_PASSWORD }} | podman login quay.io -u ${{ secrets.QUAY_USERNAME }} --password-stdin
-  #     - name: Build Image
-  #       run: |
-  #         podman build \
-  #           --platform "linux/${{ matrix.platform.tag }}" \
-  #           -f Dockerfile \
-  #           -t "${{ env.IMAGE_NAME }}:${{ env.TAG }}-linux-${{ matrix.platform.tag }}" \
-  #           .
-  #     - name: Push Image
-  #       run: |
-  #         podman push \
-  #           "${{ env.IMAGE_NAME }}:${{ env.TAG }}-linux-${{ matrix.platform.tag }}"
+  helm-package-push-production:
+    name: Package and push Helm chart (prod)
+    runs-on: ubuntu-latest
+    needs: [build-prod]
+    permissions:
+      contents: read
+      packages: write
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+          
+      - name: Set version
+        id: set_version
+        run: |
+          # Use run_number for chart version
+          echo "chart_version=0.1.${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "image_tag=production-${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "Chart version: 0.1.${{ github.run_number }}"
+          echo "Image tag: production-${{ github.run_number }}"
+          
+      - name: Update Chart.yaml version
+        run: |
+          echo "Updating Chart.yaml with version: ${{ steps.set_version.outputs.chart_version }}"
+          echo "Docker image tag: ${{ steps.set_version.outputs.image_tag }}"
+          
+          # Print the current Chart.yaml
+          echo "Before update:"
+          cat helm/k8s-mcp-server/Chart.yaml
+          
+          # Update with flexible pattern matching
+          sed -i "s/version:.*$/version: ${{ steps.set_version.outputs.chart_version }}/" helm/k8s-mcp-server/Chart.yaml
+          sed -i "s/appVersion:.*$/appVersion: \"${{ steps.set_version.outputs.image_tag }}\"/" helm/k8s-mcp-server/Chart.yaml
+          
+          echo "After update:"
+          cat helm/k8s-mcp-server/Chart.yaml
+          
+      - name: Update values.yaml with new image tag
+        run: |
+          echo "Updating values.yaml with image tag: ${{ steps.set_version.outputs.image_tag }}"
+          
+          # Print the current values.yaml image section
+          echo "Before update:"
+          grep -A 3 "image:" helm/k8s-mcp-server/values.yaml
+          
+          # Update the image tag in values.yaml
+          sed -i "/image:/,/tag:/ s/tag:.*$/tag: ${{ steps.set_version.outputs.image_tag }}/" helm/k8s-mcp-server/values.yaml
+          
+          echo "After update:"
+          grep -A 3 "image:" helm/k8s-mcp-server/values.yaml
+          
+      - name: Package Helm chart
+        run: |
+          helm package helm/k8s-mcp-server
+          
+      - name: Login to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+          
+      - name: Push Helm chart to GitHub Container Registry
+        run: |
+          version="${{ steps.set_version.outputs.chart_version }}"
+          repo_owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          
+          # Push the chart
+          echo "Pushing Helm chart version $version to GitHub Container Registry"
+          helm push --debug kubernetes-mcp-server-${version}.tgz oci://ghcr.io/${repo_owner}/kubernetes-mcp-server
 
-  # publish-manifest:
-  #   name: Publish Manifest
-  #   runs-on: ubuntu-latest
-  #   needs: publish-platform-images
-  #   steps:
-  #     - name: Quay Login
-  #       run: |
-  #         echo ${{ secrets.QUAY_PASSWORD }} | podman login quay.io -u ${{ secrets.QUAY_USERNAME }} --password-stdin
-  #     - name: Create Manifest
-  #       run: |
-  #         podman manifest create \
-  #           "${{ env.IMAGE_NAME }}:${{ env.TAG }}" \
-  #           "${{ env.IMAGE_NAME }}:${{ env.TAG }}-linux-amd64" \
-  #           "${{ env.IMAGE_NAME }}:${{ env.TAG }}-linux-arm64"
-  #     - name: Push Manifest
-  #       run: |
-  #         podman manifest push \
-  #           "${{ env.IMAGE_NAME }}:${{ env.TAG }}"
+  

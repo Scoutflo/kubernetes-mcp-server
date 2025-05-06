@@ -10,16 +10,21 @@ This Helm chart deploys the Kubernetes MCP Server in a Kubernetes cluster with p
 
 ## Installing the Chart
 
-To install the chart with the release name `my-release`:
+### From GitHub Container Registry (Recommended)
+
+Install directly from the GitHub Container Registry:
 
 ```bash
-# Add the repository (if needed)
-# helm repo add scoutflo https://scoutflo.github.io/charts
+helm install kubernetes-mcp-server oci://ghcr.io/scoutflo/kubernetes-mcp-server --namespace k8s-mcp-server --create-namespace
+```
 
-# Update your repositories (if needed)
-# helm repo update
+For more detailed installation instructions, version updates, and troubleshooting, see the [Installation Guide](./INSTALLATION_GUIDE.md).
 
-# Install the chart
+### From Local Chart
+
+To install the chart with the release name `my-release` from the local chart:
+
+```bash
 helm install my-release ./helm/k8s-mcp-server
 ```
 
@@ -144,5 +149,13 @@ openai:
 Install the chart with custom values:
 
 ```bash
+# Using local chart
 helm install my-release ./helm/k8s-mcp-server -f values.yaml
-``` 
+
+# Using OCI registry
+helm install kubernetes-mcp-server oci://ghcr.io/scoutflo/kubernetes-mcp-server -f values.yaml -n k8s-mcp-server --create-namespace
+```
+
+## Latest Versions
+
+The latest versions are automatically published to GitHub Container Registry through our CI/CD pipeline. See the [Installation Guide](./INSTALLATION_GUIDE.md) for more details on version management and updates. 
