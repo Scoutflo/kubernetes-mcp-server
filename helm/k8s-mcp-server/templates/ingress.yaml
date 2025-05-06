@@ -23,4 +23,4 @@ spec:
               service:
                 name: {{ include "k8s-mcp-server.serviceName" . }}
                 port:
-                  number: {{ .Values.service.httpPort }}
+                  number: {{ .Values.service.httpsPort }}

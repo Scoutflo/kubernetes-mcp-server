@@ -8,13 +8,13 @@ This guide provides instructions for installing the Kubernetes MCP Server Helm c
 
 ```bash
 # Install directly from GitHub Container Registry
-helm install kubernetes-mcp-server oci://ghcr.io/scoutflo/kubernetes-mcp-server --namespace k8s-mcp-server --create-namespace
+helm install k8s-mcp-server oci://ghcr.io/scoutflo/kubernetes-mcp-server/kubernetes-mcp-server --namespace k8s-mcp-server --create-namespace
 ```
 
 ### Updating the Chart
 
 ```bash
-helm upgrade kubernetes-mcp-server oci://ghcr.io/scoutflo/kubernetes-mcp-server --namespace k8s-mcp-server --version 0.1.x
+helm upgrade k8s-mcp-server oci://ghcr.io/scoutflo/kubernetes-mcp-server/kubernetes-mcp-server --namespace k8s-mcp-server --version 0.1.x
 ```
 
 ### Installing from Local Chart
