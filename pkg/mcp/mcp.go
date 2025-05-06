@@ -78,6 +78,7 @@ func (s *Server) reloadKubernetesClient() error {
 		s.initHelm(),
 		s.initArgoCD(),
 		s.initArgoRollouts(),
+		s.initDocker(),
 	)...)
 	return nil
 }
