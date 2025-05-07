@@ -294,13 +294,75 @@ func (s *Server) argocdGetApplication(ctx context.Context, ctr mcp.CallToolReque
 		return NewTextResult("", fmt.Errorf("failed to get application '%s': %w", name, err)), nil
 	}
 
+	// Build a user-friendly summary of the application
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Application: %s\n", app.Metadata.Name))
+	sb.WriteString(fmt.Sprintf("Project: %s\n", app.Spec.Project))
+	sb.WriteString(fmt.Sprintf("Namespace: %s\n", app.Spec.Destination.Namespace))
+	sb.WriteString(fmt.Sprintf("Destination Server: %s\n", app.Spec.Destination.Server))
+	sb.WriteString(fmt.Sprintf("Source: %s\n", app.Spec.Source.RepoURL))
+	sb.WriteString(fmt.Sprintf("Path: %s\n", app.Spec.Source.Path))
+	sb.WriteString(fmt.Sprintf("Target Revision: %s\n", app.Spec.Source.TargetRevision))
+
+	// Add sync policy information
+	if app.Spec.SyncPolicy != nil && app.Spec.SyncPolicy.Automated != nil {
+		sb.WriteString("Sync Policy: Automated")
+		if app.Spec.SyncPolicy.Automated.Prune {
+			sb.WriteString(" (with pruning)")
+		}
+		if app.Spec.SyncPolicy.Automated.SelfHeal {
+			sb.WriteString(" (with self-healing)")
+		}
+		sb.WriteString("\n")
+	} else {
+		sb.WriteString("Sync Policy: Manual\n")
+	}
+
+	// Add status information
+	sb.WriteString(fmt.Sprintf("\nStatus Summary:\n"))
+	sb.WriteString(fmt.Sprintf("- Sync Status: %s\n", app.Status.Sync.Status))
+	sb.WriteString(fmt.Sprintf("- Health Status: %s\n", app.Status.Health.Status))
+
+	if app.Status.OperationState != nil {
+		sb.WriteString(fmt.Sprintf("- Operation: %s\n", app.Status.OperationState.Phase))
+		if app.Status.OperationState.Message != "" {
+			sb.WriteString(fmt.Sprintf("- Message: %s\n", app.Status.OperationState.Message))
+		}
+	}
+
+	// Add resource count if available
+	if len(app.Status.Resources) > 0 {
+		resourceCounts := make(map[string]int)
+		statusCounts := make(map[string]int)
+
+		for _, res := range app.Status.Resources {
+			resourceCounts[res.Kind]++
+			statusCounts[res.Status]++
+		}
+
+		sb.WriteString("\nResources:\n")
+		for kind, count := range resourceCounts {
+			sb.WriteString(fmt.Sprintf("- %s: %d\n", kind, count))
+		}
+
+		sb.WriteString("\nResource Status:\n")
+		for status, count := range statusCounts {
+			sb.WriteString(fmt.Sprintf("- %s: %d\n", status, count))
+		}
+	}
+
+	// Provide full JSON for detailed information
+	sb.WriteString("\nFull Application Details (JSON):\n")
+
 	// Format as JSON with indentation
-	result, err := formatJSON(app)
+	jsonResult, err := formatJSON(app)
 	if err != nil {
 		return NewTextResult("", err), nil
 	}
 
-	return NewTextResult(result, nil), nil
+	sb.WriteString(jsonResult)
+
+	return NewTextResult(sb.String(), nil), nil
 }
 
 // argocdSyncApplication syncs an ArgoCD application
@@ -368,9 +430,36 @@ func (s *Server) argocdSyncApplication(ctx context.Context, ctr mcp.CallToolRequ
 		resourcesMsg = fmt.Sprintf(" (specific resources: %s)", strings.Join(resources, ", "))
 	}
 
-	result := fmt.Sprintf("Successfully started sync of application '%s'%s in %s mode%s%s",
-		name, revisionMsg, mode, pruneMsg, resourcesMsg)
+	// Build a more detailed success message
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Successfully initiated sync of application '%s'%s in %s mode%s%s\n\n",
+		name, revisionMsg, mode, pruneMsg, resourcesMsg))
 
+	// Get the latest application status to provide more context
+	app, appErr := argoClient.GetApplication(ctx, name, "normal")
+	if appErr == nil {
+		sb.WriteString("Current application status:\n")
+		sb.WriteString(fmt.Sprintf("- Sync Status: %s\n", app.Status.Sync.Status))
+		sb.WriteString(fmt.Sprintf("- Health Status: %s\n", app.Status.Health.Status))
+
+		if app.Status.OperationState != nil {
+			sb.WriteString(fmt.Sprintf("- Operation Phase: %s\n", app.Status.OperationState.Phase))
+			if app.Status.OperationState.Message != "" {
+				sb.WriteString(fmt.Sprintf("- Operation Message: %s\n", app.Status.OperationState.Message))
+			}
+		}
+
+		// Add resource status information
+		if len(app.Status.Resources) > 0 {
+			sb.WriteString("\nResources:\n")
+			for _, res := range app.Status.Resources {
+				sb.WriteString(fmt.Sprintf("- %s/%s: %s\n",
+					res.Kind, res.Name, res.Status))
+			}
+		}
+	}
+
+	result := sb.String()
 	return NewTextResult(result, nil), nil
 }
 
@@ -445,11 +534,17 @@ func (s *Server) argocdCreateApplication(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("failed to create application '%s': %w", name, err)), nil
 	}
 
-	// Format the response
-	result, err := formatJSON(createdApp)
+	// Format the response with a clear success message
+	successMsg := fmt.Sprintf("Successfully created application '%s' in project '%s'.\n\nApplication details:\n", name, project)
+
+	// Format the application details as JSON
+	appDetails, err := formatJSON(createdApp)
 	if err != nil {
 		return NewTextResult("", err), nil
 	}
+
+	// Combine success message with application details
+	result := successMsg + appDetails
 
 	return NewTextResult(result, nil), nil
 }
@@ -510,11 +605,45 @@ func (s *Server) argocdUpdateApplication(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("failed to update application '%s': %w", name, err)), nil
 	}
 
-	// Format the response
-	result, err := formatJSON(updatedApp)
+	// Create a success message listing what was updated
+	var updatedFields []string
+	if project != "" {
+		updatedFields = append(updatedFields, "project")
+	}
+	if repoURL != "" {
+		updatedFields = append(updatedFields, "repository URL")
+	}
+	if path != "" {
+		updatedFields = append(updatedFields, "path")
+	}
+	if destServer != "" {
+		updatedFields = append(updatedFields, "destination server")
+	}
+	if destNamespace != "" {
+		updatedFields = append(updatedFields, "destination namespace")
+	}
+	if revision != "" {
+		updatedFields = append(updatedFields, "revision")
+	}
+	if automatedSync != nil || prune != nil || selfHeal != nil {
+		updatedFields = append(updatedFields, "sync policy")
+	}
+
+	var updateDesc string
+	if len(updatedFields) > 0 {
+		updateDesc = fmt.Sprintf(" with updated %s", strings.Join(updatedFields, ", "))
+	}
+
+	successMsg := fmt.Sprintf("Successfully updated application '%s'%s.\n\nApplication details:\n", name, updateDesc)
+
+	// Format the updated application as JSON
+	appDetails, err := formatJSON(updatedApp)
 	if err != nil {
 		return NewTextResult("", err), nil
 	}
+
+	// Combine success message with application details
+	result := successMsg + appDetails
 
 	return NewTextResult(result, nil), nil
 }
@@ -558,13 +687,19 @@ func (s *Server) argocdDeleteApplication(ctx context.Context, ctr mcp.CallToolRe
 	}()
 
 	// First check if the application exists
-	_, err = argoClient.GetApplication(ctx, name, "")
+	app, err := argoClient.GetApplication(ctx, name, "")
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "404") {
 			return NewTextResult("", fmt.Errorf("application '%s' not found", name)), nil
 		}
 		return NewTextResult("", fmt.Errorf("failed to verify application existence: %w", err)), nil
 	}
+
+	// Capture some details about the application before deleting it
+	appProject := app.Spec.Project
+	appDestNamespace := app.Spec.Destination.Namespace
+	appRepoURL := app.Spec.Source.RepoURL
+	appPath := app.Spec.Source.Path
 
 	// Delete the application
 	err = argoClient.DeleteApplication(ctx, name, cascade, propagationPolicy, namespace)
@@ -576,19 +711,26 @@ func (s *Server) argocdDeleteApplication(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("failed to delete application '%s': %w", name, err)), nil
 	}
 
-	// Prepare success message
-	cascadeMsg := ""
+	// Build detailed success message
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("✅ Successfully deleted ArgoCD application '%s'\n\n", name))
+	sb.WriteString("Deleted application details:\n")
+	sb.WriteString(fmt.Sprintf("- Project: %s\n", appProject))
+	sb.WriteString(fmt.Sprintf("- Namespace: %s\n", appDestNamespace))
+	sb.WriteString(fmt.Sprintf("- Repository: %s\n", appRepoURL))
+	sb.WriteString(fmt.Sprintf("- Path: %s\n", appPath))
+
+	sb.WriteString("\nDeletion options:\n")
 	if cascade {
-		cascadeMsg = " and its resources"
+		sb.WriteString("- Cascade: true (application resources were also deleted)\n")
+	} else {
+		sb.WriteString("- Cascade: false (application resources were preserved)\n")
 	}
 
-	propagationMsg := ""
 	if propagationPolicy != "" {
-		propagationMsg = fmt.Sprintf(" using propagation policy '%s'", propagationPolicy)
+		sb.WriteString(fmt.Sprintf("- Propagation Policy: %s\n", propagationPolicy))
 	}
 
-	result := fmt.Sprintf("Successfully deleted application '%s'%s%s", name, cascadeMsg, propagationMsg)
-	log.Info(result)
-
-	return NewTextResult(result, nil), nil
+	log.Info(fmt.Sprintf("Successfully deleted application '%s'", name))
+	return NewTextResult(sb.String(), nil), nil
 }
