@@ -38,7 +38,7 @@ ingress:
 ## @param image.dockerConfigSecret Docker config secret for private registry
 image:
   repository: scoutflo/kubernetes_mcp_server
-  tag: pre-prod-22
+  tag: pre-prod-26
   pullPolicy: IfNotPresent
   dockerConfigSecret: "eyJhdXRocyI6eyJodHRwczovL2luZGV4LmRvY2tlci5pby92MS8iOnsidXNlcm5hbWUiOiJzY291dGZsbyIsInBhc3N3b3JkIjoiZGNrcl9wYXRfNFlNLUZuZWNYTklnUS1ZVVpxV1pKeEFUUTZ3IiwiZW1haWwiOiJjb250YWN0QHNjb3V0ZmxvLmNvbSIsImF1dGgiOiJjMk52ZFhSbWJHODZaR05yY2w5d1lYUmZORmxOTFVadVpXTllUa2xuVVMxWlZWcHhWMXBLZUVGVVVUWjMifX19"
 
@@ -83,10 +83,10 @@ rbac:
 ## @param openai.deploymentName OpenAI deployment name
 ## @param openai.apiVersion OpenAI API version
 openai:
-  apiKey: ""
-  endpoint: ""
-  deploymentName: ""
-  apiVersion: ""
+  apiKey: "qWU7whjnsPo4raxabq2iWHH3v1EzHqOwQfvlDV7vhPzWDiL6UkBIJQQJ99BCACYeBjFXJ3w3AAABACOG6yoL"
+  endpoint: "https://sf-ai-test.openai.azure.com/"
+  deploymentName: "gpt-4o"
+  apiVersion: "2024-02-15-preview"
 
 ## @section Pod Disruption Budget parameters
 ## @param podDisruptionBudget.enabled Enable Pod Disruption Budget
