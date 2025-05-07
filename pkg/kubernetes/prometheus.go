@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -378,7 +379,14 @@ func (k *Kubernetes) GeneratePromQLQuery(description string) (string, error) {
 	// Create a new LLM client
 	llmClient, err := llm.NewDefaultClient()
 	if err != nil {
-		return "", fmt.Errorf("failed to create LLM client: %v", err)
+		// Add detailed error information for debugging
+		apiKey := os.Getenv("AZURE_OPENAI_API_KEY")
+		endpoint := os.Getenv("AZURE_OPENAI_ENDPOINT")
+		deploymentName := os.Getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+		apiVersion := os.Getenv("OPENAI_API_VERSION")
+
+		return "", fmt.Errorf("failed to create LLM client: %v (API Key empty: %v, Endpoint empty: %v, Deployment empty: %v, API Version empty: %v)",
+			err, apiKey == "", endpoint == "", deploymentName == "", apiVersion == "")
 	}
 
 	// Make the LLM API call with the PromQL prompt and the description

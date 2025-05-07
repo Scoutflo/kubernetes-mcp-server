@@ -35,26 +35,26 @@ spec:
             containerPort: {{ .Values.metrics.port }}
           {{- end }}
           env:
-          - name: AZURE_OPENAI_API_KEY
-            valueFrom:
-              secretKeyRef:
-                name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
-                key: AZURE_OPENAI_API_KEY
-          - name: AZURE_OPENAI_ENDPOINT
-            valueFrom:
-              secretKeyRef:
-                name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
-                key: AZURE_OPENAI_ENDPOINT
-          - name: AZURE_OPENAI_DEPLOYMENT_NAME
-            valueFrom:
-              secretKeyRef:
-                name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
-                key: AZURE_OPENAI_DEPLOYMENT_NAME
-          - name: OPENAI_API_VERSION
-            valueFrom:
-              secretKeyRef:
-                name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
-                key: OPENAI_API_VERSION
+            - name: AZURE_OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
+                  key: AZURE_OPENAI_API_KEY
+            - name: AZURE_OPENAI_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
+                  key: AZURE_OPENAI_ENDPOINT
+            - name: AZURE_OPENAI_DEPLOYMENT_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
+                  key: AZURE_OPENAI_DEPLOYMENT_NAME
+            - name: OPENAI_API_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
+                  key: OPENAI_API_VERSION
           {{- if .Values.probes.liveness.enabled }}
           livenessProbe:
             httpGet:
