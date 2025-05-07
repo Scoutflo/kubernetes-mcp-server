@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -93,9 +94,28 @@ func NewDefaultClient() (*Client, error) {
 	endpoint := os.Getenv("AZURE_OPENAI_ENDPOINT")
 	deploymentName := os.Getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 	apiVersion := os.Getenv("OPENAI_API_VERSION")
+	maxTokensStr := os.Getenv("AZURE_OPENAI_MAX_TOKENS")
+	temperatureStr := os.Getenv("AZURE_OPENAI_TEMPERATURE")
+	topPStr := os.Getenv("AZURE_OPENAI_TOP_P")
 
-	if apiKey == "" || endpoint == "" || deploymentName == "" || apiVersion == "" {
+	if apiKey == "" || endpoint == "" || deploymentName == "" || apiVersion == "" || maxTokensStr == "" || temperatureStr == "" || topPStr == "" {
 		return nil, errors.New("missing required environment variables for Azure OpenAI")
+	}
+
+	// Convert string values to proper types
+	maxTokens, err := strconv.Atoi(maxTokensStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid value for AZURE_OPENAI_MAX_TOKENS: %v", err)
+	}
+
+	temperature, err := strconv.ParseFloat(temperatureStr, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid value for AZURE_OPENAI_TEMPERATURE: %v", err)
+	}
+
+	topP, err := strconv.ParseFloat(topPStr, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid value for AZURE_OPENAI_TOP_P: %v", err)
 	}
 
 	config := Config{
@@ -103,9 +123,9 @@ func NewDefaultClient() (*Client, error) {
 		Endpoint:       endpoint,
 		DeploymentName: deploymentName,
 		APIVersion:     apiVersion,
-		MaxTokens:      1024,
-		Temperature:    0.7,
-		TopP:           1.0,
+		MaxTokens:      maxTokens,
+		Temperature:    temperature,
+		TopP:           topP,
 	}
 
 	return NewClient(config), nil

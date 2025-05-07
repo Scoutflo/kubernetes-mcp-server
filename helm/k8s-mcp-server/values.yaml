@@ -87,6 +87,9 @@ openai:
   endpoint: "https://sf-ai-test.openai.azure.com/"
   deploymentName: "gpt-4o"
   apiVersion: "2024-02-15-preview"
+  maxTokens: 1024
+  temperature: 0.7
+  topP: 1.0
 
 ## @section Pod Disruption Budget parameters
 ## @param podDisruptionBudget.enabled Enable Pod Disruption Budget

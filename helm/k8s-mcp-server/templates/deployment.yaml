@@ -55,6 +55,21 @@ spec:
                 secretKeyRef:
                   name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
                   key: OPENAI_API_VERSION
+            - name: AZURE_OPENAI_MAX_TOKENS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
+                  key: AZURE_OPENAI_MAX_TOKENS
+            - name: AZURE_OPENAI_TEMPERATURE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
+                  key: AZURE_OPENAI_TEMPERATURE
+            - name: AZURE_OPENAI_TOP_P
+              valueFrom:  
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
+                  key: AZURE_OPENAI_TOP_P
           {{- if .Values.probes.liveness.enabled }}
           livenessProbe:
             httpGet:
