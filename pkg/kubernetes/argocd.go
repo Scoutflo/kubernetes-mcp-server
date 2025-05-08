@@ -778,3 +778,394 @@ func (c *ArgoClient) DeleteApplication(ctx context.Context, name string, cascade
 	body, _ := io.ReadAll(resp.Body)
 	return fmt.Errorf("delete application failed with status code %d: %s", resp.StatusCode, string(body))
 }
+
+// ApplicationResourceTree represents the resource tree of an application
+type ApplicationResourceTree struct {
+	Nodes []ResourceNode `json:"nodes"`
+	Edges []ResourceEdge `json:"edges"`
+}
+
+// ResourceNode represents a node in the application resource tree
+type ResourceNode struct {
+	Group           string            `json:"group"`
+	Version         string            `json:"version"`
+	Kind            string            `json:"kind"`
+	Namespace       string            `json:"namespace"`
+	Name            string            `json:"name"`
+	UID             string            `json:"uid"`
+	ResourceVersion string            `json:"resourceVersion"`
+	Health          HealthStatus      `json:"health,omitempty"`
+	Status          string            `json:"status,omitempty"`
+	Info            []ResourceInfo    `json:"info,omitempty"`
+	NetworkingInfo  *NetworkingInfo   `json:"networkingInfo,omitempty"`
+	ResourceStatus  *ResourceStatus   `json:"resourceStatus,omitempty"`
+	Images          []string          `json:"images,omitempty"`
+	CreatedAt       string            `json:"createdAt,omitempty"`
+	ParentRefs      []ParentRef       `json:"parentRefs,omitempty"`
+	Annotations     map[string]string `json:"annotations,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty"`
+}
+
+// ResourceEdge represents an edge in the application resource tree
+type ResourceEdge struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+// ResourceInfo represents information about a resource
+type ResourceInfo struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// NetworkingInfo contains networking information about a resource
+type NetworkingInfo struct {
+	TargetLabels map[string]string `json:"targetLabels,omitempty"`
+	Labels       map[string]string `json:"labels,omitempty"`
+	Ingress      []Ingress         `json:"ingress,omitempty"`
+	ExternalURLs []string          `json:"externalURLs,omitempty"`
+}
+
+// Ingress contains information about an ingress resource
+type Ingress struct {
+	Host  string        `json:"host"`
+	Paths []IngressPath `json:"paths"`
+}
+
+// IngressPath represents a path in an ingress
+type IngressPath struct {
+	Path     string `json:"path"`
+	Backend  string `json:"backend"`
+	Service  string `json:"service"`
+	Port     int    `json:"port"`
+	Protocol string `json:"protocol,omitempty"`
+}
+
+// ParentRef represents a reference to a parent resource
+type ParentRef struct {
+	Group     string `json:"group"`
+	Version   string `json:"version"`
+	Kind      string `json:"kind"`
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	UID       string `json:"uid"`
+}
+
+// ApplicationManagedResourcesResponse represents managed resources response
+type ApplicationManagedResourcesResponse struct {
+	Items []ResourceDiff `json:"items"`
+}
+
+// ResourceDiff represents a diff of a resource
+type ResourceDiff struct {
+	Group               string `json:"group"`
+	Kind                string `json:"kind"`
+	Name                string `json:"name"`
+	Namespace           string `json:"namespace"`
+	Hook                bool   `json:"hook"`
+	NormalizedLiveState string `json:"normalizedLiveState,omitempty"`
+	PredictedLiveState  string `json:"predictedLiveState,omitempty"`
+	TargetState         string `json:"targetState,omitempty"`
+	LiveState           string `json:"liveState,omitempty"`
+	Modified            bool   `json:"modified,omitempty"`
+}
+
+// ApplicationLog represents a log entry from an application
+type ApplicationLog struct {
+	Content   string `json:"content"`
+	PodName   string `json:"podName"`
+	TimeStamp string `json:"timeStamp,omitempty"`
+	Container string `json:"container,omitempty"`
+}
+
+// Event represents a Kubernetes event
+type Event struct {
+	Metadata       Metadata    `json:"metadata"`
+	Type           string      `json:"type"`
+	Reason         string      `json:"reason"`
+	Message        string      `json:"message"`
+	Count          int         `json:"count"`
+	FirstTimestamp string      `json:"firstTimestamp"`
+	LastTimestamp  string      `json:"lastTimestamp"`
+	InvolvedObject ObjectRef   `json:"involvedObject"`
+	Source         EventSource `json:"source"`
+}
+
+// EventSource represents the source of an event
+type EventSource struct {
+	Component string `json:"component,omitempty"`
+	Host      string `json:"host,omitempty"`
+}
+
+// ObjectRef contains reference to an object
+type ObjectRef struct {
+	Kind            string `json:"kind"`
+	Namespace       string `json:"namespace,omitempty"`
+	Name            string `json:"name"`
+	UID             string `json:"uid,omitempty"`
+	ResourceVersion string `json:"resourceVersion,omitempty"`
+}
+
+// EventList represents a list of events
+type EventList struct {
+	Items []Event `json:"items"`
+}
+
+// ResourceAction represents an action that can be performed on a resource
+type ResourceAction struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName"`
+	Description string `json:"description,omitempty"`
+	Disabled    bool   `json:"disabled"`
+	Background  bool   `json:"background"`
+}
+
+// ResourceActionsResponse represents available actions for a resource
+type ResourceActionsResponse struct {
+	Actions []ResourceAction `json:"actions"`
+}
+
+// GetApplicationResourceTree gets the resource tree for an application
+func (c *ArgoClient) GetApplicationResourceTree(ctx context.Context, appName string) (*ApplicationResourceTree, error) {
+	path := fmt.Sprintf("/api/v1/applications/%s/resource-tree", appName)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, path, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get application resource tree failed with status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var resourceTree ApplicationResourceTree
+	err = json.NewDecoder(resp.Body).Decode(&resourceTree)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing application resource tree: %w", err)
+	}
+
+	return &resourceTree, nil
+}
+
+// GetApplicationManagedResources gets the managed resources for an application
+func (c *ArgoClient) GetApplicationManagedResources(ctx context.Context, appName string) (*ApplicationManagedResourcesResponse, error) {
+	path := fmt.Sprintf("/api/v1/applications/%s/managed-resources", appName)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, path, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get application managed resources failed with status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var managedResources ApplicationManagedResourcesResponse
+	err = json.NewDecoder(resp.Body).Decode(&managedResources)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing application managed resources: %w", err)
+	}
+
+	return &managedResources, nil
+}
+
+// GetWorkloadLogs gets logs for a workload in an application
+func (c *ArgoClient) GetWorkloadLogs(ctx context.Context, appName, appNamespace, resourceNamespace, resourceName,
+	resourceKind, resourceGroup, resourceVersion, container string, tail int, follow bool) ([]ApplicationLog, error) {
+
+	path := fmt.Sprintf("/api/v1/applications/%s/logs", appName)
+
+	// Build query parameters
+	queryParams := make(map[string]string)
+	queryParams["appNamespace"] = appNamespace
+	queryParams["namespace"] = resourceNamespace
+	queryParams["name"] = resourceName
+	queryParams["kind"] = resourceKind
+
+	if resourceGroup != "" {
+		queryParams["group"] = resourceGroup
+	}
+
+	if resourceVersion != "" {
+		queryParams["resourceVersion"] = resourceVersion
+	}
+
+	if container != "" {
+		queryParams["container"] = container
+	}
+
+	queryParams["tailLines"] = fmt.Sprintf("%d", tail)
+	queryParams["follow"] = fmt.Sprintf("%t", follow)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, path, queryParams, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get workload logs failed with status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse the logs from the response
+	var logs []ApplicationLog
+
+	// If response is a JSON array
+	contentType := resp.Header.Get("Content-Type")
+	if strings.Contains(contentType, "application/json") {
+		err = json.NewDecoder(resp.Body).Decode(&logs)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing logs: %w", err)
+		}
+	} else {
+		// Handle plain text logs - convert to ApplicationLog objects
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("error reading logs response: %w", err)
+		}
+
+		logLines := strings.Split(string(bodyBytes), "\n")
+		for _, line := range logLines {
+			if line != "" {
+				logs = append(logs, ApplicationLog{
+					Content:   line,
+					PodName:   resourceName,
+					Container: container,
+				})
+			}
+		}
+	}
+
+	return logs, nil
+}
+
+// GetResourceEvents gets events for a resource in an application
+func (c *ArgoClient) GetResourceEvents(ctx context.Context, appName, appNamespace, resourceUID, resourceNamespace, resourceName string) (*EventList, error) {
+	path := fmt.Sprintf("/api/v1/applications/%s/events", appName)
+
+	// Build query parameters
+	queryParams := make(map[string]string)
+	queryParams["appNamespace"] = appNamespace
+	queryParams["resourceNamespace"] = resourceNamespace
+	queryParams["resourceUID"] = resourceUID
+	queryParams["resourceName"] = resourceName
+
+	resp, err := c.doRequest(ctx, http.MethodGet, path, queryParams, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get resource events failed with status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var events EventList
+	err = json.NewDecoder(resp.Body).Decode(&events)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing resource events: %w", err)
+	}
+
+	return &events, nil
+}
+
+// GetResourceActions gets available actions for a resource in an application
+func (c *ArgoClient) GetResourceActions(ctx context.Context, appName, appNamespace, resourceNamespace, resourceName,
+	resourceKind, resourceGroup, resourceVersion, resourceUID string) (*ResourceActionsResponse, error) {
+
+	path := fmt.Sprintf("/api/v1/applications/%s/resource/actions", appName)
+
+	// Build query parameters
+	queryParams := make(map[string]string)
+	queryParams["appNamespace"] = appNamespace
+	queryParams["namespace"] = resourceNamespace
+	queryParams["name"] = resourceName
+	queryParams["kind"] = resourceKind
+
+	if resourceGroup != "" {
+		queryParams["group"] = resourceGroup
+	}
+
+	if resourceVersion != "" {
+		queryParams["version"] = resourceVersion
+	}
+
+	if resourceUID != "" {
+		queryParams["resourceUID"] = resourceUID
+	}
+
+	resp, err := c.doRequest(ctx, http.MethodGet, path, queryParams, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get resource actions failed with status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var actions ResourceActionsResponse
+	err = json.NewDecoder(resp.Body).Decode(&actions)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing resource actions: %w", err)
+	}
+
+	return &actions, nil
+}
+
+// RunResourceAction runs an action on a resource in an application
+func (c *ArgoClient) RunResourceAction(ctx context.Context, appName, appNamespace, resourceNamespace, resourceName,
+	resourceKind, resourceGroup, resourceVersion, resourceUID, actionName string) (*Application, error) {
+
+	path := fmt.Sprintf("/api/v1/applications/%s/resource/actions", appName)
+
+	// Build query parameters
+	queryParams := make(map[string]string)
+	queryParams["appNamespace"] = appNamespace
+	queryParams["namespace"] = resourceNamespace
+	queryParams["name"] = resourceName
+	queryParams["kind"] = resourceKind
+
+	if resourceGroup != "" {
+		queryParams["group"] = resourceGroup
+	}
+
+	if resourceVersion != "" {
+		queryParams["version"] = resourceVersion
+	}
+
+	if resourceUID != "" {
+		queryParams["resourceUID"] = resourceUID
+	}
+
+	// Action name is passed in the body
+	actionBody := map[string]string{
+		"action": actionName,
+	}
+
+	resp, err := c.doRequest(ctx, http.MethodPost, path, queryParams, actionBody)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("run resource action failed with status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result Application
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing action result: %w", err)
+	}
+
+	return &result, nil
+}
