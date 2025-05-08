@@ -143,7 +143,14 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusCreateSnapshot},
 		{Tool: mcp.NewTool("prometheus_delete_series",
 			mcp.WithDescription("Tool for deleting Prometheus series data. Deletes time series data matching specific criteria in Prometheus. Use this tool carefully to remove obsolete data or free up storage space. Deleted data cannot be recovered. You can specify time ranges and series selectors."),
-			mcp.WithArray("match", mcp.Description("Series selectors"), mcp.Required()),
+			mcp.WithArray("match", mcp.Description("Series selectors"),
+				func(schema map[string]interface{}) {
+					schema["type"] = "array"
+					schema["items"] = map[string]interface{}{
+						"type": "string",
+					}
+				},
+				mcp.Required()),
 			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format (optional)")),
 			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format (optional)")),
 		), Handler: s.prometheusDeleteSeries},

@@ -979,14 +979,13 @@ func (c *ArgoClient) GetWorkloadLogs(ctx context.Context, appName, appNamespace 
 }
 
 // GetResourceEvents gets events for a resource in an application
-func (c *ArgoClient) GetResourceEvents(ctx context.Context, appName, appNamespace, resourceUID, resourceNamespace, resourceName string) (*EventList, error) {
+func (c *ArgoClient) GetResourceEvents(ctx context.Context, appName, appNamespace, resourceNamespace, resourceName string) (*EventList, error) {
 	path := fmt.Sprintf("/api/v1/applications/%s/events", appName)
 
 	// Build query parameters
 	queryParams := make(map[string]string)
 	queryParams["appNamespace"] = appNamespace
 	queryParams["resourceNamespace"] = resourceNamespace
-	queryParams["resourceUID"] = resourceUID
 	queryParams["resourceName"] = resourceName
 
 	resp, err := c.doRequest(ctx, http.MethodGet, path, queryParams, nil)
@@ -1011,7 +1010,7 @@ func (c *ArgoClient) GetResourceEvents(ctx context.Context, appName, appNamespac
 
 // GetResourceActions gets available actions for a resource in an application
 func (c *ArgoClient) GetResourceActions(ctx context.Context, appName, appNamespace, resourceNamespace, resourceName,
-	resourceKind, resourceGroup, resourceVersion, resourceUID string) (*ResourceActionsResponse, error) {
+	resourceKind, resourceGroup, resourceVersion string) (*ResourceActionsResponse, error) {
 
 	path := fmt.Sprintf("/api/v1/applications/%s/resource/actions", appName)
 
@@ -1028,10 +1027,6 @@ func (c *ArgoClient) GetResourceActions(ctx context.Context, appName, appNamespa
 
 	if resourceVersion != "" {
 		queryParams["version"] = resourceVersion
-	}
-
-	if resourceUID != "" {
-		queryParams["resourceUID"] = resourceUID
 	}
 
 	resp, err := c.doRequest(ctx, http.MethodGet, path, queryParams, nil)
@@ -1056,7 +1051,7 @@ func (c *ArgoClient) GetResourceActions(ctx context.Context, appName, appNamespa
 
 // RunResourceAction runs an action on a resource in an application
 func (c *ArgoClient) RunResourceAction(ctx context.Context, appName, appNamespace, resourceNamespace, resourceName,
-	resourceKind, resourceGroup, resourceVersion, resourceUID, actionName string) (*Application, error) {
+	resourceKind, resourceGroup, resourceVersion, actionName string) (*Application, error) {
 
 	path := fmt.Sprintf("/api/v1/applications/%s/resource/actions", appName)
 
@@ -1073,10 +1068,6 @@ func (c *ArgoClient) RunResourceAction(ctx context.Context, appName, appNamespac
 
 	if resourceVersion != "" {
 		queryParams["version"] = resourceVersion
-	}
-
-	if resourceUID != "" {
-		queryParams["resourceUID"] = resourceUID
 	}
 
 	// Action name is passed in the body
