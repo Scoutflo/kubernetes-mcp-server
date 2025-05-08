@@ -279,7 +279,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				),
 				mcp.WithString("resource_uid",
 					mcp.Description("The UID of the resource"),
-					mcp.Required(),
 				),
 				mcp.WithString("resource_namespace",
 					mcp.Description("The namespace of the resource"),
@@ -325,7 +324,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				),
 				mcp.WithString("resource_uid",
 					mcp.Description("The UID of the resource"),
-					mcp.Required(),
 				),
 			),
 			Handler: s.argocdGetResourceActions,
@@ -363,7 +361,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				),
 				mcp.WithString("resource_uid",
 					mcp.Description("The UID of the resource"),
-					mcp.Required(),
 				),
 				mcp.WithString("action",
 					mcp.Description("The name of the action to run"),
@@ -473,6 +470,18 @@ func (s *Server) argocdGetApplication(ctx context.Context, ctr mcp.CallToolReque
 
 	// Build a user-friendly summary of the application
 	var sb strings.Builder
+
+	// Provide full JSON for detailed information
+	sb.WriteString("\nFull Application Details (JSON):\n")
+
+	// Format as JSON with indentation
+	jsonResult, err := formatJSON(app)
+	if err != nil {
+		return NewTextResult("", err), nil
+	}
+
+	sb.WriteString(jsonResult)
+
 	sb.WriteString(fmt.Sprintf("Application: %s\n", app.Metadata.Name))
 	sb.WriteString(fmt.Sprintf("Project: %s\n", app.Spec.Project))
 	sb.WriteString(fmt.Sprintf("Namespace: %s\n", app.Spec.Destination.Namespace))
@@ -527,17 +536,6 @@ func (s *Server) argocdGetApplication(ctx context.Context, ctr mcp.CallToolReque
 			sb.WriteString(fmt.Sprintf("- %s: %d\n", status, count))
 		}
 	}
-
-	// Provide full JSON for detailed information
-	sb.WriteString("\nFull Application Details (JSON):\n")
-
-	// Format as JSON with indentation
-	jsonResult, err := formatJSON(app)
-	if err != nil {
-		return NewTextResult("", err), nil
-	}
-
-	sb.WriteString(jsonResult)
 
 	return NewTextResult(sb.String(), nil), nil
 }
@@ -1002,6 +1000,9 @@ func (s *Server) argocdGetApplicationManagedResources(ctx context.Context, ctr m
 	}
 
 	var sb strings.Builder
+	sb.WriteString("Full managed resources (JSON):\n")
+	sb.WriteString(jsonResult)
+
 	sb.WriteString(fmt.Sprintf("Managed resources for application '%s':\n\n", name))
 
 	// Add summary of resource counts
@@ -1026,9 +1027,6 @@ func (s *Server) argocdGetApplicationManagedResources(ctx context.Context, ctr m
 	} else {
 		sb.WriteString("No managed resources found.\n\n")
 	}
-
-	sb.WriteString("Full managed resources (JSON):\n")
-	sb.WriteString(jsonResult)
 
 	return NewTextResult(sb.String(), nil), nil
 }
@@ -1304,6 +1302,9 @@ func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolR
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Available actions for %s '%s' in namespace '%s' from application '%s':\n\n",
 		resourceKind, resourceName, resourceNamespace, name))
+
+	sb.WriteString("Full actions (JSON):\n")
+	sb.WriteString(jsonResult)
 
 	if len(actions.Actions) == 0 {
 		sb.WriteString("No actions available for this resource.\n\n")
