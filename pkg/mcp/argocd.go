@@ -948,6 +948,9 @@ func (s *Server) argocdGetApplicationResourceTree(ctx context.Context, ctr mcp.C
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Resource tree for application '%s':\n\n", name))
 
+	sb.WriteString("Full resource tree (JSON):\n")
+	sb.WriteString(jsonResult)
+
 	// Add summary of resource counts by kind
 	if len(resourceTree.Nodes) > 0 {
 		kindCounts := make(map[string]int)
@@ -961,9 +964,6 @@ func (s *Server) argocdGetApplicationResourceTree(ctx context.Context, ctr mcp.C
 		}
 		sb.WriteString("\n")
 	}
-
-	sb.WriteString("Full resource tree (JSON):\n")
-	sb.WriteString(jsonResult)
 
 	return NewTextResult(sb.String(), nil), nil
 }

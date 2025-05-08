@@ -25,8 +25,7 @@ const (
 // TODO: Move these to a secure configuration store
 var (
 	argoServerURL = "https://argocd-sf-test-pp-sf9-i.scoutflo.agency/"
-	argoUsername  = "admin"
-	argoPassword  = "v4XxJcUESNeuqxgI"
+	argoApiToken  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhcmdvY2QiLCJzdWIiOiJhZG1pbjphcGlLZXkiLCJuYmYiOjE3NDY2ODQ1NDIsImlhdCI6MTc0NjY4NDU0MiwianRpIjoiNDBiM2FhMDktMzVjZS00MTJjLWJlZDItNWYwMjVlYzkxODgxIn0.Rsi78M4kfyxtf2msQd0T-OroOtR_AuEfIAMB7xvrGNM"
 )
 
 // ArgoClient represents a client for ArgoCD REST API
@@ -282,67 +281,13 @@ func (k *Kubernetes) NewArgoClient(ctx context.Context, requestNamespace string)
 			Timeout: 30 * time.Second,
 		},
 		namespace: namespaceOrDefault(requestNamespace),
-	}
-
-	// Get auth token
-	err := client.authenticate(ctx, argoUsername, argoPassword)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to authenticate with ArgoCD: %w", err)
+		authToken: argoApiToken, // Use the API token directly
 	}
 
 	// Create a closer function that does nothing since we don't have a persistent connection
 	closer := io.NopCloser(strings.NewReader(""))
 
 	return client, closer, nil
-}
-
-// authenticate logs in to ArgoCD and gets an auth token
-func (c *ArgoClient) authenticate(ctx context.Context, username, password string) error {
-	loginURL := fmt.Sprintf("%s%s", strings.TrimSuffix(c.serverURL, "/"), ArgoCDSessionPath)
-
-	reqBody := map[string]string{
-		"username": username,
-		"password": password,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return fmt.Errorf("error marshaling login request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, loginURL, strings.NewReader(string(jsonBody)))
-	if err != nil {
-		return fmt.Errorf("error creating login request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error executing login request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("login failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	var loginResp struct {
-		Token string `json:"token"`
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&loginResp)
-	if err != nil {
-		return fmt.Errorf("error parsing login response: %w", err)
-	}
-
-	if loginResp.Token == "" {
-		return fmt.Errorf("authentication succeeded but no token was returned")
-	}
-
-	c.authToken = loginResp.Token
-	return nil
 }
 
 // doRequest is a helper function to make HTTP requests to ArgoCD API
