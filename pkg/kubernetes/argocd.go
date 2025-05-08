@@ -982,7 +982,6 @@ func (c *ArgoClient) GetWorkloadLogs(ctx context.Context, appName, appNamespace 
 func (c *ArgoClient) GetResourceEvents(ctx context.Context, appName, appNamespace, resourceNamespace, resourceName string) (*EventList, error) {
 	path := fmt.Sprintf("/api/v1/applications/%s/events", appName)
 
-	// Build query parameters
 	queryParams := make(map[string]string)
 	queryParams["appNamespace"] = appNamespace
 	queryParams["resourceNamespace"] = resourceNamespace
@@ -994,15 +993,32 @@ func (c *ArgoClient) GetResourceEvents(ctx context.Context, appName, appNamespac
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("get resource events failed with status code %d: %s", resp.StatusCode, string(body))
+	var events EventList
+	if err := json.NewDecoder(resp.Body).Decode(&events); err != nil {
+		return nil, fmt.Errorf("failed to parse events response: %w", err)
 	}
 
-	var events EventList
-	err = json.NewDecoder(resp.Body).Decode(&events)
+	return &events, nil
+}
+
+// GetApplicationEvents gets events for an application
+func (c *ArgoClient) GetApplicationEvents(ctx context.Context, appName, appNamespace string) (*EventList, error) {
+	path := fmt.Sprintf("/api/v1/applications/%s/events", appName)
+
+	queryParams := make(map[string]string)
+	if appNamespace != "" {
+		queryParams["appNamespace"] = appNamespace
+	}
+
+	resp, err := c.doRequest(ctx, http.MethodGet, path, queryParams, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing resource events: %w", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var events EventList
+	if err := json.NewDecoder(resp.Body).Decode(&events); err != nil {
+		return nil, fmt.Errorf("failed to parse events response: %w", err)
 	}
 
 	return &events, nil

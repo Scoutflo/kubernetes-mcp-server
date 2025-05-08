@@ -57,6 +57,19 @@ func (s *Server) initArgoCD() []server.ServerTool {
 			Handler: s.argocdGetApplication,
 		},
 		{
+			Tool: mcp.NewTool("argocd_get_application_event",
+				mcp.WithDescription("Returns events for an application"),
+				mcp.WithString("application_name",
+					mcp.Description("The name of the application"),
+					mcp.Required(),
+				),
+				mcp.WithString("application_namespace",
+					mcp.Description("The application namespace (optional)"),
+				),
+			),
+			Handler: s.argocdGetApplicationEvent,
+		},
+		{
 			Tool: mcp.NewTool("argocd_sync_application",
 				mcp.WithDescription("Sync an ArgoCD application to its desired state"),
 				mcp.WithString("name",
@@ -1333,6 +1346,66 @@ func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRe
 		action, resourceKind, resourceName, resourceNamespace, name))
 
 	sb.WriteString("Action result (JSON):\n")
+	sb.WriteString(jsonResult)
+
+	return NewTextResult(sb.String(), nil), nil
+}
+
+// argocdGetApplicationEvent returns events for an application
+func (s *Server) argocdGetApplicationEvent(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract parameters
+	name, ok := ctr.Params.Arguments["application_name"].(string)
+	if !ok || name == "" {
+		return NewTextResult("", fmt.Errorf("application name is required")), nil
+	}
+
+	namespace, _ := ctr.Params.Arguments["application_namespace"].(string)
+
+	// Create ArgoCD client
+	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
+	}
+	defer func() {
+		if err := closer.Close(); err != nil {
+			log.Warnf("Failed to close ArgoCD client connection: %v", err)
+		}
+	}()
+
+	// Get application events
+	events, err := argoClient.GetApplicationEvents(ctx, name, namespace)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to get events for application '%s': %w", name, err)), nil
+	}
+
+	// Format as JSON with indentation
+	jsonResult, err := formatJSON(events)
+	if err != nil {
+		return NewTextResult("", err), nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Events for application '%s':\n\n", name))
+
+	if len(events.Items) == 0 {
+		sb.WriteString("No events found.\n\n")
+	} else {
+		sb.WriteString(fmt.Sprintf("Total events: %d\n\n", len(events.Items)))
+
+		// Show a table-like structure for events
+		for i, event := range events.Items {
+			sb.WriteString(fmt.Sprintf("Event #%d:\n", i+1))
+			sb.WriteString(fmt.Sprintf("  Type: %s\n", event.Type))
+			sb.WriteString(fmt.Sprintf("  Reason: %s\n", event.Reason))
+			sb.WriteString(fmt.Sprintf("  Message: %s\n", event.Message))
+			if event.LastTimestamp != "" {
+				sb.WriteString(fmt.Sprintf("  Last Timestamp: %s\n", event.LastTimestamp))
+			}
+			sb.WriteString("\n")
+		}
+	}
+
+	sb.WriteString("Full events (JSON):\n")
 	sb.WriteString(jsonResult)
 
 	return NewTextResult(sb.String(), nil), nil
