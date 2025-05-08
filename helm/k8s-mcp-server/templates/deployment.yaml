@@ -70,6 +70,31 @@ spec:
                 secretKeyRef:
                   name: {{ include "k8s-mcp-server.fullname" . }}-openai-credentials
                   key: AZURE_OPENAI_TOP_P
+            - name: ARGOCD_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-argocd-credentials
+                  key: ARGOCD_ENDPOINT
+            - name: ARGOCD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-argocd-credentials
+                  key: ARGOCD_TOKEN
+            - name: ARGOCD_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-argocd-credentials
+                  key: ARGOCD_USERNAME
+            - name: ARGOCD_NAMESPACE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-argocd-credentials
+                  key: ARGOCD_NAMESPACE
+            - name: PROMETHEUS_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-prometheus-credentials
+                  key: PROMETHEUS_ENDPOINT
           {{- if .Values.probes.liveness.enabled }}
           livenessProbe:
             httpGet:

@@ -154,3 +154,19 @@ podAnnotations: {}
 ## @section Pod labels parameters
 ## @param podLabels Additional labels for pods
 podLabels: {}  
+
+## @section ArgoCD parameters
+## @param argocd.endpoint ArgoCD endpoint URL
+## @param argocd.token ArgoCD API token
+## @param argocd.username ArgoCD username
+## @param argocd.namespace ArgoCD namespace
+argocd:
+  endpoint: "https://argocd-sf-test-pp-sf9-i.scoutflo.agency/"
+  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhcmdvY2QiLCJzdWIiOiJhZG1pbjphcGlLZXkiLCJuYmYiOjE3NDY2ODQ1NDIsImlhdCI6MTc0NjY4NDU0MiwianRpIjoiNDBiM2FhMDktMzVjZS00MTJjLWJlZDItNWYwMjVlYzkxODgxIn0.Rsi78M4kfyxtf2msQd0T-OroOtR_AuEfIAMB7xvrGNM"
+  username: "admin"
+  namespace: "argocd-sf-test-pp-sf9-i"  
+
+## @section Prometheus parameters
+## @param prometheus.endpoint Prometheus endpoint URL
+prometheus:
+  endpoint: ""  
