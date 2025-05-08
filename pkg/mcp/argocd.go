@@ -57,7 +57,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 			Handler: s.argocdGetApplication,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_application_event",
+			Tool: mcp.NewTool("argocd_get_application_events",
 				mcp.WithDescription("Returns events for an application"),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
@@ -67,7 +67,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("The application namespace (optional)"),
 				),
 			),
-			Handler: s.argocdGetApplicationEvent,
+			Handler: s.argocdGetApplicationEvents,
 		},
 		{
 			Tool: mcp.NewTool("argocd_sync_application",
@@ -247,28 +247,9 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("The namespace of the application"),
 					mcp.Required(),
 				),
-				mcp.WithString("resource_name",
-					mcp.Description("The name of the resource"),
+				mcp.WithString("resource_ref",
+					mcp.Description("The resource reference in the format of a map with keys 'name', 'namespace', 'kind' (optional), 'group' (optional), 'version' (optional), and 'container' (optional)"),
 					mcp.Required(),
-				),
-				mcp.WithString("resource_namespace",
-					mcp.Description("The namespace of the resource"),
-					mcp.Required(),
-				),
-				mcp.WithString("resource_kind",
-					mcp.Description("The kind of the resource (e.g., Deployment, StatefulSet, Pod)"),
-					mcp.Required(),
-				),
-				mcp.WithString("resource_group",
-					mcp.Description("The API group of the resource"),
-					mcp.Required(),
-				),
-				mcp.WithString("resource_version",
-					mcp.Description("The API version of the resource"),
-					mcp.Required(),
-				),
-				mcp.WithString("container",
-					mcp.Description("The container name (optional, will use first container if not specified)"),
 				),
 				mcp.WithString("tail",
 					mcp.Description("Number of lines to show from the end of the logs (default: '100')"),
@@ -290,16 +271,25 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("The namespace of the application"),
 					mcp.Required(),
 				),
-				mcp.WithString("resource_namespace",
-					mcp.Description("The namespace of the resource"),
-					mcp.Required(),
-				),
-				mcp.WithString("resource_name",
-					mcp.Description("The name of the resource"),
+				mcp.WithString("resource_ref",
+					mcp.Description("The resource reference in the format of a map with keys 'name', 'namespace', and optional 'uid'"),
 					mcp.Required(),
 				),
 			),
 			Handler: s.argocdGetResourceEvents,
+		},
+		{
+			Tool: mcp.NewTool("argocd_get_application_events",
+				mcp.WithDescription("Returns events for an application"),
+				mcp.WithString("application_name",
+					mcp.Description("The name of the application"),
+					mcp.Required(),
+				),
+				mcp.WithString("application_namespace",
+					mcp.Description("The application namespace (optional)"),
+				),
+			),
+			Handler: s.argocdGetApplicationEvents,
 		},
 		{
 			Tool: mcp.NewTool("argocd_get_resource_actions",
@@ -312,20 +302,9 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("The namespace of the application"),
 					mcp.Required(),
 				),
-				mcp.WithString("resource_name",
-					mcp.Description("The name of the resource"),
-				),
-				mcp.WithString("resource_namespace",
-					mcp.Description("The namespace of the resource"),
-				),
-				mcp.WithString("resource_kind",
-					mcp.Description("The kind of the resource (e.g., Deployment, StatefulSet, Pod)"),
-				),
-				mcp.WithString("resource_group",
-					mcp.Description("The API group of the resource"),
-				),
-				mcp.WithString("resource_version",
-					mcp.Description("The API version of the resource"),
+				mcp.WithString("resource_ref",
+					mcp.Description("The resource reference in the format of a map with keys 'name', 'namespace', 'kind' (optional), 'group' (optional), and 'version' (optional)"),
+					mcp.Required(),
 				),
 			),
 			Handler: s.argocdGetResourceActions,
@@ -341,24 +320,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("The namespace of the application"),
 					mcp.Required(),
 				),
-				mcp.WithString("resource_name",
-					mcp.Description("The name of the resource"),
-					mcp.Required(),
-				),
-				mcp.WithString("resource_namespace",
-					mcp.Description("The namespace of the resource"),
-					mcp.Required(),
-				),
-				mcp.WithString("resource_kind",
-					mcp.Description("The kind of the resource (e.g., Deployment, StatefulSet, Pod)"),
-					mcp.Required(),
-				),
-				mcp.WithString("resource_group",
-					mcp.Description("The API group of the resource"),
-					mcp.Required(),
-				),
-				mcp.WithString("resource_version",
-					mcp.Description("The API version of the resource"),
+				mcp.WithString("resource_ref",
+					mcp.Description("The resource reference in the format of a map with keys 'name', 'namespace', 'kind', 'group', and 'version'"),
 					mcp.Required(),
 				),
 				mcp.WithString("action",
@@ -989,7 +952,7 @@ func (s *Server) argocdGetApplicationManagedResources(ctx context.Context, ctr m
 	return NewTextResult(sb.String(), nil), nil
 }
 
-// argocdGetApplicationWorkloadLogs returns logs for an application workload
+// argocdGetApplicationWorkloadLogs returns logs for application workload
 func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
 	name, ok := ctr.Params.Arguments["application_name"].(string)
@@ -1002,44 +965,70 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
 	}
 
-	// Extract resource parameters
-	resourceName, ok := ctr.Params.Arguments["resource_name"].(string)
-	if !ok || resourceName == "" {
-		return NewTextResult("", fmt.Errorf("resource name is required")), nil
+	// Extract resource_ref parameter which could be a string or map
+	var resourceRef kubernetes.ResourceRef
+
+	switch ref := ctr.Params.Arguments["resource_ref"].(type) {
+	case map[string]interface{}:
+		// It's already a map, extract fields directly
+		resourceName, ok := ref["name"].(string)
+		if !ok || resourceName == "" {
+			return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
+		}
+
+		resourceNamespace, ok := ref["namespace"].(string)
+		if !ok || resourceNamespace == "" {
+			return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
+		}
+
+		resourceKind, ok := ref["kind"].(string)
+		if !ok || resourceKind == "" {
+			return NewTextResult("", fmt.Errorf("resource_ref.kind is required")), nil
+		}
+
+		resourceGroup, _ := ref["group"].(string)
+
+		resourceVersion, ok := ref["version"].(string)
+
+		container, _ := ref["container"].(string)
+
+		resourceRef = kubernetes.ResourceRef{
+			Group:     resourceGroup,
+			Version:   resourceVersion,
+			Kind:      resourceKind,
+			Namespace: resourceNamespace,
+			Name:      resourceName,
+			Container: container,
+		}
+	case string:
+		// It's a JSON string, try to parse it
+		if err := json.Unmarshal([]byte(ref), &resourceRef); err != nil {
+			return NewTextResult("", fmt.Errorf("failed to parse resource_ref JSON: %w", err)), nil
+		}
+
+		// Validate required fields
+		if resourceRef.Name == "" {
+			return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
+		}
+		if resourceRef.Namespace == "" {
+			return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
+		}
+		if resourceRef.Kind == "" {
+			return NewTextResult("", fmt.Errorf("resource_ref.kind is required")), nil
+		}
+	default:
+		return NewTextResult("", fmt.Errorf("resource_ref is required")), nil
 	}
 
-	resourceNamespace, ok := ctr.Params.Arguments["resource_namespace"].(string)
-	if !ok || resourceNamespace == "" {
-		return NewTextResult("", fmt.Errorf("resource namespace is required")), nil
+	// Get tail lines parameter if provided
+	tailStr, _ := ctr.Params.Arguments["tail"].(string)
+	if tailStr == "" {
+		tailStr = "100" // Default to 100 lines
 	}
 
-	resourceKind, ok := ctr.Params.Arguments["resource_kind"].(string)
-	if !ok || resourceKind == "" {
-		return NewTextResult("", fmt.Errorf("resource kind is required")), nil
-	}
-
-	resourceGroup, ok := ctr.Params.Arguments["resource_group"].(string)
-	if !ok {
-		return NewTextResult("", fmt.Errorf("resource group is required")), nil
-	}
-
-	resourceVersion, ok := ctr.Params.Arguments["resource_version"].(string)
-	if !ok || resourceVersion == "" {
-		return NewTextResult("", fmt.Errorf("resource version is required")), nil
-	}
-
-	// Optional parameters
-	container, _ := ctr.Params.Arguments["container"].(string)
-
-	// Create resource reference
-	resourceRef := kubernetes.ResourceRef{
-		Group:     resourceGroup,
-		Version:   resourceVersion,
-		Kind:      resourceKind,
-		Namespace: resourceNamespace,
-		Name:      resourceName,
-		Container: container,
-	}
+	// Get follow parameter if provided
+	followStr, _ := ctr.Params.Arguments["follow"].(string)
+	follow := strings.ToLower(followStr) == "true"
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, appNamespace)
@@ -1053,19 +1042,19 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 	}()
 
 	// Get workload logs
-	logs, err := argoClient.GetWorkloadLogs(ctx, name, appNamespace, resourceRef)
+	logs, err := argoClient.GetWorkloadLogs(ctx, name, appNamespace, resourceRef, follow, tailStr)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to get logs for workload '%s' in application '%s': %w",
-			resourceName, name, err)), nil
+			resourceRef.Name, name, err)), nil
 	}
 
 	// Format the logs
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Logs for %s '%s' in namespace '%s' from application '%s':\n\n",
-		resourceKind, resourceName, resourceNamespace, name))
+		resourceRef.Kind, resourceRef.Name, resourceRef.Namespace, name))
 
-	if container != "" {
-		sb.WriteString(fmt.Sprintf("Container: %s\n\n", container))
+	if resourceRef.Container != "" {
+		sb.WriteString(fmt.Sprintf("Container: %s\n\n", resourceRef.Container))
 	}
 
 	if len(logs) == 0 {
@@ -1083,19 +1072,30 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 // argocdGetResourceEvents returns events for a resource managed by an application
 func (s *Server) argocdGetResourceEvents(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
+	name, ok := ctr.Params.Arguments["application_name"].(string)
 	if !ok || name == "" {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	appNamespace, ok := ctr.Params.Arguments["app_namespace"].(string)
+	appNamespace, ok := ctr.Params.Arguments["application_namespace"].(string)
 	if !ok || appNamespace == "" {
 		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
 	}
 
-	resourceNamespace, ok := ctr.Params.Arguments["resource_namespace"].(string)
+	resourceRef, ok := ctr.Params.Arguments["resource_ref"].(map[string]interface{})
+	if !ok || resourceRef == nil {
+		return NewTextResult("", fmt.Errorf("resource_ref is required")), nil
+	}
 
-	resourceName, ok := ctr.Params.Arguments["resource_name"].(string)
+	resourceName, ok := resourceRef["name"].(string)
+	if !ok || resourceName == "" {
+		return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
+	}
+
+	resourceNamespace, ok := resourceRef["namespace"].(string)
+	if !ok || resourceNamespace == "" {
+		return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
+	}
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, appNamespace)
@@ -1190,30 +1190,35 @@ func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolR
 		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
 	}
 
-	// Extract resource parameters
-	resourceName, ok := ctr.Params.Arguments["resource_name"].(string)
+	// Extract resource parameters from resourceRef object
+	resourceRef, ok := ctr.Params.Arguments["resource_ref"].(map[string]interface{})
+	if !ok || resourceRef == nil {
+		return NewTextResult("", fmt.Errorf("resource_ref is required")), nil
+	}
+
+	resourceName, ok := resourceRef["name"].(string)
 	if !ok || resourceName == "" {
-		return NewTextResult("", fmt.Errorf("resource name is required")), nil
+		return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
 	}
 
-	resourceNamespace, ok := ctr.Params.Arguments["resource_namespace"].(string)
+	resourceNamespace, ok := resourceRef["namespace"].(string)
 	if !ok || resourceNamespace == "" {
-		return NewTextResult("", fmt.Errorf("resource namespace is required")), nil
+		return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
 	}
 
-	resourceKind, ok := ctr.Params.Arguments["resource_kind"].(string)
+	resourceKind, ok := resourceRef["kind"].(string)
 	if !ok || resourceKind == "" {
-		return NewTextResult("", fmt.Errorf("resource kind is required")), nil
+		return NewTextResult("", fmt.Errorf("resource_ref.kind is required")), nil
 	}
 
-	resourceGroup, ok := ctr.Params.Arguments["resource_group"].(string)
+	resourceGroup, ok := resourceRef["group"].(string)
 	if !ok {
-		return NewTextResult("", fmt.Errorf("resource group is required")), nil
+		resourceGroup = "" // group can be empty for core resources
 	}
 
-	resourceVersion, ok := ctr.Params.Arguments["resource_version"].(string)
+	resourceVersion, ok := resourceRef["version"].(string)
 	if !ok || resourceVersion == "" {
-		return NewTextResult("", fmt.Errorf("resource version is required")), nil
+		return NewTextResult("", fmt.Errorf("resource_ref.version is required")), nil
 	}
 
 	// Create ArgoCD client
@@ -1244,9 +1249,6 @@ func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolR
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Available actions for %s '%s' in namespace '%s' from application '%s':\n\n",
 		resourceKind, resourceName, resourceNamespace, name))
-
-	sb.WriteString("Full actions (JSON):\n")
-	sb.WriteString(jsonResult)
 
 	if len(actions.Actions) == 0 {
 		sb.WriteString("No actions available for this resource.\n\n")
@@ -1285,31 +1287,33 @@ func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
 	}
 
-	// Extract resource parameters
-	resourceName, ok := ctr.Params.Arguments["resource_name"].(string)
+	// Extract resource parameters from resourceRef object
+	resourceRef, ok := ctr.Params.Arguments["resource_ref"].(map[string]interface{})
+	if !ok || resourceRef == nil {
+		return NewTextResult("", fmt.Errorf("resource_ref is required")), nil
+	}
+
+	resourceName, ok := resourceRef["name"].(string)
 	if !ok || resourceName == "" {
-		return NewTextResult("", fmt.Errorf("resource name is required")), nil
+		return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
 	}
 
-	resourceNamespace, ok := ctr.Params.Arguments["resource_namespace"].(string)
+	resourceNamespace, ok := resourceRef["namespace"].(string)
 	if !ok || resourceNamespace == "" {
-		return NewTextResult("", fmt.Errorf("resource namespace is required")), nil
+		return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
 	}
 
-	resourceKind, ok := ctr.Params.Arguments["resource_kind"].(string)
+	resourceKind, ok := resourceRef["kind"].(string)
 	if !ok || resourceKind == "" {
-		return NewTextResult("", fmt.Errorf("resource kind is required")), nil
+		return NewTextResult("", fmt.Errorf("resource_ref.kind is required")), nil
 	}
 
-	resourceGroup, ok := ctr.Params.Arguments["resource_group"].(string)
+	resourceGroup, ok := resourceRef["group"].(string)
 	if !ok {
-		return NewTextResult("", fmt.Errorf("resource group is required")), nil
+		resourceGroup = "" // group can be empty for core resources
 	}
 
-	resourceVersion, ok := ctr.Params.Arguments["resource_version"].(string)
-	if !ok || resourceVersion == "" {
-		return NewTextResult("", fmt.Errorf("resource version is required")), nil
-	}
+	resourceVersion, ok := resourceRef["version"].(string)
 
 	action, ok := ctr.Params.Arguments["action"].(string)
 	if !ok || action == "" {
@@ -1351,8 +1355,8 @@ func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRe
 	return NewTextResult(sb.String(), nil), nil
 }
 
-// argocdGetApplicationEvent returns events for an application
-func (s *Server) argocdGetApplicationEvent(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// argocdGetApplicationEvents returns events for an application
+func (s *Server) argocdGetApplicationEvents(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
 	name, ok := ctr.Params.Arguments["application_name"].(string)
 	if !ok || name == "" {
@@ -1393,13 +1397,54 @@ func (s *Server) argocdGetApplicationEvent(ctx context.Context, ctr mcp.CallTool
 		sb.WriteString(fmt.Sprintf("Total events: %d\n\n", len(events.Items)))
 
 		// Show a table-like structure for events
+		sb.WriteString("REASON                 TYPE       AGE        MESSAGE\n")
+		sb.WriteString("------                 ----       ---        -------\n")
+
+		for _, event := range events.Items {
+			// Format age as a duration from LastTimestamp to now
+			age := "unknown"
+			if event.LastTimestamp != "" {
+				if lastTime, err := time.Parse(time.RFC3339, event.LastTimestamp); err == nil {
+					age = formatTimeAgo(time.Since(lastTime))
+				}
+			}
+
+			// Truncate message if it's too long
+			message := event.Message
+			if len(message) > 60 {
+				message = message[:57] + "..."
+			}
+
+			sb.WriteString(fmt.Sprintf("%-22s %-10s %-10s %s\n",
+				event.Reason,
+				event.Type,
+				age,
+				message))
+		}
+
+		sb.WriteString("\n")
+
+		// Add more detailed information for each event
+		sb.WriteString("Event Details:\n\n")
 		for i, event := range events.Items {
 			sb.WriteString(fmt.Sprintf("Event #%d:\n", i+1))
 			sb.WriteString(fmt.Sprintf("  Type: %s\n", event.Type))
 			sb.WriteString(fmt.Sprintf("  Reason: %s\n", event.Reason))
 			sb.WriteString(fmt.Sprintf("  Message: %s\n", event.Message))
+			if event.Count > 1 {
+				sb.WriteString(fmt.Sprintf("  Count: %d\n", event.Count))
+			}
+			if event.FirstTimestamp != "" {
+				sb.WriteString(fmt.Sprintf("  First Seen: %s\n", event.FirstTimestamp))
+			}
 			if event.LastTimestamp != "" {
-				sb.WriteString(fmt.Sprintf("  Last Timestamp: %s\n", event.LastTimestamp))
+				sb.WriteString(fmt.Sprintf("  Last Seen: %s\n", event.LastTimestamp))
+			}
+			if event.InvolvedObject.Kind != "" {
+				sb.WriteString(fmt.Sprintf("  Involved Object: %s/%s\n", event.InvolvedObject.Kind, event.InvolvedObject.Name))
+			}
+			if event.Source.Component != "" {
+				sb.WriteString(fmt.Sprintf("  Source: %s\n", event.Source.Component))
 			}
 			sb.WriteString("\n")
 		}

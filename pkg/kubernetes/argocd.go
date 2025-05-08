@@ -923,7 +923,7 @@ func (c *ArgoClient) GetApplicationManagedResources(ctx context.Context, appName
 }
 
 // GetWorkloadLogs gets logs for a workload in an application
-func (c *ArgoClient) GetWorkloadLogs(ctx context.Context, appName, appNamespace string, resourceRef ResourceRef) ([]ApplicationLog, error) {
+func (c *ArgoClient) GetWorkloadLogs(ctx context.Context, appName, appNamespace string, resourceRef ResourceRef, follow bool, tailLines string) ([]ApplicationLog, error) {
 	path := fmt.Sprintf("/api/v1/applications/%s/logs", appName)
 
 	// Build query parameters
@@ -939,8 +939,19 @@ func (c *ArgoClient) GetWorkloadLogs(ctx context.Context, appName, appNamespace 
 		queryParams["container"] = resourceRef.Container
 	}
 
-	queryParams["tailLines"] = "100" // Default to 100 lines
-	queryParams["follow"] = "false"  // Default to not following
+	// Use provided tail lines or default
+	if tailLines != "" {
+		queryParams["tailLines"] = tailLines
+	} else {
+		queryParams["tailLines"] = "100" // Default to 100 lines
+	}
+
+	// Set follow parameter
+	if follow {
+		queryParams["follow"] = "true"
+	} else {
+		queryParams["follow"] = "false"
+	}
 
 	resp, err := c.doRequest(ctx, http.MethodGet, path, queryParams, nil)
 	if err != nil {
