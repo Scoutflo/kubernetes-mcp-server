@@ -240,8 +240,12 @@ type AppDestination struct {
 
 // ResourceRef reference to a Kubernetes resource
 type ResourceRef struct {
-	Group string `json:"group,omitempty"`
-	Kind  string `json:"kind"`
+	Group     string `json:"group"`
+	Version   string `json:"version"`
+	Kind      string `json:"kind"`
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	Container string `json:"container,omitempty"`
 }
 
 // ProjectRole represents a user's role within a project
@@ -919,32 +923,24 @@ func (c *ArgoClient) GetApplicationManagedResources(ctx context.Context, appName
 }
 
 // GetWorkloadLogs gets logs for a workload in an application
-func (c *ArgoClient) GetWorkloadLogs(ctx context.Context, appName, appNamespace, resourceNamespace, resourceName,
-	resourceKind, resourceGroup, resourceVersion, container string, tail int, follow bool) ([]ApplicationLog, error) {
-
+func (c *ArgoClient) GetWorkloadLogs(ctx context.Context, appName, appNamespace string, resourceRef ResourceRef) ([]ApplicationLog, error) {
 	path := fmt.Sprintf("/api/v1/applications/%s/logs", appName)
 
 	// Build query parameters
 	queryParams := make(map[string]string)
 	queryParams["appNamespace"] = appNamespace
-	queryParams["namespace"] = resourceNamespace
-	queryParams["name"] = resourceName
-	queryParams["kind"] = resourceKind
+	queryParams["namespace"] = resourceRef.Namespace
+	queryParams["name"] = resourceRef.Name
+	queryParams["kind"] = resourceRef.Kind
+	queryParams["group"] = resourceRef.Group
+	queryParams["resourceVersion"] = resourceRef.Version
 
-	if resourceGroup != "" {
-		queryParams["group"] = resourceGroup
+	if resourceRef.Container != "" {
+		queryParams["container"] = resourceRef.Container
 	}
 
-	if resourceVersion != "" {
-		queryParams["resourceVersion"] = resourceVersion
-	}
-
-	if container != "" {
-		queryParams["container"] = container
-	}
-
-	queryParams["tailLines"] = fmt.Sprintf("%d", tail)
-	queryParams["follow"] = fmt.Sprintf("%t", follow)
+	queryParams["tailLines"] = "100" // Default to 100 lines
+	queryParams["follow"] = "false"  // Default to not following
 
 	resp, err := c.doRequest(ctx, http.MethodGet, path, queryParams, nil)
 	if err != nil {
@@ -957,30 +953,23 @@ func (c *ArgoClient) GetWorkloadLogs(ctx context.Context, appName, appNamespace,
 		return nil, fmt.Errorf("get workload logs failed with status code %d: %s", resp.StatusCode, string(body))
 	}
 
-	// Parse the logs from the response
+	// Read the entire response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading logs response: %w", err)
+	}
+
+	// Try to parse as JSON first
 	var logs []ApplicationLog
-
-	// If response is a JSON array
-	contentType := resp.Header.Get("Content-Type")
-	if strings.Contains(contentType, "application/json") {
-		err = json.NewDecoder(resp.Body).Decode(&logs)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing logs: %w", err)
-		}
-	} else {
-		// Handle plain text logs - convert to ApplicationLog objects
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("error reading logs response: %w", err)
-		}
-
+	if err := json.Unmarshal(bodyBytes, &logs); err != nil {
+		// If JSON parsing fails, treat as plain text
 		logLines := strings.Split(string(bodyBytes), "\n")
 		for _, line := range logLines {
 			if line != "" {
 				logs = append(logs, ApplicationLog{
 					Content:   line,
-					PodName:   resourceName,
-					Container: container,
+					PodName:   resourceRef.Name,
+					Container: resourceRef.Container,
 				})
 			}
 		}

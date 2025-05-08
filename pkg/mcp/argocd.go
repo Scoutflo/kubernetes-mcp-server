@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/scoutflo/kubernetes-mcp-server/pkg/kubernetes"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -226,11 +226,11 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_application_workload_logs",
 				mcp.WithDescription("Returns logs for application workload (Deployment, StatefulSet, Pod, etc.) by application name and resource details"),
-				mcp.WithString("name",
+				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
 				),
-				mcp.WithString("app_namespace",
+				mcp.WithString("application_namespace",
 					mcp.Description("The namespace of the application"),
 					mcp.Required(),
 				),
@@ -1036,12 +1036,12 @@ func (s *Server) argocdGetApplicationManagedResources(ctx context.Context, ctr m
 // argocdGetApplicationWorkloadLogs returns logs for an application workload
 func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
+	name, ok := ctr.Params.Arguments["application_name"].(string)
 	if !ok || name == "" {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	appNamespace, ok := ctr.Params.Arguments["app_namespace"].(string)
+	appNamespace, ok := ctr.Params.Arguments["application_namespace"].(string)
 	if !ok || appNamespace == "" {
 		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
 	}
@@ -1074,19 +1074,16 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 
 	// Optional parameters
 	container, _ := ctr.Params.Arguments["container"].(string)
-	tailStr, _ := ctr.Params.Arguments["tail"].(string)
-	followStr, _ := ctr.Params.Arguments["follow"].(string)
 
-	// Parse optional parameters
-	tail := 100 // Default
-	if tailStr != "" {
-		parsedTail, err := strconv.Atoi(tailStr)
-		if err == nil && parsedTail > 0 {
-			tail = parsedTail
-		}
+	// Create resource reference
+	resourceRef := kubernetes.ResourceRef{
+		Group:     resourceGroup,
+		Version:   resourceVersion,
+		Kind:      resourceKind,
+		Namespace: resourceNamespace,
+		Name:      resourceName,
+		Container: container,
 	}
-
-	follow := strings.ToLower(followStr) == "true"
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, appNamespace)
@@ -1100,8 +1097,7 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 	}()
 
 	// Get workload logs
-	logs, err := argoClient.GetWorkloadLogs(ctx, name, appNamespace, resourceNamespace, resourceName,
-		resourceKind, resourceGroup, resourceVersion, container, tail, follow)
+	logs, err := argoClient.GetWorkloadLogs(ctx, name, appNamespace, resourceRef)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to get logs for workload '%s' in application '%s': %w",
 			resourceName, name, err)), nil
