@@ -159,3 +159,128 @@ func waitForPodRunning(ctx context.Context, clientset kubernetes.Interface, name
 		}
 	}
 }
+
+// CheckIngressConnectivity attempts to connect to a Kubernetes ingress host
+// to verify network connectivity by creating a temporary pod inside the cluster
+// and executing a curl command to the ingress host
+func (k *Kubernetes) CheckIngressConnectivity(ctx context.Context, ingressHost string) (string, error) {
+	// Add default http protocol and port if not provided
+	address := ingressHost
+	if !strings.HasPrefix(address, "http://") && !strings.HasPrefix(address, "https://") {
+		address = "http://" + address
+	}
+
+	// First try regular DNS resolution to see if there might be an issue
+	hostPart := ingressHost
+	if strings.Contains(ingressHost, "://") {
+		parts := strings.Split(ingressHost, "://")
+		if len(parts) > 1 {
+			hostPart = parts[1]
+		}
+	}
+
+	// Extract hostname without port if present
+	if strings.Contains(hostPart, ":") {
+		hostPart = strings.Split(hostPart, ":")[0]
+	}
+
+	_, err := net.LookupHost(hostPart)
+	dnsMsg := ""
+	if err != nil {
+		dnsMsg = fmt.Sprintf("DNS resolution failed: %v\nAttempting in-cluster check...", err)
+	}
+
+	// Create a temporary pod in the default namespace to run curl
+	podName := fmt.Sprintf("ingress-test-%d", time.Now().Unix())
+	namespace := namespaceOrDefault("")
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "curl",
+					Image: "curlimages/curl:latest",
+					Command: []string{
+						"sleep",
+						"120", // Pod will live for 2 minutes max
+					},
+				},
+			},
+			RestartPolicy: corev1.RestartPolicyNever,
+		},
+	}
+
+	// Create the pod
+	_, err = k.clientSet.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to create ingress connectivity test pod: %v", err)
+	}
+
+	// Set up deferred deletion of the pod
+	defer func() {
+		deleteCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = k.clientSet.CoreV1().Pods(namespace).Delete(deleteCtx, podName, metav1.DeleteOptions{})
+	}()
+
+	// Wait for the pod to be ready
+	err = waitForPodRunning(ctx, k.clientSet, namespace, podName, 60*time.Second)
+	if err != nil {
+		return "", fmt.Errorf("failed waiting for ingress connectivity test pod to start: %v", err)
+	}
+
+	// Define the command to execute
+	command := []string{"curl", "-v", "-m", "10", "--header", "Host: " + hostPart, address}
+
+	// Execute the command in the pod
+	execReq := k.clientSet.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(namespace).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Container: "curl",
+			Command:   command,
+			Stdin:     false,
+			Stdout:    true,
+			Stderr:    true,
+		}, scheme.ParameterCodec)
+
+	var stdout, stderr bytes.Buffer
+	exec, err := remotecommand.NewSPDYExecutor(k.cfg, "POST", execReq.URL())
+	if err != nil {
+		return "", fmt.Errorf("failed to create exec command: %v", err)
+	}
+
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
+
+	// Build the result message
+	result := fmt.Sprintf("In-cluster connectivity check to ingress host %s:\n", ingressHost)
+	if dnsMsg != "" {
+		result += dnsMsg + "\n"
+	}
+
+	if err != nil {
+		result += fmt.Sprintf("Connection check failed: %v\n", err)
+		if stderr.Len() > 0 {
+			result += fmt.Sprintf("Error output: %s\n", stderr.String())
+		}
+		return result, nil
+	}
+
+	result += "Connection successful from inside the cluster\n"
+	if stderr.Len() > 0 {
+		result += fmt.Sprintf("Connection details: %s\n", stderr.String())
+	}
+	if stdout.Len() > 0 {
+		result += fmt.Sprintf("Response: %s\n", stdout.String())
+	}
+
+	return result, nil
+}

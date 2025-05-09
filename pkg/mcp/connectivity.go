@@ -18,6 +18,13 @@ func (s *Server) initConnectivity() []server.ServerTool {
 				mcp.Required(),
 			),
 		), Handler: s.checkServiceConnectivity},
+		{Tool: mcp.NewTool("check_ingress_connectivity",
+			mcp.WithDescription("Check connectivity to a Kubernetes ingress host"),
+			mcp.WithString("ingress_host",
+				mcp.Description("Ingress host to check connectivity to (e.g. example.com or https://example.com)"),
+				mcp.Required(),
+			),
+		), Handler: s.checkIngressConnectivity},
 	}
 }
 
@@ -30,6 +37,20 @@ func (s *Server) checkServiceConnectivity(ctx context.Context, ctr mcp.CallToolR
 	result, err := s.k.CheckServiceConnectivity(ctx, serviceName)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("connectivity check failed: %v", err)), nil
+	}
+
+	return NewTextResult(result, nil), nil
+}
+
+func (s *Server) checkIngressConnectivity(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	ingressHost, ok := ctr.Params.Arguments["ingress_host"].(string)
+	if !ok || ingressHost == "" {
+		return NewTextResult("", errors.New("failed to check ingress connectivity, missing or invalid ingress_host")), nil
+	}
+
+	result, err := s.k.CheckIngressConnectivity(ctx, ingressHost)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("ingress connectivity check failed: %v", err)), nil
 	}
 
 	return NewTextResult(result, nil), nil

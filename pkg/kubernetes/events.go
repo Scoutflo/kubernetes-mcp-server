@@ -3,16 +3,33 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"strings"
 )
 
-func (k *Kubernetes) EventsList(ctx context.Context, namespace string) (string, error) {
-	unstructuredList, err := k.resourcesList(ctx, &schema.GroupVersionKind{
+func (k *Kubernetes) EventsList(ctx context.Context, namespace string, fieldSelectors []string) (string, error) {
+	options := metav1.ListOptions{}
+
+	// Apply field selectors if provided
+	if len(fieldSelectors) > 0 {
+		options.FieldSelector = strings.Join(fieldSelectors, ",")
+	}
+
+	gvk := &schema.GroupVersionKind{
 		Group: "", Version: "v1", Kind: "Event",
-	}, namespace)
+	}
+
+	gvr, err := k.resourceFor(gvk)
+	if err != nil {
+		return "", err
+	}
+
+	unstructuredList, err := k.dynamicClient.Resource(*gvr).Namespace(namespace).List(ctx, options)
+
 	if err != nil {
 		return "", err
 	}

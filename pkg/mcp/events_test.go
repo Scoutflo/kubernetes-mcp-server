@@ -1,10 +1,12 @@
 package mcp
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 func TestEventsList(t *testing.T) {
@@ -91,5 +93,28 @@ func TestEventsList(t *testing.T) {
 				t.Fatalf("unexpected result %v", toolResult.Content[0].(mcp.TextContent).Text)
 			}
 		})
+
+		// Test field selectors
+		toolResult, err = c.callTool("events_list", map[string]interface{}{
+			"involved_object_name": "a-pod",
+			"involved_object_kind": "Pod",
+		})
+		t.Run("events_list with field selectors returns filtered events OK", func(t *testing.T) {
+			if err != nil {
+				t.Fatalf("call tool failed %v", err)
+			}
+			if toolResult.IsError {
+				t.Fatalf("call tool failed")
+			}
+			if !containsEventWithNamespace(toolResult.Content[0].(mcp.TextContent).Text, "default") ||
+				!containsEventWithNamespace(toolResult.Content[0].(mcp.TextContent).Text, "ns-1") {
+				t.Fatalf("expected to find events from both namespaces, got: %v", toolResult.Content[0].(mcp.TextContent).Text)
+			}
+		})
 	})
+}
+
+// Helper function to check if the result contains an event from a specific namespace
+func containsEventWithNamespace(result string, namespace string) bool {
+	return strings.Contains(result, "Namespace: "+namespace)
 }
