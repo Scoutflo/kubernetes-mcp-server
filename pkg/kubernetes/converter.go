@@ -66,6 +66,51 @@ func (k *Kubernetes) K8sManifestToHelmChart(k8sManifest string, chartName string
 	return response, nil
 }
 
+// DeploymentToArgoRollout converts a Kubernetes Deployment manifest to an Argo Rollout resource
+func (k *Kubernetes) DeploymentToArgoRollout(k8sManifest string, strategy string, canaryConfig string) (string, error) {
+	// Create a new LLM client
+	llmClient, err := llm.NewDefaultClient()
+	if err != nil {
+		return "", fmt.Errorf("failed to create LLM client: %v", err)
+	}
+
+	// Prepare user message with Kubernetes Deployment manifest content
+	userMessage := fmt.Sprintf("Please convert the following Kubernetes Deployment manifest into an Argo Rollout resource. Additionally, create all necessary Service resources required for the Rollout to function properly. The result should include both the Rollout and Service YAML manifests.\n\n```yaml\n%s\n```", k8sManifest)
+
+	// Add strategy information
+	userMessage += fmt.Sprintf("\n\nPlease use the '%s' strategy for the Argo Rollout. Include all required services for this strategy:", strategy)
+
+	// Add specific guidance based on strategy type
+	if strategy == "blueGreen" {
+		userMessage += "\n- Create an active service for the current stable version" +
+			"\n- Create a preview service for the new version being deployed" +
+			"\n- Ensure both services use selectors that match the pod labels in the Rollout"
+	} else if strategy == "canary" {
+		userMessage += "\n- Create a main service that will direct traffic to both stable and canary versions" +
+			"\n- Make sure the service selector matches the pod labels in the Rollout"
+
+		// Add custom canary configuration if provided
+		if canaryConfig != "" {
+			userMessage += fmt.Sprintf("\n\nPlease use the following custom configuration for the canary strategy steps:\n%s", canaryConfig)
+		}
+	}
+
+	// Make the LLM API call with the Deployment to Argo Rollout prompt and the Kubernetes manifest content
+	response, err := llmClient.Call(llm.DeploymentResourceToArgoRolloutPrompt, userMessage)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert Kubernetes Deployment to Argo Rollout: %v", err)
+	}
+
+	// Extract the YAML content from the response
+	manifest := extractYAMLFromResponse(response)
+	if manifest == "" {
+		// If extraction failed, return the raw response
+		return response, nil
+	}
+
+	return manifest, nil
+}
+
 // extractYAMLFromResponse extracts the YAML content from the LLM response
 // It handles cases where the LLM might wrap the YAML in markdown code blocks
 func extractYAMLFromResponse(response string) string {

@@ -30,7 +30,7 @@ func (s *Server) initPods() []server.ServerTool {
 		), Handler: s.podsDelete},
 		{Tool: mcp.NewTool("pods_exec",
 			mcp.WithDescription("Execute a command in a Kubernetes Pod in the current or provided namespace with the provided name and command"),
-			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod logs from")),
+			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
 			mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
 			mcp.WithArray("command", mcp.Description("Command to execute in the Pod container. "+
 				"The first item is the command to be run, and the rest are the arguments to that command. "+

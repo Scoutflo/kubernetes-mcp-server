@@ -71,14 +71,14 @@ func (s *Server) reloadKubernetesClient() error {
 		s.initResources(),
 		s.initPortForward(),
 		s.initNodes(),
-		// s.initMetricsServer(),
-		// s.initPrometheus(),
-		// s.initLabels(),
+		s.initMetricsServer(),
+		s.initPrometheus(),
+		s.initLabels(),
 		s.initConnectivity(),
-		// s.initHelm(),
-		// s.initArgoCD(),
-		// s.initArgoRollouts(),
-		// s.initDocker(),
+		s.initHelm(),
+		s.initArgoCD(),
+		s.initArgoRollouts(),
+		s.initConverters(),
 	)...)
 	return nil
 }
