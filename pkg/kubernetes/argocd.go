@@ -23,10 +23,6 @@ const (
 
 // ArgoCD connection config - this should be moved to a proper config manager
 // TODO: Move these to a secure configuration store
-var (
-	argoServerURL = "https://argocd-sf-test-pp-sf9-i.scoutflo.agency/"
-	argoApiToken  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhcmdvY2QiLCJzdWIiOiJhZG1pbjphcGlLZXkiLCJuYmYiOjE3NDY2ODQ1NDIsImlhdCI6MTc0NjY4NDU0MiwianRpIjoiNDBiM2FhMDktMzVjZS00MTJjLWJlZDItNWYwMjVlYzkxODgxIn0.Rsi78M4kfyxtf2msQd0T-OroOtR_AuEfIAMB7xvrGNM"
-)
 
 // ArgoClient represents a client for ArgoCD REST API
 type ArgoClient struct {
@@ -280,12 +276,20 @@ type JWTToken struct {
 // NewArgoClient creates a new ArgoCD HTTP client
 func (k *Kubernetes) NewArgoClient(ctx context.Context, requestNamespace string) (*ArgoClient, io.Closer, error) {
 	client := &ArgoClient{
-		serverURL: argoServerURL,
+		serverURL: k.ArgoCDEndpoint,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		namespace: namespaceOrDefault(requestNamespace),
-		authToken: argoApiToken, // Use the API token directly
+		namespace: func() string {
+			if requestNamespace != "" {
+				return requestNamespace
+			}
+			if k.ArgoCDNamespace != "" {
+				return k.ArgoCDNamespace
+			}
+			return namespaceOrDefault("")
+		}(),
+		authToken: k.ArgoCDToken,
 	}
 
 	// Create a closer function that does nothing since we don't have a persistent connection

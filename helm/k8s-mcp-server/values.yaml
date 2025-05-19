@@ -169,4 +169,4 @@ argocd:
 ## @section Prometheus parameters
 ## @param prometheus.endpoint Prometheus endpoint URL
 prometheus:
-  endpoint: ""  
+  endpoint: "https://scoutflo-monitoring-bik8p9.scoutflo.agency/"  

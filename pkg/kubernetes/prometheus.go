@@ -16,6 +16,11 @@ import (
 
 // getPrometheusURL attempts to discover the Prometheus URL in the cluster
 func (k *Kubernetes) getPrometheusURL() (string, error) {
+	// Use environment variable if set
+	if k.PrometheusEndpoint != "" {
+		return k.PrometheusEndpoint, nil
+	}
+
 	// Try to find Prometheus Ingress first (preferred method)
 	namespace := "scoutflo-monitoring"
 
@@ -675,7 +680,7 @@ func (k *Kubernetes) GetPrometheusAlerts() (string, error) {
 }
 
 // GetPrometheusRules retrieves information about configured alerting and recording rules
-func (k *Kubernetes) GetPrometheusRules(ruleType, groupLimit string, ruleNames, ruleGroups, files []string, excludeAlerts bool, matchLabels []string) (string, error) {
+func (k *Kubernetes) GetPrometheusRules(groupLimit string, ruleNames, ruleGroups, files []string, excludeAlerts bool, matchLabels []string) (string, error) {
 	// Get Prometheus URL using service discovery
 	prometheusURL, err := k.getPrometheusURL()
 	if err != nil {
@@ -689,9 +694,9 @@ func (k *Kubernetes) GetPrometheusRules(ruleType, groupLimit string, ruleNames, 
 	queryParams := url.Values{}
 
 	// Add rule type filter if provided
-	if ruleType != "" {
-		queryParams.Add("type", ruleType)
-	}
+	// if ruleType != "" {
+	// 	queryParams.Add("type", ruleType)
+	// }
 
 	// Add rule names filter if provided
 	for _, name := range ruleNames {

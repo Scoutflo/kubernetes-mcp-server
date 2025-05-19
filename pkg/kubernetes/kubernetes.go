@@ -44,6 +44,12 @@ type Kubernetes struct {
 	discoveryClient             *discovery.DiscoveryClient
 	deferredDiscoveryRESTMapper *restmapper.DeferredDiscoveryRESTMapper
 	dynamicClient               *dynamic.DynamicClient
+
+	// ArgoCD and Prometheus config
+	ArgoCDEndpoint     string
+	ArgoCDToken        string
+	ArgoCDNamespace    string
+	PrometheusEndpoint string
 }
 
 func NewKubernetes() (*Kubernetes, error) {
@@ -72,6 +78,13 @@ func NewKubernetes() (*Kubernetes, error) {
 		return nil, err
 	}
 	k8s.parameterCodec = runtime.NewParameterCodec(k8s.scheme)
+
+	// Load ArgoCD and Prometheus config from environment variables
+	k8s.ArgoCDEndpoint = os.Getenv("ARGOCD_ENDPOINT")
+	k8s.ArgoCDToken = os.Getenv("ARGOCD_TOKEN")
+	k8s.ArgoCDNamespace = os.Getenv("ARGOCD_NAMESPACE")
+	k8s.PrometheusEndpoint = os.Getenv("PROMETHEUS_ENDPOINT")
+
 	return k8s, nil
 }
 
