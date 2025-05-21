@@ -79,6 +79,7 @@ func (s *Server) reloadKubernetesClient() error {
 		s.initArgoCD(),
 		s.initArgoRollouts(),
 		s.initConverters(),
+		s.initPromptGenerator(),
 	)...)
 	return nil
 }
@@ -163,6 +164,8 @@ func NewTextResult(content string, err error) *mcp.CallToolResult {
 			},
 		}
 	}
+
+	// Return the full content without any truncation
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			mcp.TextContent{

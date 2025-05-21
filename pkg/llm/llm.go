@@ -184,8 +184,9 @@ func (c *Client) ChatCompletion(messages []Message) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	// Read the response body
-	body, err := io.ReadAll(resp.Body)
+	// Read the response body with a larger buffer capacity
+	// Allow for up to 10MB response
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %v", err)
 	}
@@ -206,5 +207,6 @@ func (c *Client) ChatCompletion(messages []Message) (string, error) {
 		return "", errors.New("no completions returned from the API")
 	}
 
+	// Return the full untruncated message content
 	return chatResponse.Choices[0].Message.Content, nil
 }
