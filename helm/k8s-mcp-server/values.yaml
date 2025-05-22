@@ -49,11 +49,11 @@ image:
 ## @param resources.requests.memory Memory requests for the container
 resources:
   limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
     cpu: 500m
     memory: 512Mi
-  requests:
-    cpu: 100m
-    memory: 128Mi
 
 ## @section Service parameters
 ## @param service.type Service type
@@ -70,7 +70,7 @@ service:
 
 ## @section Replicas parameters
 ## @param replicaCount Number of replicas
-replicaCount: 2
+replicaCount: 1
 
 ## @section RBAC parameters
 ## @param rbac.create Create RBAC resources
