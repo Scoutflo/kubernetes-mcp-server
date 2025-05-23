@@ -1,10 +1,12 @@
 package mcp
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -143,7 +145,12 @@ func (s *Server) Close() {
 
 	// Close health server if it exists
 	if s.healthServer != nil {
-		s.healthServer.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.healthServer.Shutdown(ctx); err != nil {
+			// Log error but don't crash (could use a proper logger here)
+			println("Health server shutdown error:", err.Error())
+		}
 	}
 }
 
