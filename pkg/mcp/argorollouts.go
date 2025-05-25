@@ -202,56 +202,56 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 // createArgoRolloutsConfig generates an Argo Rollout YAML configuration based on provided parameters
 func (s *Server) createArgoRolloutsConfig(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
-	namespace, ok := ctr.Params.Arguments["namespace"].(string)
-	if !ok || namespace == "" {
+	namespace, err := ctr.RequireString("namespace")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
-	image, ok := ctr.Params.Arguments["image"].(string)
-	if !ok || image == "" {
+	image, err := ctr.RequireString("image")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("container image is required")), nil
 	}
 
-	strategy, ok := ctr.Params.Arguments["strategy"].(string)
-	if !ok || strategy == "" {
+	strategy, err := ctr.RequireString("strategy")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("rollout strategy is required")), nil
 	}
 
-	selectorLabels, ok := ctr.Params.Arguments["selector_labels"].(string)
-	if !ok || selectorLabels == "" {
+	selectorLabels := ctr.GetString("selector_labels", "")
+	if selectorLabels == "" {
 		return NewTextResult("", fmt.Errorf("selector labels are required")), nil
 	}
 
 	// Extract optional parameters with defaults
-	replicas := getStringParam(ctr.Params.Arguments, "replicas", "1")
-	minReadySeconds := getStringParam(ctr.Params.Arguments, "min_ready_seconds", "0")
-	progressDeadlineSeconds := getStringParam(ctr.Params.Arguments, "progress_deadline_seconds", "600")
-	cpuRequest := getStringParam(ctr.Params.Arguments, "cpu_request", "")
-	memoryRequest := getStringParam(ctr.Params.Arguments, "memory_request", "")
-	scaleDownDelaySeconds := getStringParam(ctr.Params.Arguments, "scale_down_delay_seconds", "30")
+	replicas := ctr.GetString("replicas", "1")
+	minReadySeconds := ctr.GetString("min_ready_seconds", "0")
+	progressDeadlineSeconds := ctr.GetString("progress_deadline_seconds", "600")
+	cpuRequest := ctr.GetString("cpu_request", "")
+	memoryRequest := ctr.GetString("memory_request", "")
+	scaleDownDelaySeconds := ctr.GetString("scale_down_delay_seconds", "30")
 
 	// Collect blue-green strategy options
 	blueGreenOptions := map[string]string{
-		"active_service":         getStringParam(ctr.Params.Arguments, "active_service", ""),
-		"preview_service":        getStringParam(ctr.Params.Arguments, "preview_service", ""),
-		"auto_promotion_enabled": getStringParam(ctr.Params.Arguments, "auto_promotion_enabled", "false"),
-		"auto_promotion_seconds": getStringParam(ctr.Params.Arguments, "auto_promotion_seconds", ""),
+		"active_service":         ctr.GetString("active_service", ""),
+		"preview_service":        ctr.GetString("preview_service", ""),
+		"auto_promotion_enabled": ctr.GetString("auto_promotion_enabled", "false"),
+		"auto_promotion_seconds": ctr.GetString("auto_promotion_seconds", ""),
 	}
 
 	// Collect canary strategy options
 	canaryOptions := map[string]string{
-		"max_surge":                getStringParam(ctr.Params.Arguments, "max_surge", "1"),
-		"max_unavailable":          getStringParam(ctr.Params.Arguments, "max_unavailable", "0"),
-		"canary_service":           getStringParam(ctr.Params.Arguments, "canary_service", ""),
-		"stable_service":           getStringParam(ctr.Params.Arguments, "stable_service", ""),
-		"traffic_routing_provider": getStringParam(ctr.Params.Arguments, "traffic_routing_provider", ""),
-		"steps":                    getStringParam(ctr.Params.Arguments, "steps", ""),
-		"analysis_templates":       getStringParam(ctr.Params.Arguments, "analysis_templates", ""),
+		"max_surge":                ctr.GetString("max_surge", "1"),
+		"max_unavailable":          ctr.GetString("max_unavailable", "0"),
+		"canary_service":           ctr.GetString("canary_service", ""),
+		"stable_service":           ctr.GetString("stable_service", ""),
+		"traffic_routing_provider": ctr.GetString("traffic_routing_provider", ""),
+		"steps":                    ctr.GetString("steps", ""),
+		"analysis_templates":       ctr.GetString("analysis_templates", ""),
 	}
 
 	// Create ArgoRolloutsClient
@@ -276,19 +276,18 @@ func (s *Server) createArgoRolloutsConfig(ctx context.Context, ctr mcp.CallToolR
 // promoteArgoRollout promotes an Argo Rollout to advance it to the next step
 func (s *Server) promoteArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
-	namespace, ok := ctr.Params.Arguments["namespace"].(string)
-	if !ok || namespace == "" {
+	namespace, err := ctr.RequireString("namespace")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
 	// Extract optional parameters
-	fullPromoteStr, _ := ctr.Params.Arguments["full"].(string)
-	fullPromote := strings.ToLower(fullPromoteStr) == "true"
+	fullPromote := ctr.GetBool("full", false)
 
 	// Create ArgoRolloutsClient
 	argoClient, err := s.k.NewArgoRolloutsClient(namespace)
@@ -308,13 +307,13 @@ func (s *Server) promoteArgoRollout(ctx context.Context, ctr mcp.CallToolRequest
 // abortArgoRollout aborts an in-progress Argo Rollout and reverts to the stable version
 func (s *Server) abortArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
-	namespace, ok := ctr.Params.Arguments["namespace"].(string)
-	if !ok || namespace == "" {
+	namespace, err := ctr.RequireString("namespace")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
@@ -336,17 +335,17 @@ func (s *Server) abortArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) 
 // getArgoRollout gets the status of an Argo Rollout
 func (s *Server) getArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
-	namespace, ok := ctr.Params.Arguments["namespace"].(string)
-	if !ok || namespace == "" {
+	namespace, err := ctr.RequireString("namespace")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
-	output, _ := ctr.Params.Arguments["output"].(string)
+	output := ctr.GetString("output", "")
 
 	// Create ArgoRolloutsClient
 	argoClient, err := s.k.NewArgoRolloutsClient(namespace)
@@ -372,18 +371,18 @@ func (s *Server) getArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*
 // setArgoRolloutWeight sets the weight for a canary rollout
 func (s *Server) setArgoRolloutWeight(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
-	namespace, ok := ctr.Params.Arguments["namespace"].(string)
-	if !ok || namespace == "" {
+	namespace, err := ctr.RequireString("namespace")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
-	weightStr, ok := ctr.Params.Arguments["weight"].(string)
-	if !ok || weightStr == "" {
+	weightStr, err := ctr.RequireString("weight")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("weight is required")), nil
 	}
 
@@ -410,13 +409,13 @@ func (s *Server) setArgoRolloutWeight(ctx context.Context, ctr mcp.CallToolReque
 // pauseArgoRollout pauses an Argo Rollout to temporarily halt progression
 func (s *Server) pauseArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
-	namespace, ok := ctr.Params.Arguments["namespace"].(string)
-	if !ok || namespace == "" {
+	namespace, err := ctr.RequireString("namespace")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
@@ -438,23 +437,23 @@ func (s *Server) pauseArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) 
 // setArgoRolloutImage sets the image for a container in an Argo Rollouts deployment
 func (s *Server) setArgoRolloutImage(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
-	namespace, ok := ctr.Params.Arguments["namespace"].(string)
-	if !ok || namespace == "" {
+	namespace, err := ctr.RequireString("namespace")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
-	image, ok := ctr.Params.Arguments["image"].(string)
-	if !ok || image == "" {
+	image, err := ctr.RequireString("image")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("new image is required")), nil
 	}
 
 	// Extract optional parameters
-	containerName, _ := ctr.Params.Arguments["container"].(string)
+	containerName := ctr.GetString("container", "")
 
 	// Create ArgoRolloutsClient
 	argoClient, err := s.k.NewArgoRolloutsClient(namespace)

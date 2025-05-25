@@ -126,15 +126,15 @@ func (s *Server) initResources() []server.ServerTool {
 }
 
 func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
+	namespace, err := ctr.RequireString("namespace")
+	if err != nil {
 		namespace = ""
 	}
-	gvk, err := parseGroupVersionKind(ctr.Params.Arguments)
+	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to list resources, %s", err)), nil
 	}
-	ret, err := s.k.ResourcesList(ctx, gvk, namespace.(string))
+	ret, err := s.k.ResourcesList(ctx, gvk, namespace)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to list resources: %v", err)), nil
 	}
@@ -142,19 +142,19 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 }
 
 func (s *Server) resourcesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
+	namespace, err := ctr.RequireString("namespace")
+	if err != nil {
 		namespace = ""
 	}
-	gvk, err := parseGroupVersionKind(ctr.Params.Arguments)
+	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to get resource, %s", err)), nil
 	}
-	name := ctr.Params.Arguments["name"]
-	if name == nil {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to get resource, missing argument name")), nil
 	}
-	ret, err := s.k.ResourcesGet(ctx, gvk, namespace.(string), name.(string))
+	ret, err := s.k.ResourcesGet(ctx, gvk, namespace, name)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to get resource: %v", err)), nil
 	}
@@ -162,11 +162,11 @@ func (s *Server) resourcesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mc
 }
 
 func (s *Server) resourcesCreateOrUpdate(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	resource := ctr.Params.Arguments["resource"]
-	if resource == nil || resource == "" {
+	resource, err := ctr.RequireString("resource")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to create or update resources, missing argument resource")), nil
 	}
-	ret, err := s.k.ResourcesCreateOrUpdate(ctx, resource.(string))
+	ret, err := s.k.ResourcesCreateOrUpdate(ctx, resource)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to create or update resources: %v", err)), nil
 	}
@@ -174,19 +174,19 @@ func (s *Server) resourcesCreateOrUpdate(ctx context.Context, ctr mcp.CallToolRe
 }
 
 func (s *Server) resourcesDelete(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
+	namespace, err := ctr.RequireString("namespace")
+	if err != nil {
 		namespace = ""
 	}
-	gvk, err := parseGroupVersionKind(ctr.Params.Arguments)
+	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to delete resource, %s", err)), nil
 	}
-	name := ctr.Params.Arguments["name"]
-	if name == nil {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to delete resource, missing argument name")), nil
 	}
-	err = s.k.ResourcesDelete(ctx, gvk, namespace.(string), name.(string))
+	err = s.k.ResourcesDelete(ctx, gvk, namespace, name)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to delete resource: %v", err)), nil
 	}
@@ -210,26 +210,29 @@ func parseGroupVersionKind(arguments map[string]interface{}) (*schema.GroupVersi
 }
 
 func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
+	namespace, err := ctr.RequireString("namespace")
+	if err != nil {
 		namespace = ""
 	}
-	gvk, err := parseGroupVersionKind(ctr.Params.Arguments)
+	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to get YAML, %s", err)), nil
 	}
 
-	name, nameProvided := ctr.Params.Arguments["name"].(string)
-	if nameProvided && name != "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
+		return NewTextResult("", errors.New("failed to get YAML, missing argument name")), nil
+	}
+	if name != "" {
 		// Get a specific resource
-		ret, err := s.k.ResourcesGet(ctx, gvk, namespace.(string), name)
+		ret, err := s.k.ResourcesGet(ctx, gvk, namespace, name)
 		if err != nil {
 			return NewTextResult("", fmt.Errorf("failed to get resource YAML: %v", err)), nil
 		}
 		return NewTextResult(ret, err), nil
 	} else {
 		// Get all resources of this type in the namespace
-		ret, err := s.k.ResourcesList(ctx, gvk, namespace.(string))
+		ret, err := s.k.ResourcesList(ctx, gvk, namespace)
 		if err != nil {
 			return NewTextResult("", fmt.Errorf("failed to list resources YAML: %v", err)), nil
 		}
@@ -238,11 +241,11 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 }
 
 func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	manifestPath, hasPath := ctr.Params.Arguments["manifest_path"].(string)
-	yamlContent, hasContent := ctr.Params.Arguments["yaml_content"].(string)
+	manifestPath := ctr.GetString("manifest_path", "")
+	yamlContent := ctr.GetString("yaml_content", "")
 
 	// Ensure at least one of manifest_path or yaml_content is provided
-	if (!hasPath || manifestPath == "") && (!hasContent || yamlContent == "") {
+	if manifestPath == "" && yamlContent == "" {
 		return NewTextResult("", errors.New("failed to apply manifest, either manifest_path or yaml_content must be provided")), nil
 	}
 
@@ -250,7 +253,7 @@ func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	var err error
 
 	// If manifest_path is provided, read the file
-	if hasPath && manifestPath != "" {
+	if manifestPath != "" {
 		contentBytes, err := os.ReadFile(manifestPath)
 		if err != nil {
 			return NewTextResult("", fmt.Errorf("failed to read manifest file: %v", err)), nil
@@ -271,28 +274,28 @@ func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*m
 }
 
 func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
+	namespace, err := ctr.RequireString("namespace")
+	if err != nil {
 		namespace = ""
 	}
 
-	gvk, err := parseGroupVersionKind(ctr.Params.Arguments)
+	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to patch resource, %s", err)), nil
 	}
 
-	resourceName := ctr.Params.Arguments["resource_name"]
-	if resourceName == nil {
+	resourceName, err := ctr.RequireString("resource_name")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to patch resource, missing argument resource_name")), nil
 	}
 
-	patch, ok := ctr.Params.Arguments["patch"]
-	if !ok || patch == nil {
+	patch, err := ctr.RequireString("patch")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to patch resource, missing argument patch")), nil
 	}
 
 	patchType := "strategic"
-	if pt, ok := ctr.Params.Arguments["patch_type"].(string); ok && pt != "" {
+	if pt, err := ctr.RequireString("patch_type"); err == nil {
 		patchType = pt
 	}
 
@@ -308,7 +311,7 @@ func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*
 	}
 
 	// Apply the patch
-	ret, err := s.k.ResourcesPatch(ctx, gvk, namespace.(string), resourceName.(string), patchType, patchJSON)
+	ret, err := s.k.ResourcesPatch(ctx, gvk, namespace, resourceName, patchType, patchJSON)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to patch resource: %v", err)), nil
 	}

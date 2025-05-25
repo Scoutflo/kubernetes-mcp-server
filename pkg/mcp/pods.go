@@ -70,11 +70,11 @@ func (s *Server) podsListInAllNamespaces(ctx context.Context, _ mcp.CallToolRequ
 }
 
 func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	ns := ctr.Params.Arguments["namespace"]
-	if ns == nil {
+	ns := ctr.GetString("namespace", "")
+	if ns == "" {
 		return NewTextResult("", errors.New("failed to list pods in namespace, missing argument namespace")), nil
 	}
-	ret, err := s.k.PodsListInNamespace(ctx, ns.(string))
+	ret, err := s.k.PodsListInNamespace(ctx, ns)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to list pods in namespace %s: %v", ns, err)), nil
 	}
@@ -82,15 +82,12 @@ func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolReques
 }
 
 func (s *Server) podsGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	ns := ctr.Params.Arguments["namespace"]
-	if ns == nil {
-		ns = ""
-	}
-	name := ctr.Params.Arguments["name"]
-	if name == nil {
+	ns := ctr.GetString("namespace", "")
+	name := ctr.GetString("name", "")
+	if name == "" {
 		return NewTextResult("", errors.New("failed to get pod, missing argument name")), nil
 	}
-	ret, err := s.k.PodsGet(ctx, ns.(string), name.(string))
+	ret, err := s.k.PodsGet(ctx, ns, name)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to get pod %s in namespace %s: %v", name, ns, err)), nil
 	}
@@ -98,15 +95,12 @@ func (s *Server) podsGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 }
 
 func (s *Server) podsDelete(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	ns := ctr.Params.Arguments["namespace"]
-	if ns == nil {
-		ns = ""
-	}
-	name := ctr.Params.Arguments["name"]
-	if name == nil {
+	ns := ctr.GetString("namespace", "")
+	name := ctr.GetString("name", "")
+	if name == "" {
 		return NewTextResult("", errors.New("failed to delete pod, missing argument name")), nil
 	}
-	ret, err := s.k.PodsDelete(ctx, ns.(string), name.(string))
+	ret, err := s.k.PodsDelete(ctx, ns, name)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to delete pod %s in namespace %s: %v", name, ns, err)), nil
 	}
@@ -114,26 +108,35 @@ func (s *Server) podsDelete(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.
 }
 
 func (s *Server) podsExec(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	ns := ctr.Params.Arguments["namespace"]
-	if ns == nil {
-		ns = ""
-	}
-	name := ctr.Params.Arguments["name"]
-	if name == nil {
+	ns := ctr.GetString("namespace", "")
+	name := ctr.GetString("name", "")
+	if name == "" {
 		return NewTextResult("", errors.New("failed to exec in pod, missing argument name")), nil
 	}
-	commandArg := ctr.Params.Arguments["command"]
+	// Get command array using new API
+	args := ctr.GetRawArguments()
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return NewTextResult("", errors.New("failed to get arguments")), nil
+	}
+
+	commandArg, ok := argsMap["command"]
+	if !ok {
+		return NewTextResult("", errors.New("failed to exec in pod, missing command argument")), nil
+	}
+
 	command := make([]string, 0)
-	if _, ok := commandArg.([]interface{}); ok {
-		for _, cmd := range commandArg.([]interface{}) {
-			if _, ok := cmd.(string); ok {
-				command = append(command, cmd.(string))
+	if cmdArray, ok := commandArg.([]interface{}); ok {
+		for _, cmd := range cmdArray {
+			if strCmd, ok := cmd.(string); ok {
+				command = append(command, strCmd)
 			}
 		}
 	} else {
 		return NewTextResult("", errors.New("failed to exec in pod, invalid command argument")), nil
 	}
-	ret, err := s.k.PodsExec(ctx, ns.(string), name.(string), "", command)
+
+	ret, err := s.k.PodsExec(ctx, ns, name, "", command)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to exec in pod %s in namespace %s: %v", name, ns, err)), nil
 	} else if ret == "" {
@@ -143,15 +146,12 @@ func (s *Server) podsExec(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Ca
 }
 
 func (s *Server) podsLog(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	ns := ctr.Params.Arguments["namespace"]
-	if ns == nil {
-		ns = ""
-	}
-	name := ctr.Params.Arguments["name"]
-	if name == nil {
+	ns := ctr.GetString("namespace", "")
+	name := ctr.GetString("name", "")
+	if name == "" {
 		return NewTextResult("", errors.New("failed to get pod log, missing argument name")), nil
 	}
-	ret, err := s.k.PodsLog(ctx, ns.(string), name.(string))
+	ret, err := s.k.PodsLog(ctx, ns, name)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to get pod %s log in namespace %s: %v", name, ns, err)), nil
 	} else if ret == "" {
@@ -161,23 +161,17 @@ func (s *Server) podsLog(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 }
 
 func (s *Server) podsRun(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	ns := ctr.Params.Arguments["namespace"]
-	if ns == nil {
-		ns = ""
-	}
-	name := ctr.Params.Arguments["name"]
-	if name == nil {
+	ns := ctr.GetString("namespace", "")
+	name := ctr.GetString("name", "")
+	if name == "" {
 		name = ""
 	}
-	image := ctr.Params.Arguments["image"]
-	if image == nil {
+	image := ctr.GetString("image", "")
+	if image == "" {
 		return NewTextResult("", errors.New("failed to run pod, missing argument image")), nil
 	}
-	port := ctr.Params.Arguments["port"]
-	if port == nil {
-		port = float64(0)
-	}
-	ret, err := s.k.PodsRun(ctx, ns.(string), name.(string), image.(string), int32(port.(float64)))
+	port := ctr.GetFloat("port", 0)
+	ret, err := s.k.PodsRun(ctx, ns, name, image, int32(port))
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to get pod %s log in namespace %s: %v", name, ns, err)), nil
 	}

@@ -32,12 +32,12 @@ func (s *Server) nodesList(ctx context.Context, _ mcp.CallToolRequest) (*mcp.Cal
 
 // nodesGet handles the nodes_get tool request
 func (s *Server) nodesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	name := ctr.Params.Arguments["name"]
-	if name == nil {
+	name := ctr.GetString("name", "")
+	if name == "" {
 		return NewTextResult("", errors.New("missing required parameter: name")), nil
 	}
 
-	ret, err := s.k.NodesGet(ctx, name.(string))
+	ret, err := s.k.NodesGet(ctx, name)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to get node '%s': %v", name, err)), nil
 	}

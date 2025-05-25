@@ -26,8 +26,14 @@ func (s *Server) initPromptGenerator() []server.ServerTool {
 
 func (s *Server) promptGenerator(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract the description parameter
-	descriptionArg := ctr.Params.Arguments["description"]
-	if descriptionArg == nil {
+	args := ctr.GetRawArguments()
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return NewTextResult("", errors.New("failed to get arguments")), nil
+	}
+
+	descriptionArg, exists := argsMap["description"]
+	if !exists || descriptionArg == nil {
 		return NewTextResult("", errors.New("missing required parameter: description")), nil
 	}
 	description := descriptionArg.(string)

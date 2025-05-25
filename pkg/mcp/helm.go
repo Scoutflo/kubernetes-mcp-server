@@ -218,20 +218,17 @@ func (s *Server) initHelm() []server.ServerTool {
 
 func (s *Server) helmAddRepository(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to add repository: missing or invalid repository name")), nil
 	}
 
-	url, ok := ctr.Params.Arguments["url"].(string)
-	if !ok || url == "" {
+	url, err := ctr.RequireString("url")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to add repository: missing or invalid repository URL")), nil
 	}
 
-	namespace := ""
-	if ns, ok := ctr.Params.Arguments["namespace"].(string); ok {
-		namespace = ns
-	}
+	namespace := ctr.GetString("namespace", "")
 
 	// Create Helm client
 	helmClient, err := s.k.NewHelmClient(namespace)
@@ -288,7 +285,8 @@ func (s *Server) helmUpdateRepositories(ctx context.Context, ctr mcp.CallToolReq
 
 	// Check if specific repo was specified
 	var repoNames []string
-	if repoName, ok := ctr.Params.Arguments["repo_name"].(string); ok && repoName != "" {
+	repoName := ctr.GetString("repo_name", "")
+	if repoName != "" {
 		repoNames = []string{repoName}
 	}
 
@@ -303,20 +301,15 @@ func (s *Server) helmUpdateRepositories(ctx context.Context, ctr mcp.CallToolReq
 
 func (s *Server) helmGetRelease(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to get release: missing or invalid release name")), nil
 	}
 
-	namespace := ""
-	if ns, ok := ctr.Params.Arguments["namespace"].(string); ok {
-		namespace = ns
-	}
+	namespace := ctr.GetString("namespace", "")
 
 	resource := ""
-	if res, ok := ctr.Params.Arguments["resource"].(string); ok {
-		resource = res
-	}
+	resource = ctr.GetString("resource", "")
 
 	// Create Helm client
 	helmClient, err := s.k.NewHelmClient(namespace)
@@ -335,51 +328,30 @@ func (s *Server) helmGetRelease(ctx context.Context, ctr mcp.CallToolRequest) (*
 
 func (s *Server) helmListReleases(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	namespace := ""
-	if ns, ok := ctr.Params.Arguments["namespace"].(string); ok {
-		namespace = ns
-	}
+	namespace := ctr.GetString("namespace", "")
 
 	// Build the list options
 	opts := kubernetes.ListOptions{}
 
 	// Boolean options (as strings)
-	if val, ok := ctr.Params.Arguments["all_namespaces"].(string); ok {
-		opts.AllNamespaces = strings.ToLower(val) == "true"
-	}
+	opts.AllNamespaces = strings.ToLower(ctr.GetString("all_namespaces", "false")) == "true"
 
-	if val, ok := ctr.Params.Arguments["all"].(string); ok {
-		opts.All = strings.ToLower(val) == "true"
-	}
+	opts.All = strings.ToLower(ctr.GetString("all", "false")) == "true"
 
-	if val, ok := ctr.Params.Arguments["uninstalled"].(string); ok {
-		opts.Uninstalled = strings.ToLower(val) == "true"
-	}
+	opts.Uninstalled = strings.ToLower(ctr.GetString("uninstalled", "false")) == "true"
 
-	if val, ok := ctr.Params.Arguments["uninstalling"].(string); ok {
-		opts.Uninstalling = strings.ToLower(val) == "true"
-	}
+	opts.Uninstalling = strings.ToLower(ctr.GetString("uninstalling", "false")) == "true"
 
-	if val, ok := ctr.Params.Arguments["failed"].(string); ok {
-		opts.Failed = strings.ToLower(val) == "true"
-	}
+	opts.Failed = strings.ToLower(ctr.GetString("failed", "false")) == "true"
 
-	if val, ok := ctr.Params.Arguments["deployed"].(string); ok {
-		opts.Deployed = strings.ToLower(val) == "true"
-	}
+	opts.Deployed = strings.ToLower(ctr.GetString("deployed", "false")) == "true"
 
-	if val, ok := ctr.Params.Arguments["pending"].(string); ok {
-		opts.Pending = strings.ToLower(val) == "true"
-	}
+	opts.Pending = strings.ToLower(ctr.GetString("pending", "false")) == "true"
 
 	// String options
-	if val, ok := ctr.Params.Arguments["filter"].(string); ok {
-		opts.Filter = val
-	}
+	opts.Filter = ctr.GetString("filter", "")
 
-	if val, ok := ctr.Params.Arguments["output"].(string); ok {
-		opts.Output = val
-	}
+	opts.Output = ctr.GetString("output", "")
 
 	// Create Helm client
 	helmClient, err := s.k.NewHelmClient(namespace)
@@ -398,13 +370,13 @@ func (s *Server) helmListReleases(ctx context.Context, ctr mcp.CallToolRequest) 
 
 func (s *Server) helmUninstallRelease(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to uninstall release: missing or invalid release name")), nil
 	}
 
-	namespace, ok := ctr.Params.Arguments["namespace"].(string)
-	if !ok || namespace == "" {
+	namespace := ctr.GetString("namespace", "")
+	if namespace == "" {
 		return NewTextResult("", errors.New("failed to uninstall release: missing or invalid namespace")), nil
 	}
 
@@ -412,13 +384,9 @@ func (s *Server) helmUninstallRelease(ctx context.Context, ctr mcp.CallToolReque
 	opts := kubernetes.UninstallReleaseOptions{}
 
 	// Boolean options (as strings)
-	if dryRun, ok := ctr.Params.Arguments["dry_run"].(string); ok {
-		opts.DryRun = strings.ToLower(dryRun) == "true"
-	}
+	opts.DryRun = strings.ToLower(ctr.GetString("dry_run", "false")) == "true"
 
-	if wait, ok := ctr.Params.Arguments["wait"].(string); ok {
-		opts.Wait = strings.ToLower(wait) == "true"
-	}
+	opts.Wait = strings.ToLower(ctr.GetString("wait", "false")) == "true"
 
 	// Create Helm client
 	helmClient, err := s.k.NewHelmClient(namespace)
@@ -437,21 +405,18 @@ func (s *Server) helmUninstallRelease(ctx context.Context, ctr mcp.CallToolReque
 
 func (s *Server) helmInstallRelease(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to install release: missing or invalid release name")), nil
 	}
 
-	chart, ok := ctr.Params.Arguments["chart"].(string)
-	if !ok || chart == "" {
+	chart, err := ctr.RequireString("chart")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to install release: missing or invalid chart")), nil
 	}
 
 	// Extract optional parameters
-	namespace := ""
-	if ns, ok := ctr.Params.Arguments["namespace"].(string); ok {
-		namespace = ns
-	}
+	namespace := ctr.GetString("namespace", "")
 
 	// Build the install options
 	opts := kubernetes.InstallOptions{
@@ -459,28 +424,27 @@ func (s *Server) helmInstallRelease(ctx context.Context, ctr mcp.CallToolRequest
 	}
 
 	// Set repository URL if provided
-	if repoURL, ok := ctr.Params.Arguments["repo_url"].(string); ok {
-		opts.RepoURL = repoURL
-	}
+	opts.RepoURL = ctr.GetString("repo_url", "")
 
 	// Set version if provided
-	if version, ok := ctr.Params.Arguments["version"].(string); ok {
-		opts.Version = version
-	}
+	opts.Version = ctr.GetString("version", "")
 
 	// Array options
-	if setValues, ok := ctr.Params.Arguments["set"].([]interface{}); ok {
-		for _, sv := range setValues {
-			if strVal, ok := sv.(string); ok {
-				opts.Set = append(opts.Set, strVal)
+	args := ctr.GetRawArguments()
+	if argsMap, ok := args.(map[string]interface{}); ok {
+		if setValues, ok := argsMap["set"].([]interface{}); ok {
+			for _, sv := range setValues {
+				if strVal, ok := sv.(string); ok {
+					opts.Set = append(opts.Set, strVal)
+				}
 			}
 		}
-	}
 
-	if valueFiles, ok := ctr.Params.Arguments["values"].([]interface{}); ok {
-		for _, vf := range valueFiles {
-			if strVal, ok := vf.(string); ok {
-				opts.Values = append(opts.Values, strVal)
+		if valueFiles, ok := argsMap["values"].([]interface{}); ok {
+			for _, vf := range valueFiles {
+				if strVal, ok := vf.(string); ok {
+					opts.Values = append(opts.Values, strVal)
+				}
 			}
 		}
 	}
@@ -502,21 +466,18 @@ func (s *Server) helmInstallRelease(ctx context.Context, ctr mcp.CallToolRequest
 
 func (s *Server) helmUpgradeRelease(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to upgrade release: missing or invalid release name")), nil
 	}
 
-	chart, ok := ctr.Params.Arguments["chart"].(string)
-	if !ok || chart == "" {
+	chart, err := ctr.RequireString("chart")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to upgrade release: missing or invalid chart")), nil
 	}
 
 	// Extract optional parameters
-	namespace := ""
-	if ns, ok := ctr.Params.Arguments["namespace"].(string); ok {
-		namespace = ns
-	}
+	namespace := ctr.GetString("namespace", "")
 
 	// Build the upgrade options
 	opts := kubernetes.UpgradeOptions{
@@ -524,23 +485,24 @@ func (s *Server) helmUpgradeRelease(ctx context.Context, ctr mcp.CallToolRequest
 	}
 
 	// Set version if provided
-	if version, ok := ctr.Params.Arguments["version"].(string); ok {
-		opts.Version = version
-	}
+	opts.Version = ctr.GetString("version", "")
 
 	// Array options
-	if setValues, ok := ctr.Params.Arguments["set"].([]interface{}); ok {
-		for _, sv := range setValues {
-			if strVal, ok := sv.(string); ok {
-				opts.Set = append(opts.Set, strVal)
+	args := ctr.GetRawArguments()
+	if argsMap, ok := args.(map[string]interface{}); ok {
+		if setValues, ok := argsMap["set"].([]interface{}); ok {
+			for _, sv := range setValues {
+				if strVal, ok := sv.(string); ok {
+					opts.Set = append(opts.Set, strVal)
+				}
 			}
 		}
-	}
 
-	if valueFiles, ok := ctr.Params.Arguments["values"].([]interface{}); ok {
-		for _, vf := range valueFiles {
-			if strVal, ok := vf.(string); ok {
-				opts.Values = append(opts.Values, strVal)
+		if valueFiles, ok := argsMap["values"].([]interface{}); ok {
+			for _, vf := range valueFiles {
+				if strVal, ok := vf.(string); ok {
+					opts.Values = append(opts.Values, strVal)
+				}
 			}
 		}
 	}

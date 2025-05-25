@@ -98,7 +98,7 @@ type mcpContext struct {
 	cancel        context.CancelFunc
 	mcpServer     *Server
 	mcpHttpServer *httptest.Server
-	mcpClient     *client.SSEMCPClient
+	mcpClient     *client.Client
 }
 
 func (c *mcpContext) beforeEach(t *testing.T) {
@@ -252,7 +252,10 @@ func (c *mcpContext) crdWaitUntilReady(name string) {
 func (c *mcpContext) callTool(name string, args map[string]interface{}) (*mcp.CallToolResult, error) {
 	callToolRequest := mcp.CallToolRequest{}
 	callToolRequest.Params.Name = name
-	callToolRequest.Params.Arguments = args
+	// Copy all arguments to the request arguments map
+	for k, v := range args {
+		callToolRequest.GetArguments()[k] = v
+	}
 	return c.mcpClient.CallTool(c.ctx, callToolRequest)
 }
 

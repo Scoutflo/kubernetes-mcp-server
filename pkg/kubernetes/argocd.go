@@ -284,10 +284,7 @@ func (k *Kubernetes) NewArgoClient(ctx context.Context, requestNamespace string)
 			if requestNamespace != "" {
 				return requestNamespace
 			}
-			if k.ArgoCDNamespace != "" {
-				return k.ArgoCDNamespace
-			}
-			return namespaceOrDefault("")
+			return namespaceOrDefault(k.ArgoCDNamespace)
 		}(),
 		authToken: k.ArgoCDToken,
 	}

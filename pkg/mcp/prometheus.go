@@ -70,7 +70,6 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusGetAlerts},
 		{Tool: mcp.NewTool("prometheus_get_rules",
 			mcp.WithDescription("Tool for getting Prometheus alerting and recording rules. Retrieves information about configured alerting and recording rules in Prometheus. Use this tool to understand what alerts are defined and what metrics are being pre-computed. You can filter rules by type, name, group, and other criteria."),
-			// mcp.WithString("type", mcp.Description("Rule type filter")),
 			mcp.WithArray("rule_name", mcp.Description("Rule names filter"),
 				func(schema map[string]interface{}) {
 					schema["type"] = "array"
@@ -160,10 +159,10 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		{Tool: mcp.NewTool("prometheus_runtimeinfo",
 			mcp.WithDescription("Tool for getting Prometheus runtime information. Provides detailed information about the Prometheus server's runtime state. Use this tool to monitor server health and performance through details about garbage collection, memory usage, and other runtime metrics."),
 		), Handler: s.prometheusRuntimeInfo},
-		// {Tool: mcp.NewTool("prometheus_TSDB_status",
-		// 	mcp.WithDescription("Tool for getting Prometheus TSDB status. Provides information about the time series database (TSDB) status in Prometheus. Use this tool to monitor database health through details about data storage, head blocks, WAL status, and other TSDB metrics."),
-		// 	mcp.WithNumber("limit", mcp.Description("Number of items limit")),
-		// ), Handler: s.prometheusTSDBStatus},
+		{Tool: mcp.NewTool("prometheus_TSDB_status",
+			mcp.WithDescription("Tool for getting Prometheus TSDB status. Provides information about the time series database (TSDB) status in Prometheus. Use this tool to monitor database health through details about data storage, head blocks, WAL status, and other TSDB metrics."),
+			mcp.WithNumber("limit", mcp.Description("Number of items limit")),
+		), Handler: s.prometheusTSDBStatus},
 		// {Tool: mcp.NewTool("prometheus_WALReplay",
 		// 	mcp.WithDescription("Tool for getting Prometheus WAL replay status. Retrieves the status of Write-Ahead Log (WAL) replay operations in Prometheus. Use this tool to monitor the progress of WAL replay during server startup or recovery. Helps track data durability and recovery progress."),
 		// ), Handler: s.prometheusWALReplay},
@@ -173,16 +172,16 @@ func (s *Server) initPrometheus() []server.ServerTool {
 // prometheusMetrics handles the prometheus_metrics_query tool request
 func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required query parameter
-	queryArg := ctr.Params.Arguments["query"]
-	if queryArg == nil {
+	queryArg := ctr.GetString("query", "")
+	if queryArg == "" {
 		return NewTextResult("", errors.New("missing required parameter: query")), nil
 	}
-	query := queryArg.(string)
+	query := queryArg
 
 	// Extract optional time parameter
 	var queryTime *time.Time
-	if timeArg := ctr.Params.Arguments["time"]; timeArg != nil {
-		parsedTime := parseTime(timeArg.(string), time.Time{})
+	if timeArg := ctr.GetString("time", ""); timeArg != "" {
+		parsedTime := parseTime(timeArg, time.Time{})
 		if !parsedTime.IsZero() {
 			queryTime = &parsedTime
 		}
@@ -190,8 +189,8 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 
 	// Extract optional timeout parameter
 	timeout := ""
-	if timeoutArg := ctr.Params.Arguments["timeout"]; timeoutArg != nil {
-		timeout = timeoutArg.(string)
+	if timeoutArg := ctr.GetString("timeout", ""); timeoutArg != "" {
+		timeout = timeoutArg
 	}
 
 	// Execute the instant query with the provided parameters
@@ -222,47 +221,47 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 // prometheusMetricsRange handles the prometheus_metrics_query_range tool request
 func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	queryArg := ctr.Params.Arguments["query"]
-	startArg := ctr.Params.Arguments["start"]
-	endArg := ctr.Params.Arguments["end"]
-	stepArg := ctr.Params.Arguments["step"]
+	queryArg := ctr.GetString("query", "")
+	startArg := ctr.GetString("start", "")
+	endArg := ctr.GetString("end", "")
+	stepArg := ctr.GetString("step", "")
 
 	// Validate required parameters
-	if queryArg == nil {
+	if queryArg == "" {
 		return NewTextResult("", errors.New("missing required parameter: query")), nil
 	}
-	if startArg == nil {
+	if startArg == "" {
 		return NewTextResult("", errors.New("missing required parameter: start")), nil
 	}
-	if endArg == nil {
+	if endArg == "" {
 		return NewTextResult("", errors.New("missing required parameter: end")), nil
 	}
-	if stepArg == nil {
+	if stepArg == "" {
 		return NewTextResult("", errors.New("missing required parameter: step")), nil
 	}
 
 	// Parse query
-	query := queryArg.(string)
+	query := queryArg
 
 	// Parse start time
-	startTime := parseTime(startArg.(string), time.Now().Add(-1*time.Hour))
+	startTime := parseTime(startArg, time.Now().Add(-1*time.Hour))
 	if startTime.IsZero() {
 		return NewTextResult("", errors.New("invalid start time format")), nil
 	}
 
 	// Parse end time
-	endTime := parseTime(endArg.(string), time.Now())
+	endTime := parseTime(endArg, time.Now())
 	if endTime.IsZero() {
 		return NewTextResult("", errors.New("invalid end time format")), nil
 	}
 
 	// Parse step
-	step := stepArg.(string)
+	step := stepArg
 
 	// Extract optional timeout parameter
 	timeout := ""
-	if timeoutArg := ctr.Params.Arguments["timeout"]; timeoutArg != nil {
-		timeout = timeoutArg.(string)
+	if timeoutArg := ctr.GetString("timeout", ""); timeoutArg != "" {
+		timeout = timeoutArg
 	}
 
 	// Execute the range query with the provided parameters
@@ -306,18 +305,15 @@ func (s *Server) prometheusListMetrics(ctx context.Context, _ mcp.CallToolReques
 // prometheusMetricInfo handles the prometheus_metric_info tool request
 func (s *Server) prometheusMetricInfo(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required metric parameter
-	metricArg := ctr.Params.Arguments["metric"]
-	if metricArg == nil {
+	metric := ctr.GetString("metric", "")
+	if metric == "" {
 		return NewTextResult("", errors.New("missing required parameter: metric")), nil
 	}
-	metric := metricArg.(string)
 
 	// Check if statistics are requested
 	includeStats := false
-	if statsArg := ctr.Params.Arguments["include_statistics"]; statsArg != nil {
-		if b, ok := statsArg.(bool); ok {
-			includeStats = b
-		}
+	if statsArg := ctr.GetString("include_statistics", ""); statsArg != "" {
+		includeStats = statsArg == "true"
 	}
 
 	ret, err := s.k.GetPrometheusMetricInfo(metric, includeStats)
@@ -337,11 +333,10 @@ func (s *Server) prometheusMetricInfo(ctx context.Context, ctr mcp.CallToolReque
 // prometheusGenerateQuery handles the prometheus_generate_query tool request
 func (s *Server) prometheusGenerateQuery(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract the description parameter
-	descriptionArg := ctr.Params.Arguments["description"]
-	if descriptionArg == nil {
+	description := ctr.GetString("description", "")
+	if description == "" {
 		return NewTextResult("", errors.New("missing required parameter: description")), nil
 	}
-	description := descriptionArg.(string)
 
 	// Generate the PromQL query
 	query, err := s.k.GeneratePromQLQuery(description)
@@ -383,9 +378,15 @@ func parseTime(timeStr string, defaultTime time.Time) time.Time {
 
 // prometheusSeries handles the prometheus_series_query tool request
 func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// Extract the match parameter (required)
-	matchArg := ctr.Params.Arguments["match"]
-	if matchArg == nil {
+	// Extract the match parameter (required) using new API
+	args := ctr.GetRawArguments()
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return NewTextResult("", errors.New("failed to get arguments")), nil
+	}
+
+	matchArg, ok := argsMap["match"]
+	if !ok {
 		return NewTextResult("", errors.New("missing required parameter: match")), nil
 	}
 
@@ -406,25 +407,29 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 
 	// Extract optional start parameter
 	var startTime *time.Time
-	if startArg := ctr.Params.Arguments["start"]; startArg != nil {
-		parsed := parseTime(startArg.(string), time.Time{})
-		if !parsed.IsZero() {
-			startTime = &parsed
+	if startArg, exists := argsMap["start"]; exists && startArg != nil {
+		if startStr, ok := startArg.(string); ok {
+			parsed := parseTime(startStr, time.Time{})
+			if !parsed.IsZero() {
+				startTime = &parsed
+			}
 		}
 	}
 
 	// Extract optional end parameter
 	var endTime *time.Time
-	if endArg := ctr.Params.Arguments["end"]; endArg != nil {
-		parsed := parseTime(endArg.(string), time.Time{})
-		if !parsed.IsZero() {
-			endTime = &parsed
+	if endArg, exists := argsMap["end"]; exists && endArg != nil {
+		if endStr, ok := endArg.(string); ok {
+			parsed := parseTime(endStr, time.Time{})
+			if !parsed.IsZero() {
+				endTime = &parsed
+			}
 		}
 	}
 
 	// Extract optional limit parameter
 	limit := 1000 // Default limit
-	if limitArg := ctr.Params.Arguments["limit"]; limitArg != nil {
+	if limitArg, exists := argsMap["limit"]; exists && limitArg != nil {
 		if limitVal, ok := limitArg.(float64); ok {
 			limit = int(limitVal)
 		}
@@ -459,14 +464,14 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 func (s *Server) prometheusTargets(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract optional state parameter
 	state := ""
-	if stateArg := ctr.Params.Arguments["state"]; stateArg != nil {
-		state = stateArg.(string)
+	if stateArg := ctr.GetString("state", ""); stateArg != "" {
+		state = stateArg
 	}
 
 	// Extract optional scrape_pool parameter
 	scrapePool := ""
-	if scrapePoolArg := ctr.Params.Arguments["scrape_pool"]; scrapePoolArg != nil {
-		scrapePool = scrapePoolArg.(string)
+	if scrapePoolArg := ctr.GetString("scrape_pool", ""); scrapePoolArg != "" {
+		scrapePool = scrapePoolArg
 	}
 
 	// Call the Kubernetes function
@@ -482,21 +487,24 @@ func (s *Server) prometheusTargets(ctx context.Context, ctr mcp.CallToolRequest)
 func (s *Server) prometheusTargetMetadata(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract optional match_target parameter
 	matchTarget := ""
-	if matchTargetArg := ctr.Params.Arguments["match_target"]; matchTargetArg != nil {
-		matchTarget = matchTargetArg.(string)
+	if matchTargetArg := ctr.GetString("match_target", ""); matchTargetArg != "" {
+		matchTarget = matchTargetArg
 	}
 
 	// Extract optional metric parameter
 	metric := ""
-	if metricArg := ctr.Params.Arguments["metric"]; metricArg != nil {
-		metric = metricArg.(string)
+	if metricArg := ctr.GetString("metric", ""); metricArg != "" {
+		metric = metricArg
 	}
 
-	// Extract optional limit parameter
+	// Extract optional limit parameter using new API
 	limit := 0 // Default is no limit
-	if limitArg := ctr.Params.Arguments["limit"]; limitArg != nil {
-		if limitVal, ok := limitArg.(float64); ok {
-			limit = int(limitVal)
+	args := ctr.GetRawArguments()
+	if argsMap, ok := args.(map[string]interface{}); ok {
+		if limitArg, exists := argsMap["limit"]; exists && limitArg != nil {
+			if limitVal, ok := limitArg.(float64); ok {
+				limit = int(limitVal)
+			}
 		}
 	}
 
@@ -512,138 +520,148 @@ func (s *Server) prometheusTargetMetadata(ctx context.Context, ctr mcp.CallToolR
 // Handler for creating Prometheus alerts
 func (s *Server) prometheusCreateAlert(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract and validate required parameters
-	alertName := ctr.Params.Arguments["alertname"]
-	if alertName == nil {
+	alertName := ctr.GetString("alertname", "")
+	if alertName == "" {
 		return NewTextResult("", errors.New("missing required parameter: alertname")), nil
 	}
 
-	expression := ctr.Params.Arguments["expression"]
-	if expression == nil {
+	expression := ctr.GetString("expression", "")
+	if expression == "" {
 		return NewTextResult("", errors.New("missing required parameter: expression")), nil
 	}
 
-	appLabel := ctr.Params.Arguments["applabel"]
-	if appLabel == nil {
+	appLabel := ctr.GetString("applabel", "")
+	if appLabel == "" {
 		return NewTextResult("", errors.New("missing required parameter: applabel")), nil
 	}
 
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
+	namespace := ctr.GetString("namespace", "")
+	if namespace == "" {
 		return NewTextResult("", errors.New("missing required parameter: namespace")), nil
 	}
 
 	// Extract optional parameters with defaults
 	var interval string
-	if intervalArg := ctr.Params.Arguments["interval"]; intervalArg != nil {
-		interval = intervalArg.(string)
+	if intervalArg := ctr.GetString("interval", ""); intervalArg != "" {
+		interval = intervalArg
 	} else {
 		interval = "1m" // Default to 1 minute
 	}
 
 	var forDuration string
-	if forArg := ctr.Params.Arguments["for"]; forArg != nil {
-		forDuration = forArg.(string)
+	if forArg := ctr.GetString("for", ""); forArg != "" {
+		forDuration = forArg
 	} else {
 		forDuration = "5m" // Default to 5 minutes
 	}
 
-	// Convert annotations from interface{} to map[string]string
+	// Convert annotations from interface{} to map[string]string using new API
 	var annotations map[string]string
-	if annotationsRaw, exists := ctr.Params.Arguments["annotations"]; exists && annotationsRaw != nil {
-		annotations = make(map[string]string)
-		if annotationsMap, ok := annotationsRaw.(map[string]interface{}); ok {
-			for k, v := range annotationsMap {
-				if str, ok := v.(string); ok {
-					annotations[k] = str
+	args := ctr.GetRawArguments()
+	if argsMap, ok := args.(map[string]interface{}); ok {
+		if annotationsRaw, exists := argsMap["annotations"]; exists && annotationsRaw != nil {
+			annotations = make(map[string]string)
+			if annotationsMap, ok := annotationsRaw.(map[string]interface{}); ok {
+				for k, v := range annotationsMap {
+					if str, ok := v.(string); ok {
+						annotations[k] = str
+					}
 				}
 			}
 		}
-	}
 
-	// Convert alertlabels from interface{} to map[string]string
-	var alertLabels map[string]string
-	if alertLabelsRaw, exists := ctr.Params.Arguments["alertlabels"]; exists && alertLabelsRaw != nil {
-		alertLabels = make(map[string]string)
-		if alertLabelsMap, ok := alertLabelsRaw.(map[string]interface{}); ok {
-			for k, v := range alertLabelsMap {
-				if str, ok := v.(string); ok {
-					alertLabels[k] = str
+		// Convert alertlabels from interface{} to map[string]string using new API
+		var alertLabels map[string]string
+		if alertLabelsRaw, exists := argsMap["alertlabels"]; exists && alertLabelsRaw != nil {
+			alertLabels = make(map[string]string)
+			if alertLabelsMap, ok := alertLabelsRaw.(map[string]interface{}); ok {
+				for k, v := range alertLabelsMap {
+					if str, ok := v.(string); ok {
+						alertLabels[k] = str
+					}
 				}
 			}
 		}
+
+		// Call the Kubernetes function
+		result, err := s.k.CreatePrometheusAlert(alertName, expression, appLabel, namespace, interval, forDuration, annotations, alertLabels)
+		if err != nil {
+			return NewTextResult("", fmt.Errorf("failed to create Prometheus alert: %v", err)), nil
+		}
+
+		return NewTextResult(result, nil), nil
 	}
 
-	// Call the Kubernetes function
-	result, err := s.k.CreatePrometheusAlert(alertName.(string), expression.(string), appLabel.(string), namespace.(string), interval, forDuration, annotations, alertLabels)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to create Prometheus alert: %v", err)), nil
-	}
-
-	return NewTextResult(result, nil), nil
+	return NewTextResult("", errors.New("failed to get arguments")), nil
 }
 
 // Handler for updating Prometheus alerts
 func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract and validate required parameters
-	alertName := ctr.Params.Arguments["alertname"]
-	if alertName == nil {
+	alertName := ctr.GetString("alertname", "")
+	if alertName == "" {
 		return NewTextResult("", errors.New("missing required parameter: alertname")), nil
 	}
 
-	appLabel := ctr.Params.Arguments["applabel"]
-	if appLabel == nil {
+	appLabel := ctr.GetString("applabel", "")
+	if appLabel == "" {
 		return NewTextResult("", errors.New("missing required parameter: applabel")), nil
 	}
 
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
+	namespace := ctr.GetString("namespace", "")
+	if namespace == "" {
 		return NewTextResult("", errors.New("missing required parameter: namespace")), nil
 	}
 
 	// Extract optional parameters
 	var expression string
-	if expressionArg := ctr.Params.Arguments["expression"]; expressionArg != nil {
-		expression = expressionArg.(string)
+	if expressionArg := ctr.GetString("expression", ""); expressionArg != "" {
+		expression = expressionArg
 	}
 
 	var interval string
-	if intervalArg := ctr.Params.Arguments["interval"]; intervalArg != nil {
-		interval = intervalArg.(string)
+	if intervalArg := ctr.GetString("interval", ""); intervalArg != "" {
+		interval = intervalArg
 	}
 
 	var forDuration string
-	if forArg := ctr.Params.Arguments["for"]; forArg != nil {
-		forDuration = forArg.(string)
+	if forArg := ctr.GetString("for", ""); forArg != "" {
+		forDuration = forArg
 	}
 
-	// Convert annotations from interface{} to map[string]string
+	// Convert annotations and alertlabels using new API
 	var annotations map[string]string
-	if annotationsRaw, exists := ctr.Params.Arguments["annotations"]; exists && annotationsRaw != nil {
-		annotations = make(map[string]string)
-		if annotationsMap, ok := annotationsRaw.(map[string]interface{}); ok {
-			for k, v := range annotationsMap {
-				if str, ok := v.(string); ok {
-					annotations[k] = str
-				}
-			}
-		}
-	}
-
-	// Convert alertlabels from interface{} to map[string]string
 	var alertLabels map[string]string
-	if alertLabelsRaw, exists := ctr.Params.Arguments["alertlabels"]; exists && alertLabelsRaw != nil {
-		alertLabels = make(map[string]string)
-		if alertLabelsMap, ok := alertLabelsRaw.(map[string]interface{}); ok {
-			for k, v := range alertLabelsMap {
-				if str, ok := v.(string); ok {
-					alertLabels[k] = str
+
+	args := ctr.GetRawArguments()
+	if argsMap, ok := args.(map[string]interface{}); ok {
+		// Convert annotations from interface{} to map[string]string
+		if annotationsRaw, exists := argsMap["annotations"]; exists && annotationsRaw != nil {
+			annotations = make(map[string]string)
+			if annotationsMap, ok := annotationsRaw.(map[string]interface{}); ok {
+				for k, v := range annotationsMap {
+					if str, ok := v.(string); ok {
+						annotations[k] = str
+					}
+				}
+			}
+		}
+
+		// Convert alertlabels from interface{} to map[string]string
+		if alertLabelsRaw, exists := argsMap["alertlabels"]; exists && alertLabelsRaw != nil {
+			alertLabels = make(map[string]string)
+			if alertLabelsMap, ok := alertLabelsRaw.(map[string]interface{}); ok {
+				for k, v := range alertLabelsMap {
+					if str, ok := v.(string); ok {
+						alertLabels[k] = str
+					}
 				}
 			}
 		}
 	}
 
-	// Call the Kubernetes function
-	result, err := s.k.UpdatePrometheusAlert(alertName.(string), expression, appLabel.(string), namespace.(string), interval, forDuration, annotations, alertLabels)
+	// Call the Kubernetes function (remove type casting since these are already strings)
+	result, err := s.k.UpdatePrometheusAlert(alertName, expression, appLabel, namespace, interval, forDuration, annotations, alertLabels)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to update Prometheus alert: %v", err)), nil
 	}
@@ -654,24 +672,24 @@ func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequ
 // Handler for deleting Prometheus alerts
 func (s *Server) prometheusDeleteAlert(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract and validate required parameters
-	appLabel := ctr.Params.Arguments["applabel"]
-	if appLabel == nil {
+	appLabel := ctr.GetString("applabel", "")
+	if appLabel == "" {
 		return NewTextResult("", errors.New("missing required parameter: applabel")), nil
 	}
 
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
+	namespace := ctr.GetString("namespace", "")
+	if namespace == "" {
 		return NewTextResult("", errors.New("missing required parameter: namespace")), nil
 	}
 
 	// Extract optional alertname parameter
 	var alertName string
-	if alertNameArg := ctr.Params.Arguments["alertname"]; alertNameArg != nil {
-		alertName = alertNameArg.(string)
+	if alertNameArg := ctr.GetString("alertname", ""); alertNameArg != "" {
+		alertName = alertNameArg
 	}
 
 	// Call the Kubernetes function
-	result, err := s.k.DeletePrometheusAlert(appLabel.(string), namespace.(string), alertName)
+	result, err := s.k.DeletePrometheusAlert(appLabel, namespace, alertName)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to delete Prometheus alert: %v", err)), nil
 	}
@@ -692,15 +710,16 @@ func (s *Server) prometheusGetAlerts(ctx context.Context, _ mcp.CallToolRequest)
 
 // prometheusGetRules handles the prometheus_get_rules tool request
 func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// Extract optional parameters
-	// ruleType := ""
-	// if typeArg := ctr.Params.Arguments["type"]; typeArg != nil {
-	// 	ruleType = typeArg.(string)
-	// }
+	// Extract optional parameters using new API
+	args := ctr.GetRawArguments()
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return NewTextResult("", errors.New("failed to get arguments")), nil
+	}
 
 	// Extract rule_name parameter (string array)
 	var ruleNames []string
-	if ruleNamesArg := ctr.Params.Arguments["rule_name"]; ruleNamesArg != nil {
+	if ruleNamesArg, exists := argsMap["rule_name"]; exists && ruleNamesArg != nil {
 		if ruleNamesArr, ok := ruleNamesArg.([]interface{}); ok {
 			for _, name := range ruleNamesArr {
 				if nameStr, ok := name.(string); ok {
@@ -712,7 +731,7 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 
 	// Extract rule_group parameter (string array)
 	var ruleGroups []string
-	if ruleGroupsArg := ctr.Params.Arguments["rule_group"]; ruleGroupsArg != nil {
+	if ruleGroupsArg, exists := argsMap["rule_group"]; exists && ruleGroupsArg != nil {
 		if ruleGroupsArr, ok := ruleGroupsArg.([]interface{}); ok {
 			for _, group := range ruleGroupsArr {
 				if groupStr, ok := group.(string); ok {
@@ -724,7 +743,7 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 
 	// Extract file parameter (string array)
 	var files []string
-	if filesArg := ctr.Params.Arguments["file"]; filesArg != nil {
+	if filesArg, exists := argsMap["file"]; exists && filesArg != nil {
 		if filesArr, ok := filesArg.([]interface{}); ok {
 			for _, file := range filesArr {
 				if fileStr, ok := file.(string); ok {
@@ -734,17 +753,12 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 		}
 	}
 
-	// Extract exclude_alerts parameter (boolean)
-	excludeAlerts := false
-	if excludeAlertsArg := ctr.Params.Arguments["exclude_alerts"]; excludeAlertsArg != nil {
-		if excludeAlertsBool, ok := excludeAlertsArg.(bool); ok {
-			excludeAlerts = excludeAlertsBool
-		}
-	}
+	// Extract exclude_alerts parameter (boolean) using GetBool
+	excludeAlerts := ctr.GetBool("exclude_alerts", false)
 
 	// Extract match parameter (string array)
 	var matchLabels []string
-	if matchArg := ctr.Params.Arguments["match"]; matchArg != nil {
+	if matchArg, exists := argsMap["match"]; exists && matchArg != nil {
 		if matchArr, ok := matchArg.([]interface{}); ok {
 			for _, match := range matchArr {
 				if matchStr, ok := match.(string); ok {
@@ -754,12 +768,10 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 		}
 	}
 
-	// Extract group_limit parameter (string)
+	// Extract group_limit parameter (number) using GetFloat
 	groupLimit := ""
-	if groupLimitArg := ctr.Params.Arguments["group_limit"]; groupLimitArg != nil {
-		if limitVal, ok := groupLimitArg.(float64); ok {
-			groupLimit = fmt.Sprintf("%d", int(limitVal))
-		}
+	if limitVal := ctr.GetFloat("group_limit", 0); limitVal > 0 {
+		groupLimit = fmt.Sprintf("%d", int(limitVal))
 	}
 
 	// Call the Kubernetes function
@@ -787,13 +799,8 @@ func (s *Server) prometheusCleanTombstones(ctx context.Context, _ mcp.CallToolRe
 
 // prometheusCreateSnapshot handles the prometheus_create_snapshot tool request
 func (s *Server) prometheusCreateSnapshot(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// Extract optional skip_head parameter
-	skipHead := false
-	if skipHeadArg := ctr.Params.Arguments["skip_head"]; skipHeadArg != nil {
-		if skipHeadBool, ok := skipHeadArg.(bool); ok {
-			skipHead = skipHeadBool
-		}
-	}
+	// Extract optional skip_head parameter using GetBool
+	skipHead := ctr.GetBool("skip_head", false)
 
 	// Call the Kubernetes function
 	ret, err := s.k.CreatePrometheusSnapshot(skipHead)
@@ -809,9 +816,15 @@ func (s *Server) prometheusCreateSnapshot(ctx context.Context, ctr mcp.CallToolR
 
 // prometheusDeleteSeries handles the prometheus_delete_series tool request
 func (s *Server) prometheusDeleteSeries(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// Extract required match parameter
-	matchArg := ctr.Params.Arguments["match"]
-	if matchArg == nil {
+	// Extract required match parameter using GetRawArguments
+	args := ctr.GetRawArguments()
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return NewTextResult("", errors.New("failed to get arguments")), nil
+	}
+
+	matchArg, exists := argsMap["match"]
+	if !exists || matchArg == nil {
 		return NewTextResult("", errors.New("missing required parameter: match")), nil
 	}
 
@@ -832,8 +845,8 @@ func (s *Server) prometheusDeleteSeries(ctx context.Context, ctr mcp.CallToolReq
 
 	// Extract optional start parameter
 	var startTime *time.Time
-	if startArg := ctr.Params.Arguments["start"]; startArg != nil {
-		parsed := parseTime(startArg.(string), time.Time{})
+	if startArg := ctr.GetString("start", ""); startArg != "" {
+		parsed := parseTime(startArg, time.Time{})
 		if !parsed.IsZero() {
 			startTime = &parsed
 		}
@@ -841,8 +854,8 @@ func (s *Server) prometheusDeleteSeries(ctx context.Context, ctr mcp.CallToolReq
 
 	// Extract optional end parameter
 	var endTime *time.Time
-	if endArg := ctr.Params.Arguments["end"]; endArg != nil {
-		parsed := parseTime(endArg.(string), time.Time{})
+	if endArg := ctr.GetString("end", ""); endArg != "" {
+		parsed := parseTime(endArg, time.Time{})
 		if !parsed.IsZero() {
 			endTime = &parsed
 		}
@@ -884,13 +897,8 @@ func (s *Server) prometheusRuntimeInfo(ctx context.Context, _ mcp.CallToolReques
 
 // prometheusTSDBStatus handles the prometheus_TSDB_status tool request
 func (s *Server) prometheusTSDBStatus(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// Extract optional limit parameter
-	limit := 0 // Default is no limit
-	if limitArg := ctr.Params.Arguments["limit"]; limitArg != nil {
-		if limitVal, ok := limitArg.(float64); ok {
-			limit = int(limitVal)
-		}
-	}
+	// Extract optional limit parameter using GetFloat
+	limit := int(ctr.GetFloat("limit", 0)) // Default is no limit
 
 	// Call the Kubernetes function
 	ret, err := s.k.GetPrometheusTSDBStatus(limit)

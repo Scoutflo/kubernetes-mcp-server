@@ -112,22 +112,25 @@ func (s *Server) initLabels() []server.ServerTool {
 }
 
 func (s *Server) labelResource(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
-		namespace = ""
-	}
+	namespace := ctr.GetString("namespace", "")
 
-	gvk, err := parseGroupVersionKind(ctr.Params.Arguments)
+	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to label resource, %s", err)), nil
 	}
 
-	name := ctr.Params.Arguments["name"]
-	if name == nil {
+	name := ctr.GetString("name", "")
+	if name == "" {
 		return NewTextResult("", errors.New("failed to label resource, missing argument name")), nil
 	}
 
-	labels, ok := ctr.Params.Arguments["labels"].(map[string]interface{})
+	args := ctr.GetRawArguments()
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return NewTextResult("", errors.New("failed to get arguments")), nil
+	}
+
+	labels, ok := argsMap["labels"].(map[string]interface{})
 	if !ok || len(labels) == 0 {
 		return NewTextResult("", errors.New("failed to label resource, missing or invalid labels")), nil
 	}
@@ -138,7 +141,7 @@ func (s *Server) labelResource(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		labelMap[k] = fmt.Sprintf("%v", v)
 	}
 
-	ret, err := s.k.LabelResource(ctx, gvk, namespace.(string), name.(string), labelMap)
+	ret, err := s.k.LabelResource(ctx, gvk, namespace, name, labelMap)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to label resource: %v", err)), nil
 	}
@@ -147,27 +150,24 @@ func (s *Server) labelResource(ctx context.Context, ctr mcp.CallToolRequest) (*m
 }
 
 func (s *Server) removeLabel(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
-		namespace = ""
-	}
+	namespace := ctr.GetString("namespace", "")
 
-	gvk, err := parseGroupVersionKind(ctr.Params.Arguments)
+	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to remove label, %s", err)), nil
 	}
 
-	name := ctr.Params.Arguments["name"]
-	if name == nil {
+	name := ctr.GetString("name", "")
+	if name == "" {
 		return NewTextResult("", errors.New("failed to remove label, missing argument name")), nil
 	}
 
-	labelKey, ok := ctr.Params.Arguments["label_key"].(string)
-	if !ok || labelKey == "" {
+	labelKey := ctr.GetString("label_key", "")
+	if labelKey == "" {
 		return NewTextResult("", errors.New("failed to remove label, missing or invalid label_key")), nil
 	}
 
-	ret, err := s.k.RemoveLabel(ctx, gvk, namespace.(string), name.(string), labelKey)
+	ret, err := s.k.RemoveLabel(ctx, gvk, namespace, name, labelKey)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to remove label: %v", err)), nil
 	}
@@ -176,22 +176,25 @@ func (s *Server) removeLabel(ctx context.Context, ctr mcp.CallToolRequest) (*mcp
 }
 
 func (s *Server) annotateResource(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
-		namespace = ""
-	}
+	namespace := ctr.GetString("namespace", "")
 
-	gvk, err := parseGroupVersionKind(ctr.Params.Arguments)
+	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to annotate resource, %s", err)), nil
 	}
 
-	name := ctr.Params.Arguments["name"]
-	if name == nil {
+	name := ctr.GetString("name", "")
+	if name == "" {
 		return NewTextResult("", errors.New("failed to annotate resource, missing argument name")), nil
 	}
 
-	annotations, ok := ctr.Params.Arguments["annotations"].(map[string]interface{})
+	args := ctr.GetRawArguments()
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return NewTextResult("", errors.New("failed to get arguments")), nil
+	}
+
+	annotations, ok := argsMap["annotations"].(map[string]interface{})
 	if !ok || len(annotations) == 0 {
 		return NewTextResult("", errors.New("failed to annotate resource, missing or invalid annotations")), nil
 	}
@@ -202,7 +205,7 @@ func (s *Server) annotateResource(ctx context.Context, ctr mcp.CallToolRequest) 
 		annotationMap[k] = fmt.Sprintf("%v", v)
 	}
 
-	ret, err := s.k.AnnotateResource(ctx, gvk, namespace.(string), name.(string), annotationMap)
+	ret, err := s.k.AnnotateResource(ctx, gvk, namespace, name, annotationMap)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to annotate resource: %v", err)), nil
 	}
@@ -211,27 +214,24 @@ func (s *Server) annotateResource(ctx context.Context, ctr mcp.CallToolRequest) 
 }
 
 func (s *Server) removeAnnotation(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
-		namespace = ""
-	}
+	namespace := ctr.GetString("namespace", "")
 
-	gvk, err := parseGroupVersionKind(ctr.Params.Arguments)
+	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to remove annotation, %s", err)), nil
 	}
 
-	name := ctr.Params.Arguments["name"]
-	if name == nil {
+	name := ctr.GetString("name", "")
+	if name == "" {
 		return NewTextResult("", errors.New("failed to remove annotation, missing argument name")), nil
 	}
 
-	annotationKey, ok := ctr.Params.Arguments["annotation_key"].(string)
-	if !ok || annotationKey == "" {
+	annotationKey := ctr.GetString("annotation_key", "")
+	if annotationKey == "" {
 		return NewTextResult("", errors.New("failed to remove annotation, missing or invalid annotation_key")), nil
 	}
 
-	ret, err := s.k.RemoveAnnotation(ctx, gvk, namespace.(string), name.(string), annotationKey)
+	ret, err := s.k.RemoveAnnotation(ctx, gvk, namespace, name, annotationKey)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to remove annotation: %v", err)), nil
 	}

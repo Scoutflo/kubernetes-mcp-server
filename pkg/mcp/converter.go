@@ -33,17 +33,14 @@ func (s *Server) initConverters() []server.ServerTool {
 // dockerComposeToK8sManifest handles the docker_compose_to_k8s_manifest tool request
 func (s *Server) dockerComposeToK8sManifest(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required docker_compose parameter
-	dockerComposeArg := ctr.Params.Arguments["docker_compose"]
-	if dockerComposeArg == nil {
+	dockerCompose, err := ctr.RequireString("docker_compose")
+	if err != nil {
 		return NewTextResult("", errors.New("missing required parameter: docker_compose")), nil
 	}
-	dockerCompose := dockerComposeArg.(string)
 
 	// Extract optional namespace parameter
 	namespace := ""
-	if namespaceArg := ctr.Params.Arguments["namespace"]; namespaceArg != nil {
-		namespace = namespaceArg.(string)
-	}
+	namespace = ctr.GetString("namespace", "")
 
 	// Generate the Kubernetes manifest
 	k8sManifest, err := s.k.DockerComposeToK8sManifest(dockerCompose, namespace)
@@ -70,17 +67,14 @@ func (s *Server) dockerComposeToK8sManifest(ctx context.Context, ctr mcp.CallToo
 // k8sManifestToHelmChart handles the k8s_manifest_to_helm_chart tool request
 func (s *Server) k8sManifestToHelmChart(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required k8s_manifest parameter
-	k8sManifestArg := ctr.Params.Arguments["k8s_manifest"]
-	if k8sManifestArg == nil {
+	k8sManifest, err := ctr.RequireString("k8s_manifest")
+	if err != nil {
 		return NewTextResult("", errors.New("missing required parameter: k8s_manifest")), nil
 	}
-	k8sManifest := k8sManifestArg.(string)
 
 	// Extract optional chart_name parameter
 	chartName := ""
-	if chartNameArg := ctr.Params.Arguments["chart_name"]; chartNameArg != nil {
-		chartName = chartNameArg.(string)
-	}
+	chartName = ctr.GetString("chart_name", "")
 
 	// Generate the Helm chart
 	helmChart, err := s.k.K8sManifestToHelmChart(k8sManifest, chartName)
@@ -107,23 +101,18 @@ func (s *Server) k8sManifestToHelmChart(ctx context.Context, ctr mcp.CallToolReq
 // k8sManifestToArgoRollout handles the k8s_manifest_to_argo_rollout tool request
 func (s *Server) k8sManifestToArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required k8s_manifest parameter
-	k8sManifestArg := ctr.Params.Arguments["k8s_manifest"]
-	if k8sManifestArg == nil {
+	k8sManifest, err := ctr.RequireString("k8s_manifest")
+	if err != nil {
 		return NewTextResult("", errors.New("missing required parameter: k8s_manifest")), nil
 	}
-	k8sManifest := k8sManifestArg.(string)
 
 	// Extract optional strategy parameter
 	strategy := "canary" // Default to canary strategy if not specified
-	if strategyArg := ctr.Params.Arguments["strategy"]; strategyArg != nil {
-		strategy = strategyArg.(string)
-	}
+	strategy = ctr.GetString("strategy", "canary")
 
 	// Extract optional canary_config parameter
 	canaryConfig := ""
-	if canaryConfigArg := ctr.Params.Arguments["canary_config"]; canaryConfigArg != nil {
-		canaryConfig = canaryConfigArg.(string)
-	}
+	canaryConfig = ctr.GetString("canary_config", "")
 
 	// Generate the Argo Rollout manifest
 	argoRollout, err := s.k.DeploymentToArgoRollout(k8sManifest, strategy, canaryConfig)

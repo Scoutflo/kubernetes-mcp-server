@@ -26,9 +26,9 @@ func (s *Server) initConfiguration() []server.ServerTool {
 
 func configurationView(_ context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	minify := true
-	minified := ctr.Params.Arguments["minified"]
-	if _, ok := minified.(bool); ok {
-		minify = minified.(bool)
+	minified := ctr.GetBool("minified", true)
+	if minified {
+		minify = minified
 	}
 	ret, err := kubernetes.ConfigurationView(minify)
 	if err != nil {

@@ -25,27 +25,27 @@ func (s *Server) initEvents() []server.ServerTool {
 }
 
 func (s *Server) eventsList(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
-		namespace = ""
-	}
+	namespace := ctr.GetString("namespace", "")
 
 	// Extract field selector parameters
 	var fieldSelectors []string
 
-	if involvedObjectName, ok := ctr.Params.Arguments["involved_object_name"].(string); ok && involvedObjectName != "" {
+	involvedObjectName := ctr.GetString("involved_object_name", "")
+	if involvedObjectName != "" {
 		fieldSelectors = append(fieldSelectors, fmt.Sprintf("involvedObject.name=%s", involvedObjectName))
 	}
 
-	if involvedObjectKind, ok := ctr.Params.Arguments["involved_object_kind"].(string); ok && involvedObjectKind != "" {
+	involvedObjectKind := ctr.GetString("involved_object_kind", "")
+	if involvedObjectKind != "" {
 		fieldSelectors = append(fieldSelectors, fmt.Sprintf("involvedObject.kind=%s", involvedObjectKind))
 	}
 
-	if involvedObjectAPIVersion, ok := ctr.Params.Arguments["involved_object_api_version"].(string); ok && involvedObjectAPIVersion != "" {
+	involvedObjectAPIVersion := ctr.GetString("involved_object_api_version", "")
+	if involvedObjectAPIVersion != "" {
 		fieldSelectors = append(fieldSelectors, fmt.Sprintf("involvedObject.apiVersion=%s", involvedObjectAPIVersion))
 	}
 
-	ret, err := s.k.EventsList(ctx, namespace.(string), fieldSelectors)
+	ret, err := s.k.EventsList(ctx, namespace, fieldSelectors)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to list events: %v", err)), nil
 	}

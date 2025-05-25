@@ -24,10 +24,7 @@ func (s *Server) initMetricsServer() []server.ServerTool {
 
 // nodesMetrics handles the nodes_metrics tool request
 func (s *Server) nodesMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	nodeName := ""
-	if name := ctr.Params.Arguments["name"]; name != nil {
-		nodeName = name.(string)
-	}
+	nodeName := ctr.GetString("name", "")
 
 	ret, err := s.k.GetNodeMetrics(ctx, nodeName)
 	if err != nil {
@@ -41,15 +38,9 @@ func (s *Server) nodesMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mc
 
 // podsMetrics handles the pods_metrics tool request
 func (s *Server) podsMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	namespace := ""
-	if ns := ctr.Params.Arguments["namespace"]; ns != nil {
-		namespace = ns.(string)
-	}
+	namespace := ctr.GetString("namespace", "")
 
-	podName := ""
-	if name := ctr.Params.Arguments["name"]; name != nil {
-		podName = name.(string)
-	}
+	podName := ctr.GetString("name", "")
 
 	ret, err := s.k.GetPodMetrics(ctx, namespace, podName)
 	if err != nil {

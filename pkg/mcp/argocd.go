@@ -29,7 +29,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("Filter applications by repository URL (optional)"),
 				),
 				mcp.WithString("namespace",
-					mcp.Description("Filter applications by namespace (optional)"),
+					mcp.Description("Filter applications by namespace"),
+					mcp.Required(),
 				),
 				mcp.WithString("refresh",
 					mcp.Description("Forces application reconciliation if set to 'hard' or 'normal' (optional)"),
@@ -49,6 +50,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				),
 				mcp.WithString("namespace",
 					mcp.Description("Namespace of the application"),
+					mcp.Required(),
 				),
 				mcp.WithString("refresh",
 					mcp.Description("Forces application reconciliation if set to 'hard' or 'normal' (optional)"),
@@ -87,6 +89,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				),
 				mcp.WithString("namespace",
 					mcp.Description("Namespace of the application"),
+					mcp.Required(),
 				),
 				mcp.WithArray("resources",
 					mcp.Description("List of specific resources to sync (optional), format: [\"group:kind:name\"]"),
@@ -205,7 +208,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("The propagation policy ('foreground', 'background', or 'orphan')"),
 				),
 				mcp.WithString("namespace",
-					mcp.Description("The application namespace (optional)"),
+					mcp.Description("The application namespace"),
+					mcp.Required(),
 				),
 			),
 			Handler: s.argocdDeleteApplication,
@@ -218,7 +222,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Required(),
 				),
 				mcp.WithString("namespace",
-					mcp.Description("The application namespace (optional)"),
+					mcp.Description("The application namespace"),
+					mcp.Required(),
 				),
 			),
 			Handler: s.argocdGetApplicationResourceTree,
@@ -231,7 +236,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Required(),
 				),
 				mcp.WithString("namespace",
-					mcp.Description("The application namespace (optional)"),
+					mcp.Description("The application namespace"),
+					mcp.Required(),
 				),
 			),
 			Handler: s.argocdGetApplicationManagedResources,
@@ -346,11 +352,11 @@ func formatJSON(data interface{}) (string, error) {
 // argocdListApplications lists ArgoCD applications with filtering
 func (s *Server) argocdListApplications(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters from the tool request
-	project, _ := ctr.Params.Arguments["project"].(string)
-	name, _ := ctr.Params.Arguments["name"].(string)
-	repo, _ := ctr.Params.Arguments["repo"].(string)
-	namespace, _ := ctr.Params.Arguments["namespace"].(string)
-	refresh, _ := ctr.Params.Arguments["refresh"].(string)
+	project := ctr.GetString("project", "")
+	name := ctr.GetString("name", "")
+	repo := ctr.GetString("repo", "")
+	namespace := ctr.GetString("namespace", "")
+	refresh := ctr.GetString("refresh", "")
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
@@ -405,13 +411,13 @@ func (s *Server) argocdListApplications(ctx context.Context, ctr mcp.CallToolReq
 // argocdGetApplication gets detailed information about a specific application
 func (s *Server) argocdGetApplication(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	namespace, _ := ctr.Params.Arguments["namespace"].(string)
-	refresh, _ := ctr.Params.Arguments["refresh"].(string)
+	namespace := ctr.GetString("namespace", "")
+	refresh := ctr.GetString("refresh", "")
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
@@ -464,29 +470,18 @@ func (s *Server) argocdGetApplication(ctx context.Context, ctr mcp.CallToolReque
 // argocdSyncApplication syncs an ArgoCD application
 func (s *Server) argocdSyncApplication(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	revision, _ := ctr.Params.Arguments["revision"].(string)
-	pruneStr, _ := ctr.Params.Arguments["prune"].(string)
-	dryRunStr, _ := ctr.Params.Arguments["dry_run"].(string)
-	namespace, _ := ctr.Params.Arguments["namespace"].(string)
+	revision := ctr.GetString("revision", "")
+	prune := ctr.GetBool("prune", false)
+	dryRun := ctr.GetBool("dry_run", false)
+	namespace := ctr.GetString("namespace", "")
 
 	// Extract resources array
-	var resources []string
-	if resourcesRaw, ok := ctr.Params.Arguments["resources"].([]interface{}); ok {
-		for _, r := range resourcesRaw {
-			if resource, ok := r.(string); ok {
-				resources = append(resources, resource)
-			}
-		}
-	}
-
-	// Parse boolean flags
-	prune := strings.ToLower(pruneStr) == "true"
-	dryRun := strings.ToLower(dryRunStr) == "true"
+	resources := ctr.GetStringSlice("resources", []string{})
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
@@ -562,55 +557,50 @@ func (s *Server) argocdSyncApplication(ctx context.Context, ctr mcp.CallToolRequ
 // argocdCreateApplication creates a new ArgoCD application
 func (s *Server) argocdCreateApplication(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	project, ok := ctr.Params.Arguments["project"].(string)
-	if !ok || project == "" {
+	project, err := ctr.RequireString("project")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("project name is required")), nil
 	}
 
-	repoURL, ok := ctr.Params.Arguments["repo_url"].(string)
-	if !ok || repoURL == "" {
+	repoURL, err := ctr.RequireString("repo_url")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("repository URL is required")), nil
 	}
 
-	path, ok := ctr.Params.Arguments["path"].(string)
-	if !ok || path == "" {
+	path, err := ctr.RequireString("path")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("repository path is required")), nil
 	}
 
-	destServer, ok := ctr.Params.Arguments["dest_server"].(string)
-	if !ok || destServer == "" {
+	destServer, err := ctr.RequireString("dest_server")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("destination server is required")), nil
 	}
 
-	destNamespace, ok := ctr.Params.Arguments["dest_namespace"].(string)
-	if !ok || destNamespace == "" {
+	destNamespace, err := ctr.RequireString("dest_namespace")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("destination namespace is required")), nil
 	}
 
 	// Extract optional parameters
-	revision, _ := ctr.Params.Arguments["revision"].(string)
+	revision := ctr.GetString("revision", "")
 	if revision == "" {
 		revision = "HEAD" // Default revision
 	}
 
-	automatedSyncStr, _ := ctr.Params.Arguments["automated_sync"].(string)
-	pruneStr, _ := ctr.Params.Arguments["prune"].(string)
-	selfHealStr, _ := ctr.Params.Arguments["self_heal"].(string)
-	namespace, _ := ctr.Params.Arguments["namespace"].(string)
-	validateStr, _ := ctr.Params.Arguments["validate"].(string)
-	upsertStr, _ := ctr.Params.Arguments["upsert"].(string)
+	automatedSync := ctr.GetBool("automated_sync", false)
+	prune := ctr.GetBool("prune", false)
+	selfHeal := ctr.GetBool("self_heal", false)
+	namespace := ctr.GetString("namespace", "")
+	validate := ctr.GetBool("validate", true)
+	upsert := ctr.GetBool("upsert", false)
 
 	// Parse boolean flags with defaults
-	automatedSync := strings.ToLower(automatedSyncStr) == "true"
-	prune := strings.ToLower(pruneStr) == "true"
-	selfHeal := strings.ToLower(selfHealStr) == "true"
-	validate := validateStr == "" || strings.ToLower(validateStr) == "true" // Default true
-	upsert := strings.ToLower(upsertStr) == "true"
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
@@ -648,34 +638,34 @@ func (s *Server) argocdCreateApplication(ctx context.Context, ctr mcp.CallToolRe
 // argocdUpdateApplication updates an existing ArgoCD application
 func (s *Server) argocdUpdateApplication(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
 	// Extract optional parameters
-	project, _ := ctr.Params.Arguments["project"].(string)
-	repoURL, _ := ctr.Params.Arguments["repo_url"].(string)
-	path, _ := ctr.Params.Arguments["path"].(string)
-	destServer, _ := ctr.Params.Arguments["dest_server"].(string)
-	destNamespace, _ := ctr.Params.Arguments["dest_namespace"].(string)
-	revision, _ := ctr.Params.Arguments["revision"].(string)
-	validateStr, _ := ctr.Params.Arguments["validate"].(string)
+	project := ctr.GetString("project", "")
+	repoURL := ctr.GetString("repo_url", "")
+	path := ctr.GetString("path", "")
+	destServer := ctr.GetString("dest_server", "")
+	destNamespace := ctr.GetString("dest_namespace", "")
+	revision := ctr.GetString("revision", "")
+	validateStr := ctr.GetString("validate", "")
 
 	// Parse and convert boolean parameters that might be optional
 	var automatedSync, prune, selfHeal *bool
 
-	if automatedSyncStr, ok := ctr.Params.Arguments["automated_sync"].(string); ok && automatedSyncStr != "" {
+	if automatedSyncStr := ctr.GetString("automated_sync", ""); automatedSyncStr != "" {
 		autoSyncVal := strings.ToLower(automatedSyncStr) == "true"
 		automatedSync = &autoSyncVal
 	}
 
-	if pruneStr, ok := ctr.Params.Arguments["prune"].(string); ok && pruneStr != "" {
+	if pruneStr := ctr.GetString("prune", ""); pruneStr != "" {
 		pruneVal := strings.ToLower(pruneStr) == "true"
 		prune = &pruneVal
 	}
 
-	if selfHealStr, ok := ctr.Params.Arguments["self_heal"].(string); ok && selfHealStr != "" {
+	if selfHealStr := ctr.GetString("self_heal", ""); selfHealStr != "" {
 		selfHealVal := strings.ToLower(selfHealStr) == "true"
 		selfHeal = &selfHealVal
 	}
@@ -747,17 +737,16 @@ func (s *Server) argocdUpdateApplication(ctx context.Context, ctr mcp.CallToolRe
 // argocdDeleteApplication deletes an ArgoCD application
 func (s *Server) argocdDeleteApplication(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	cascadeStr, _ := ctr.Params.Arguments["cascade"].(string)
-	propagationPolicy, _ := ctr.Params.Arguments["propagation_policy"].(string)
-	namespace, _ := ctr.Params.Arguments["namespace"].(string)
+	cascade := ctr.GetBool("cascade", true)
+	propagationPolicy := ctr.GetString("propagation_policy", "")
+	namespace := ctr.GetString("namespace", "")
 
 	// Default cascade to true if not specified
-	cascade := cascadeStr == "" || strings.ToLower(cascadeStr) == "true"
 
 	// Validate propagation policy
 	if propagationPolicy != "" &&
@@ -834,12 +823,12 @@ func (s *Server) argocdDeleteApplication(ctx context.Context, ctr mcp.CallToolRe
 // argocdGetApplicationResourceTree returns the resource tree for an application
 func (s *Server) argocdGetApplicationResourceTree(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	namespace, _ := ctr.Params.Arguments["namespace"].(string)
+	namespace := ctr.GetString("namespace", "")
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
@@ -890,12 +879,12 @@ func (s *Server) argocdGetApplicationResourceTree(ctx context.Context, ctr mcp.C
 // argocdGetApplicationManagedResources returns the managed resources for an application
 func (s *Server) argocdGetApplicationManagedResources(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	namespace, _ := ctr.Params.Arguments["namespace"].(string)
+	namespace := ctr.GetString("namespace", "")
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
@@ -955,79 +944,82 @@ func (s *Server) argocdGetApplicationManagedResources(ctx context.Context, ctr m
 // argocdGetApplicationWorkloadLogs returns logs for application workload
 func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["application_name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("application_name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	appNamespace, ok := ctr.Params.Arguments["application_namespace"].(string)
-	if !ok || appNamespace == "" {
+	appNamespace, err := ctr.RequireString("application_namespace")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
 	}
 
 	// Extract resource_ref parameter which could be a string or map
 	var resourceRef kubernetes.ResourceRef
 
-	switch ref := ctr.Params.Arguments["resource_ref"].(type) {
-	case map[string]interface{}:
-		// It's already a map, extract fields directly
-		resourceName, ok := ref["name"].(string)
-		if !ok || resourceName == "" {
-			return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
-		}
+	args := ctr.GetRawArguments()
+	if argsMap, ok := args.(map[string]interface{}); ok {
+		switch ref := argsMap["resource_ref"].(type) {
+		case map[string]interface{}:
+			// It's already a map, extract fields directly
+			resourceName, ok := ref["name"].(string)
+			if !ok || resourceName == "" {
+				return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
+			}
 
-		resourceNamespace, ok := ref["namespace"].(string)
-		if !ok || resourceNamespace == "" {
-			return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
-		}
+			resourceNamespace, ok := ref["namespace"].(string)
+			if !ok || resourceNamespace == "" {
+				return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
+			}
 
-		resourceKind, ok := ref["kind"].(string)
-		if !ok || resourceKind == "" {
-			return NewTextResult("", fmt.Errorf("resource_ref.kind is required")), nil
-		}
+			resourceKind, ok := ref["kind"].(string)
+			if !ok || resourceKind == "" {
+				return NewTextResult("", fmt.Errorf("resource_ref.kind is required")), nil
+			}
 
-		resourceGroup, _ := ref["group"].(string)
+			resourceGroup, _ := ref["group"].(string)
+			resourceVersion, _ := ref["version"].(string)
+			container, _ := ref["container"].(string)
 
-		resourceVersion, ok := ref["version"].(string)
+			resourceRef = kubernetes.ResourceRef{
+				Group:     resourceGroup,
+				Version:   resourceVersion,
+				Kind:      resourceKind,
+				Namespace: resourceNamespace,
+				Name:      resourceName,
+				Container: container,
+			}
+		case string:
+			// It's a JSON string, try to parse it
+			if err := json.Unmarshal([]byte(ref), &resourceRef); err != nil {
+				return NewTextResult("", fmt.Errorf("failed to parse resource_ref JSON: %w", err)), nil
+			}
 
-		container, _ := ref["container"].(string)
-
-		resourceRef = kubernetes.ResourceRef{
-			Group:     resourceGroup,
-			Version:   resourceVersion,
-			Kind:      resourceKind,
-			Namespace: resourceNamespace,
-			Name:      resourceName,
-			Container: container,
+			// Validate required fields
+			if resourceRef.Name == "" {
+				return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
+			}
+			if resourceRef.Namespace == "" {
+				return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
+			}
+			if resourceRef.Kind == "" {
+				return NewTextResult("", fmt.Errorf("resource_ref.kind is required")), nil
+			}
+		default:
+			return NewTextResult("", fmt.Errorf("resource_ref is required")), nil
 		}
-	case string:
-		// It's a JSON string, try to parse it
-		if err := json.Unmarshal([]byte(ref), &resourceRef); err != nil {
-			return NewTextResult("", fmt.Errorf("failed to parse resource_ref JSON: %w", err)), nil
-		}
-
-		// Validate required fields
-		if resourceRef.Name == "" {
-			return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
-		}
-		if resourceRef.Namespace == "" {
-			return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
-		}
-		if resourceRef.Kind == "" {
-			return NewTextResult("", fmt.Errorf("resource_ref.kind is required")), nil
-		}
-	default:
-		return NewTextResult("", fmt.Errorf("resource_ref is required")), nil
+	} else {
+		return NewTextResult("", fmt.Errorf("failed to get arguments")), nil
 	}
 
 	// Get tail lines parameter if provided
-	tailStr, _ := ctr.Params.Arguments["tail"].(string)
+	tailStr := ctr.GetString("tail", "100")
 	if tailStr == "" {
 		tailStr = "100" // Default to 100 lines
 	}
 
 	// Get follow parameter if provided
-	followStr, _ := ctr.Params.Arguments["follow"].(string)
+	followStr := ctr.GetString("follow", "false")
 	follow := strings.ToLower(followStr) == "true"
 
 	// Create ArgoCD client
@@ -1072,28 +1064,30 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 // argocdGetResourceEvents returns events for a resource managed by an application
 func (s *Server) argocdGetResourceEvents(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["application_name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("application_name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	appNamespace, ok := ctr.Params.Arguments["application_namespace"].(string)
-	if !ok || appNamespace == "" {
+	appNamespace, err := ctr.RequireString("application_namespace")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
 	}
 
-	resourceRef, ok := ctr.Params.Arguments["resource_ref"].(map[string]interface{})
-	if !ok || resourceRef == nil {
-		return NewTextResult("", fmt.Errorf("resource_ref is required")), nil
+	args := ctr.GetRawArguments()
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return NewTextResult("", fmt.Errorf("failed to get arguments")), nil
 	}
+	resourceRef := argsMap["resource_ref"].(map[string]interface{})
 
 	resourceName, ok := resourceRef["name"].(string)
-	if !ok || resourceName == "" {
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
 	}
 
 	resourceNamespace, ok := resourceRef["namespace"].(string)
-	if !ok || resourceNamespace == "" {
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
 	}
 
@@ -1180,34 +1174,36 @@ func formatTimeAgo(d time.Duration) string {
 // argocdGetResourceActions returns available actions for a resource managed by an application
 func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	appNamespace, ok := ctr.Params.Arguments["app_namespace"].(string)
-	if !ok || appNamespace == "" {
+	appNamespace, err := ctr.RequireString("app_namespace")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
 	}
 
 	// Extract resource parameters from resourceRef object
-	resourceRef, ok := ctr.Params.Arguments["resource_ref"].(map[string]interface{})
-	if !ok || resourceRef == nil {
-		return NewTextResult("", fmt.Errorf("resource_ref is required")), nil
+	args := ctr.GetRawArguments()
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return NewTextResult("", fmt.Errorf("failed to get arguments")), nil
 	}
+	resourceRef := argsMap["resource_ref"].(map[string]interface{})
 
 	resourceName, ok := resourceRef["name"].(string)
-	if !ok || resourceName == "" {
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
 	}
 
 	resourceNamespace, ok := resourceRef["namespace"].(string)
-	if !ok || resourceNamespace == "" {
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
 	}
 
 	resourceKind, ok := resourceRef["kind"].(string)
-	if !ok || resourceKind == "" {
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("resource_ref.kind is required")), nil
 	}
 
@@ -1217,7 +1213,7 @@ func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolR
 	}
 
 	resourceVersion, ok := resourceRef["version"].(string)
-	if !ok || resourceVersion == "" {
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("resource_ref.version is required")), nil
 	}
 
@@ -1277,34 +1273,36 @@ func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolR
 // argocdRunResourceAction runs an action on a resource managed by an application
 func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	appNamespace, ok := ctr.Params.Arguments["app_namespace"].(string)
-	if !ok || appNamespace == "" {
+	appNamespace, err := ctr.RequireString("app_namespace")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
 	}
 
 	// Extract resource parameters from resourceRef object
-	resourceRef, ok := ctr.Params.Arguments["resource_ref"].(map[string]interface{})
-	if !ok || resourceRef == nil {
-		return NewTextResult("", fmt.Errorf("resource_ref is required")), nil
+	args := ctr.GetRawArguments()
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return NewTextResult("", fmt.Errorf("failed to get arguments")), nil
 	}
+	resourceRef := argsMap["resource_ref"].(map[string]interface{})
 
 	resourceName, ok := resourceRef["name"].(string)
-	if !ok || resourceName == "" {
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
 	}
 
 	resourceNamespace, ok := resourceRef["namespace"].(string)
-	if !ok || resourceNamespace == "" {
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
 	}
 
 	resourceKind, ok := resourceRef["kind"].(string)
-	if !ok || resourceKind == "" {
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("resource_ref.kind is required")), nil
 	}
 
@@ -1315,8 +1313,8 @@ func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRe
 
 	resourceVersion, ok := resourceRef["version"].(string)
 
-	action, ok := ctr.Params.Arguments["action"].(string)
-	if !ok || action == "" {
+	action, err := ctr.RequireString("action")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("action name is required")), nil
 	}
 
@@ -1358,12 +1356,15 @@ func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRe
 // argocdGetApplicationEvents returns events for an application
 func (s *Server) argocdGetApplicationEvents(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract parameters
-	name, ok := ctr.Params.Arguments["application_name"].(string)
-	if !ok || name == "" {
+	name, err := ctr.RequireString("application_name")
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	namespace, _ := ctr.Params.Arguments["application_namespace"].(string)
+	namespace, err := ctr.RequireString("application_namespace")
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
+	}
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)

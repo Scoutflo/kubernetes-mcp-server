@@ -29,30 +29,27 @@ func (s *Server) initRollouts() []server.ServerTool {
 // rollout handler for the rollout MCP tool
 func (s *Server) rollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// Extract required parameters
-	action, ok := ctr.Params.Arguments["action"].(string)
-	if !ok || action == "" {
+	action, err := ctr.RequireString("action")
+	if err != nil {
 		return NewTextResult("", errors.New("missing required parameter: action")), nil
 	}
 
-	resourceType, ok := ctr.Params.Arguments["resource_type"].(string)
-	if !ok || resourceType == "" {
+	resourceType, err := ctr.RequireString("resource_type")
+	if err != nil {
 		return NewTextResult("", errors.New("missing required parameter: resource_type")), nil
 	}
 
-	resourceName, ok := ctr.Params.Arguments["resource_name"].(string)
-	if !ok || resourceName == "" {
+	resourceName, err := ctr.RequireString("resource_name")
+	if err != nil {
 		return NewTextResult("", errors.New("missing required parameter: resource_name")), nil
 	}
 
 	// Extract optional parameters
-	namespace := ""
-	if ns, ok := ctr.Params.Arguments["namespace"].(string); ok {
-		namespace = ns
-	}
+	namespace := ctr.GetString("namespace", "")
 
 	// Handle revision for undo action
 	revision := 0
-	if revStr, ok := ctr.Params.Arguments["revision"].(string); ok && revStr != "" {
+	if revStr := ctr.GetString("revision", ""); revStr != "" {
 		var err error
 		revision, err = strconv.Atoi(revStr)
 		if err != nil {

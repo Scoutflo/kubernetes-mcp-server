@@ -83,6 +83,10 @@ func (s *Server) reloadKubernetesClient() error {
 		s.initConverters(),
 		s.initPromptGenerator(),
 	)...)
+
+	// Initialize MCP resources for Kubernetes documentation
+	s.initDocumentationResources()
+
 	return nil
 }
 

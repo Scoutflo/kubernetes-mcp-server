@@ -73,26 +73,22 @@ func (s *Server) portForwardCreate(ctx context.Context, ctr mcp.CallToolRequest)
 	}
 
 	// Extract parameters
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
-		namespace = ""
-	}
-
-	resourceName := ctr.Params.Arguments["resource_name"]
-	if resourceName == nil {
+	namespace := ctr.GetString("namespace", "")
+	resourceName := ctr.GetString("resource_name", "")
+	if resourceName == "" {
 		return NewTextResult("", errors.New("missing required parameter: resource_name")), nil
 	}
 
-	apiVersion := ctr.Params.Arguments["api_version"]
-	kind := ctr.Params.Arguments["kind"]
-	if kind == nil {
+	apiVersion := ctr.GetString("api_version", "")
+	kind := ctr.GetString("kind", "")
+	if kind == "" {
 		return NewTextResult("", errors.New("missing required parameter: kind")), nil
 	}
 
 	// If api_version is not provided or is incomplete, fetch resource details
-	if apiVersion == nil || apiVersion == "" {
+	if apiVersion == "" {
 		// Default to "v1" for Pods
-		if strings.ToLower(kind.(string)) == "pod" {
+		if strings.ToLower(kind) == "pod" {
 			apiVersion = "v1"
 		} else {
 			// Try to get the resource to determine API version
@@ -104,13 +100,12 @@ func (s *Server) portForwardCreate(ctx context.Context, ctr mcp.CallToolRequest)
 			// Create a temporary request to get the resource
 			getRequest := mcp.CallToolRequest{}
 			getRequest.Params.Name = "resources_get"
-			getRequest.Params.Arguments = map[string]interface{}{
-				"namespace": namespace,
-				"name":      resourceName,
-				"kind":      kind,
-				// Try with a common API version for the kind
-				"apiVersion": guessAPIVersionForKind(kind.(string)),
-			}
+			// Set arguments using GetArguments() method
+			getRequest.GetArguments()["namespace"] = namespace
+			getRequest.GetArguments()["name"] = resourceName
+			getRequest.GetArguments()["kind"] = kind
+			// Try with a common API version for the kind
+			getRequest.GetArguments()["apiVersion"] = guessAPIVersionForKind(kind)
 
 			// Call the resource getter
 			result, err := resourceGetter.Handler(ctx, getRequest)
@@ -121,19 +116,19 @@ func (s *Server) portForwardCreate(ctx context.Context, ctr mcp.CallToolRequest)
 			// Successfully retrieved the resource, use its API version
 			// Note: In a production environment, you'd need to parse the resource YAML
 			// to extract the apiVersion properly
-			apiVersion = getRequest.Params.Arguments["apiVersion"]
+			apiVersion = getRequest.GetString("apiVersion", "")
 		}
 	}
 
-	portsArg := ctr.Params.Arguments["ports"]
+	portsArg := ctr.GetString("ports", "")
 	var portMappings []string
 
-	if portsArg == nil || portsArg == "" {
+	if portsArg == "" {
 		// Try to auto-detect container ports for the pod
 		portMappings = []string{"8080:80"} // Default fallback if nothing can be detected
 	} else {
 		// Parse ports
-		portMappings = strings.Split(portsArg.(string), ",")
+		portMappings = strings.Split(portsArg, ",")
 		for i, portMapping := range portMappings {
 			portMappings[i] = strings.TrimSpace(portMapping)
 			parts := strings.Split(portMappings[i], ":")
@@ -165,7 +160,7 @@ func (s *Server) portForwardCreate(ctx context.Context, ctr mcp.CallToolRequest)
 
 	// Check if there's already an active port forward for this resource
 	portForwardMutex.Lock()
-	portForwardKey := getPortForwardKey(namespace.(string), resourceName.(string))
+	portForwardKey := getPortForwardKey(namespace, resourceName)
 	if existingState, exists := activePortForwards[portForwardKey]; exists {
 		// Close existing port forward
 		close(existingState.StopChan)
@@ -191,9 +186,9 @@ func (s *Server) portForwardCreate(ctx context.Context, ctr mcp.CallToolRequest)
 
 	// Create port forward state
 	portForwardState := &PortForwardState{
-		Namespace:    namespace.(string),
-		ResourceName: resourceName.(string),
-		Kind:         kind.(string),
+		Namespace:    namespace,
+		ResourceName: resourceName,
+		Kind:         kind,
 		LocalPorts:   localPorts,
 		RemotePorts:  remotePorts,
 		StopChan:     stopChan,
@@ -209,10 +204,10 @@ func (s *Server) portForwardCreate(ctx context.Context, ctr mcp.CallToolRequest)
 
 	// Setup port forwarding options
 	options := kubernetes.PortForwardOptions{
-		Namespace:    namespace.(string),
-		ResourceName: resourceName.(string),
-		APIVersion:   apiVersion.(string),
-		Kind:         kind.(string),
+		Namespace:    namespace,
+		ResourceName: resourceName,
+		APIVersion:   apiVersion,
+		Kind:         kind,
 		Ports:        portMappings,
 		ReadyChan:    readyChan,
 		StopChan:     stopChan,
@@ -239,8 +234,8 @@ func (s *Server) portForwardCreate(ctx context.Context, ctr mcp.CallToolRequest)
 	case <-readyChan:
 		return NewTextResult(
 			fmt.Sprintf("Port forwarding started successfully for %s/%s\nForwarded ports: %s",
-				namespace.(string),
-				resourceName.(string),
+				namespace,
+				resourceName,
 				strings.Join(portMappings, ", ")),
 			nil), nil
 	case err := <-errChan:
@@ -263,13 +258,9 @@ func (s *Server) portForwardCancel(ctx context.Context, ctr mcp.CallToolRequest)
 	}
 
 	// Extract parameters
-	namespace := ctr.Params.Arguments["namespace"]
-	if namespace == nil {
-		namespace = ""
-	}
-
-	resourceName := ctr.Params.Arguments["resource_name"]
-	if resourceName == nil {
+	namespace := ctr.GetString("namespace", "")
+	resourceName := ctr.GetString("resource_name", "")
+	if resourceName == "" {
 		return NewTextResult("", errors.New("missing required parameter: resource_name")), nil
 	}
 
@@ -277,7 +268,7 @@ func (s *Server) portForwardCancel(ctx context.Context, ctr mcp.CallToolRequest)
 	portForwardMutex.Lock()
 	defer portForwardMutex.Unlock()
 
-	portForwardKey := getPortForwardKey(namespace.(string), resourceName.(string))
+	portForwardKey := getPortForwardKey(namespace, resourceName)
 	state, exists := activePortForwards[portForwardKey]
 	if !exists {
 		return NewTextResult("", fmt.Errorf("no active port forwarding found for %s", portForwardKey)), nil

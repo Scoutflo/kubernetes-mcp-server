@@ -29,8 +29,8 @@ func (s *Server) initConnectivity() []server.ServerTool {
 }
 
 func (s *Server) checkServiceConnectivity(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	serviceName, ok := ctr.Params.Arguments["service_name"].(string)
-	if !ok || serviceName == "" {
+	serviceName, err := ctr.RequireString("service_name")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to check service connectivity, missing or invalid service_name")), nil
 	}
 
@@ -43,8 +43,8 @@ func (s *Server) checkServiceConnectivity(ctx context.Context, ctr mcp.CallToolR
 }
 
 func (s *Server) checkIngressConnectivity(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	ingressHost, ok := ctr.Params.Arguments["ingress_host"].(string)
-	if !ok || ingressHost == "" {
+	ingressHost, err := ctr.RequireString("ingress_host")
+	if err != nil {
 		return NewTextResult("", errors.New("failed to check ingress connectivity, missing or invalid ingress_host")), nil
 	}
 
