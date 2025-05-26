@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/scoutflo/kubernetes-mcp-server/pkg/health"
@@ -36,6 +38,7 @@ type Server struct {
 	mode         ServerMode
 	healthCheck  *health.HealthChecker
 	healthServer *http.Server
+	sessions     sync.Map
 }
 
 func NewSever() (*Server, error) {
@@ -100,8 +103,62 @@ func (s *Server) IsStdioMode() bool {
 	return s.mode == StdioMode
 }
 
+// CreateSession creates a new session with a unique ID
+func (s *Server) CreateSession() (*KubernetesSession, error) {
+	sessionID := uuid.New().String()
+	session := NewKubernetesSession(sessionID)
+
+	// Register the session with the MCP server
+	if err := s.server.RegisterSession(context.Background(), session); err != nil {
+		return nil, fmt.Errorf("failed to register session: %w", err)
+	}
+
+	// Store in our local sessions map for tracking
+	s.sessions.Store(sessionID, session)
+
+	return session, nil
+}
+
+// GetSession retrieves a session by ID
+func (s *Server) GetSession(sessionID string) (*KubernetesSession, bool) {
+	if sessionVal, ok := s.sessions.Load(sessionID); ok {
+		if session, ok := sessionVal.(*KubernetesSession); ok {
+			return session, true
+		}
+	}
+	return nil, false
+}
+
+// DestroySession removes a session
+func (s *Server) DestroySession(sessionID string) {
+	s.sessions.Delete(sessionID)
+	s.server.UnregisterSession(context.Background(), sessionID)
+}
+
+// AddSessionTool adds a tool specific to a session
+func (s *Server) AddSessionTool(sessionID string, tool mcp.Tool, handler server.ToolHandlerFunc) error {
+	return s.server.AddSessionTool(sessionID, tool, handler)
+}
+
+// DeleteSessionTools removes tools from a session
+func (s *Server) DeleteSessionTools(sessionID string, toolNames ...string) error {
+	return s.server.DeleteSessionTools(sessionID, toolNames...)
+}
+
 func (s *Server) ServeStdio() error {
 	s.mode = StdioMode
+
+	// For STDIO mode, create a single session
+	session, err := s.CreateSession()
+	if err != nil {
+		return fmt.Errorf("failed to create session for STDIO mode: %w", err)
+	}
+
+	// Set the context with the session but don't use it directly
+	// The session is registered with the server and will be used for notifications
+	_ = s.server.WithContext(context.Background(), session)
+
+	// Use the standard ServeStdio function
 	return server.ServeStdio(s.server)
 }
 
@@ -112,6 +169,9 @@ func (s *Server) ServeSse(baseUrl string) *server.SSEServer {
 		options = append(options, server.WithBaseURL(baseUrl))
 	}
 
+	// Create the SSE server with the configured options
+	sseServer := server.NewSSEServer(s.server, options...)
+
 	// Start the health check server on the health port
 	go s.startHealthServer()
 
@@ -121,8 +181,11 @@ func (s *Server) ServeSse(baseUrl string) *server.SSEServer {
 		s.healthCheck.SetReady(true)
 	}()
 
-	return server.NewSSEServer(s.server, options...)
+	return sseServer
 }
+
+// contextKeySessionID is a key for storing session ID in context
+type contextKeySessionID struct{}
 
 // startHealthServer starts a separate HTTP server for health checks
 func (s *Server) startHealthServer() {
@@ -143,6 +206,14 @@ func (s *Server) startHealthServer() {
 }
 
 func (s *Server) Close() {
+	// Clean up all sessions
+	s.sessions.Range(func(key, value interface{}) bool {
+		if sessionID, ok := key.(string); ok {
+			s.DestroySession(sessionID)
+		}
+		return true
+	})
+
 	if s.k != nil {
 		s.k.Close()
 	}

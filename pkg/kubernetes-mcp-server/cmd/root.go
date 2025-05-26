@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mark3labs/mcp-go/server"
 	"github.com/scoutflo/kubernetes-mcp-server/pkg/mcp"
 	"github.com/scoutflo/kubernetes-mcp-server/pkg/version"
 	"github.com/spf13/cobra"
@@ -59,10 +58,9 @@ Note:
 		}
 		defer mcpServer.Close()
 
-		var sseServer *server.SSEServer
 		if ssePort := viper.GetInt("sse-port"); ssePort > 0 {
 			// SSE mode - supports multiple clients
-			sseServer = mcpServer.ServeSse(viper.GetString("sse-base-url"))
+			sseServer := mcpServer.ServeSse(viper.GetString("sse-base-url"))
 
 			// Set up signal handling for graceful shutdown BEFORE starting the server
 			sigChan := make(chan os.Signal, 1)
