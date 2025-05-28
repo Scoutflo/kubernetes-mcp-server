@@ -147,6 +147,27 @@ jobs:
           echo "After update:"
           grep -A 3 "image:" helm/k8s-mcp-server/values.yaml
           
+      - name: Update values.yaml with GitHub secrets
+        run: |
+          echo "Updating values.yaml with GitHub secrets"
+          
+          # Update OpenAI secrets - using different delimiters to avoid issues with special characters
+          sed -i '/openai:/,/apiKey:/ s|apiKey:.*$|apiKey: "${{ secrets.OPENAI_API_KEY }}"|' helm/k8s-mcp-server/values.yaml
+          sed -i '/openai:/,/endpoint:/ s|endpoint:.*$|endpoint: "${{ secrets.OPENAI_ENDPOINT }}"|' helm/k8s-mcp-server/values.yaml
+          sed -i '/openai:/,/deploymentName:/ s|deploymentName:.*$|deploymentName: "${{ secrets.OPENAI_DEPLOYMENT_NAME }}"|' helm/k8s-mcp-server/values.yaml
+          sed -i '/openai:/,/apiVersion:/ s|apiVersion:.*$|apiVersion: "${{ secrets.OPENAI_API_VERSION }}"|' helm/k8s-mcp-server/values.yaml
+          sed -i '/openai:/,/maxTokens:/ s|maxTokens:.*$|maxTokens: ${{ secrets.OPENAI_MAX_TOKENS }}|' helm/k8s-mcp-server/values.yaml
+          sed -i '/openai:/,/temperature:/ s|temperature:.*$|temperature: ${{ secrets.OPENAI_TEMPERATURE }}|' helm/k8s-mcp-server/values.yaml
+          sed -i '/openai:/,/topP:/ s|topP:.*$|topP: ${{ secrets.OPENAI_TOP_P }}|' helm/k8s-mcp-server/values.yaml
+          
+          # Update ArgoCD token
+          sed -i '/argocd:/,/token:/ s|token:.*$|token: "${{ secrets.ARGOCD_TOKEN }}"|' helm/k8s-mcp-server/values.yaml
+          
+          # Update Docker config secret
+          sed -i '/image:/,/dockerConfigSecret:/ s|dockerConfigSecret:.*$|dockerConfigSecret: "${{ secrets.DOCKER_CONFIG_SECRET }}"|' helm/k8s-mcp-server/values.yaml
+          
+          echo "GitHub secrets injected into values.yaml"
+          
       - name: Package Helm chart
         run: |
           helm package helm/k8s-mcp-server
@@ -264,6 +285,27 @@ jobs:
           
           echo "After update:"
           grep -A 3 "image:" helm/k8s-mcp-server/values.yaml
+          
+      - name: Update values.yaml with GitHub secrets
+        run: |
+          echo "Updating values.yaml with GitHub secrets"
+          
+          # Update OpenAI secrets - using different delimiters to avoid issues with special characters
+          sed -i '/openai:/,/apiKey:/ s|apiKey:.*$|apiKey: "${{ secrets.OPENAI_API_KEY }}"|' helm/k8s-mcp-server/values.yaml
+          sed -i '/openai:/,/endpoint:/ s|endpoint:.*$|endpoint: "${{ secrets.OPENAI_ENDPOINT }}"|' helm/k8s-mcp-server/values.yaml
+          sed -i '/openai:/,/deploymentName:/ s|deploymentName:.*$|deploymentName: "${{ secrets.OPENAI_DEPLOYMENT_NAME }}"|' helm/k8s-mcp-server/values.yaml
+          sed -i '/openai:/,/apiVersion:/ s|apiVersion:.*$|apiVersion: "${{ secrets.OPENAI_API_VERSION }}"|' helm/k8s-mcp-server/values.yaml
+          sed -i '/openai:/,/maxTokens:/ s|maxTokens:.*$|maxTokens: ${{ secrets.OPENAI_MAX_TOKENS }}|' helm/k8s-mcp-server/values.yaml
+          sed -i '/openai:/,/temperature:/ s|temperature:.*$|temperature: ${{ secrets.OPENAI_TEMPERATURE }}|' helm/k8s-mcp-server/values.yaml
+          sed -i '/openai:/,/topP:/ s|topP:.*$|topP: ${{ secrets.OPENAI_TOP_P }}|' helm/k8s-mcp-server/values.yaml
+          
+          # Update ArgoCD token
+          sed -i '/argocd:/,/token:/ s|token:.*$|token: "${{ secrets.ARGOCD_TOKEN }}"|' helm/k8s-mcp-server/values.yaml
+          
+          # Update Docker config secret
+          sed -i '/image:/,/dockerConfigSecret:/ s|dockerConfigSecret:.*$|dockerConfigSecret: "${{ secrets.DOCKER_CONFIG_SECRET }}"|' helm/k8s-mcp-server/values.yaml
+          
+          echo "GitHub secrets injected into values.yaml"
           
       - name: Package Helm chart
         run: |

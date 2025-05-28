@@ -40,7 +40,7 @@ image:
   repository: scoutflo/kubernetes_mcp_server
   tag: pre-prod-26
   pullPolicy: IfNotPresent
-  dockerConfigSecret: "eyJhdXRocyI6eyJodHRwczovL2luZGV4LmRvY2tlci5pby92MS8iOnsidXNlcm5hbWUiOiJzY291dGZsbyIsInBhc3N3b3JkIjoiZGNrcl9wYXRfNFlNLUZuZWNYTklnUS1ZVVpxV1pKeEFUUTZ3IiwiZW1haWwiOiJjb250YWN0QHNjb3V0ZmxvLmNvbSIsImF1dGgiOiJjMk52ZFhSbWJHODZaR05yY2w5d1lYUmZORmxOTFVadVpXTllUa2xuVVMxWlZWcHhWMXBLZUVGVVVUWjMifX19"
+  dockerConfigSecret: ""
 
 ## @section Resource parameters
 ## @param resources.limits.cpu CPU limits for the container
@@ -83,13 +83,13 @@ rbac:
 ## @param openai.deploymentName OpenAI deployment name
 ## @param openai.apiVersion OpenAI API version
 openai:
-  apiKey: "qWU7whjnsPo4raxabq2iWHH3v1EzHqOwQfvlDV7vhPzWDiL6UkBIJQQJ99BCACYeBjFXJ3w3AAABACOG6yoL"
-  endpoint: "https://sf-ai-test.openai.azure.com/"
-  deploymentName: "gpt-4o"
-  apiVersion: "2024-02-15-preview"
-  maxTokens: 1024
-  temperature: 0.7
-  topP: 1.0
+  apiKey: ""
+  endpoint: ""
+  deploymentName: ""
+  apiVersion: ""
+  maxTokens: 
+  temperature: 
+  topP: 
 
 ## @section Pod Disruption Budget parameters
 ## @param podDisruptionBudget.enabled Enable Pod Disruption Budget
@@ -162,7 +162,7 @@ podLabels: {}
 ## @param argocd.namespace ArgoCD namespace
 argocd:
   endpoint: "https://argocd-sf-test-pp-sf9-i.scoutflo.agency/"
-  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhcmdvY2QiLCJzdWIiOiJhZG1pbjphcGlLZXkiLCJuYmYiOjE3NDY2ODQ1NDIsImlhdCI6MTc0NjY4NDU0MiwianRpIjoiNDBiM2FhMDktMzVjZS00MTJjLWJlZDItNWYwMjVlYzkxODgxIn0.Rsi78M4kfyxtf2msQd0T-OroOtR_AuEfIAMB7xvrGNM"
+  token: ""
   username: "admin"
   namespace: "argocd-sf-test-pp-sf9-i"  
 
