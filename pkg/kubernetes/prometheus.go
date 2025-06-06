@@ -1246,3 +1246,153 @@ func (k *Kubernetes) GetPrometheusWALReplayStatus() (string, error) {
 
 	return string(resultJSON), nil
 }
+
+// ListPrometheusLabelNames retrieves all available label names from Prometheus
+func (k *Kubernetes) ListPrometheusLabelNames(startRfc3339, endRfc3339 string, limit int, matches []string) (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the API URL for labels endpoint
+	baseURL := fmt.Sprintf("%s/api/v1/labels", prometheusURL)
+
+	// Build query parameters
+	queryParams := url.Values{}
+
+	// Add start time if provided
+	if startRfc3339 != "" {
+		queryParams.Add("start", startRfc3339)
+	}
+
+	// Add end time if provided
+	if endRfc3339 != "" {
+		queryParams.Add("end", endRfc3339)
+	}
+
+	// Add limit if provided and valid
+	if limit > 0 {
+		queryParams.Add("limit", fmt.Sprintf("%d", limit))
+	}
+
+	// Add match parameters if provided - treat each string as a direct series selector
+	for _, match := range matches {
+		if match != "" {
+			queryParams.Add("match[]", match)
+		}
+	}
+
+	// Combine base URL with query parameters
+	requestURL := baseURL
+	if len(queryParams) > 0 {
+		requestURL = fmt.Sprintf("%s?%s", baseURL, queryParams.Encode())
+	}
+
+	// Send the request
+	resp, err := http.Get(requestURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Prometheus label names: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Convert result to JSON string
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}
+
+// ListPrometheusLabelValues retrieves all values for a specific label name from Prometheus
+func (k *Kubernetes) ListPrometheusLabelValues(labelName, startRfc3339, endRfc3339 string, limit int, matches []string) (string, error) {
+	// Get Prometheus URL using service discovery
+	prometheusURL, err := k.getPrometheusURL()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover Prometheus: %v", err)
+	}
+
+	// Build the API URL for label values endpoint
+	baseURL := fmt.Sprintf("%s/api/v1/label/%s/values", prometheusURL, url.PathEscape(labelName))
+
+	// Build query parameters
+	queryParams := url.Values{}
+
+	// Add start time if provided
+	if startRfc3339 != "" {
+		queryParams.Add("start", startRfc3339)
+	}
+
+	// Add end time if provided
+	if endRfc3339 != "" {
+		queryParams.Add("end", endRfc3339)
+	}
+
+	// Add limit if provided and valid
+	if limit > 0 {
+		queryParams.Add("limit", fmt.Sprintf("%d", limit))
+	}
+
+	// Add match parameters if provided - treat each string as a direct series selector
+	for _, match := range matches {
+		if match != "" {
+			queryParams.Add("match[]", match)
+		}
+	}
+
+	// Combine base URL with query parameters
+	requestURL := baseURL
+	if len(queryParams) > 0 {
+		requestURL = fmt.Sprintf("%s?%s", baseURL, queryParams.Encode())
+	}
+
+	// Send the request
+	resp, err := http.Get(requestURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Prometheus label values: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
+	}
+
+	// Check for error status
+	if status, ok := result["status"].(string); ok && status != "success" {
+		if errorType, ok := result["errorType"].(string); ok {
+			if errorMsg, ok := result["error"].(string); ok {
+				return "", fmt.Errorf("Prometheus error (%s): %s", errorType, errorMsg)
+			}
+			return "", fmt.Errorf("Prometheus error: %s", errorType)
+		}
+		return "", fmt.Errorf("Prometheus returned non-success status: %s", status)
+	}
+
+	// Convert result to JSON string
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}

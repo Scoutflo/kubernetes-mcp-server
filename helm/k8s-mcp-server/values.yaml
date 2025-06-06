@@ -14,18 +14,20 @@ fullnameOverride: ""
 ## @param namespace.name Namespace name
 ## @param namespace.create Create the namespace
 namespace:
-  name: "k8s-mcp-server"
+  name: "scoutflo-k8smcpserver-phe4z"
   create: false 
 
 ## @section Ingress parameters
 ## @param ingress.className Ingress class name
 ## @param ingress.hostname Hostname for the ingress
+## @param ingress.annotations Additional annotations for ingress
 ## @param ingress.tls.enabled Enable TLS for ingress
 ## @param ingress.tls.wildcardHostname Wildcard hostname for TLS
 ## @param ingress.tls.secretName Secret name for TLS
 ingress:
   className: nginx
-  hostname: "k8s-mcp-server.scoutflo.agency"
+  hostname: "api-scoutflo-k8smcpserver-phe4z.scoutflo.agency"
+  annotations: {}
   tls:
     enabled: true
     wildcardHostname: "*.scoutflo.agency"
@@ -38,7 +40,7 @@ ingress:
 ## @param image.dockerConfigSecret Docker config secret for private registry
 image:
   repository: scoutflo/kubernetes_mcp_server
-  tag: pre-prod-26
+  tag: pre-prod-51
   pullPolicy: IfNotPresent
   dockerConfigSecret: ""
 
@@ -161,12 +163,16 @@ podLabels: {}
 ## @param argocd.username ArgoCD username
 ## @param argocd.namespace ArgoCD namespace
 argocd:
-  endpoint: "https://argocd-sf-test-pp-sf9-i.scoutflo.agency/"
-  token: ""
+  endpoint: "https://argocd-sf-test-preprod-odyd.scoutflo.agency/"
+  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhcmdvY2QiLCJzdWIiOiJhZG1pbjphcGlLZXkiLCJuYmYiOjE3NDkxNDI4MzQsImlhdCI6MTc0OTE0MjgzNCwianRpIjoiYjZhN2RmOGItMWY1OS00MzM0LWE0YTEtNWU3NGRiNzQ0MjMyIn0.bCxeywHJ_alZofgUucirFJ0ZscmHl5bbIniy6elSt88"
   username: "admin"
-  namespace: "argocd-sf-test-pp-sf9-i"  
+  namespace: "argocd-sf-test-preprod-odyd"  
 
 ## @section Prometheus parameters
 ## @param prometheus.endpoint Prometheus endpoint URL
 prometheus:
-  endpoint: "https://scoutflo-monitoring-bik8p9.scoutflo.agency/"  
+  endpoint: "https://scoutflo-monitoring-a7cuji.scoutflo.agency/"  
+
+grafana:
+  endpoint: "https://kgrafana-cost-analyzer-sf-test-preprod-fzsje.scoutflo.agency/"
+  apitoken: "glsa_dy1vWy69nNa2aBKE5JqN5c7M9v5WhWo1_f5c8e0a2"  

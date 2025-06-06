@@ -85,6 +85,7 @@ func (s *Server) reloadKubernetesClient() error {
 		s.initArgoRollouts(),
 		s.initConverters(),
 		s.initPromptGenerator(),
+		s.initGrafana(),
 	)...)
 
 	// Initialize MCP resources for Kubernetes documentation

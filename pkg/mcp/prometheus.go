@@ -65,6 +65,35 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			mcp.WithString("metric", mcp.Description("Metric name (optional)")),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of targets (optional)")),
 		), Handler: s.prometheusTargetMetadata},
+		{Tool: mcp.NewTool("prometheus_list_label_names",
+			mcp.WithDescription("List label names in a Prometheus datasource. Allows filtering by series selectors and time range."),
+			mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the time range to filter the results by")),
+			mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the time range to filter the results by")),
+			mcp.WithNumber("limit", mcp.Description("Optionally, the maximum number of results to return")),
+			mcp.WithArray("matches", mcp.Description("Optionally, a list of label matchers to filter the results by"),
+				func(schema map[string]interface{}) {
+					schema["type"] = "array"
+					schema["items"] = map[string]interface{}{
+						"type": "string",
+					}
+				},
+			),
+		), Handler: s.prometheusListLabelNames},
+		{Tool: mcp.NewTool("prometheus_list_label_values",
+			mcp.WithDescription("Get the values for a specific label name in Prometheus. Allows filtering by series selectors and time range."),
+			mcp.WithString("labelName", mcp.Description("The name of the label to query"), mcp.Required()),
+			mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the query")),
+			mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the query")),
+			mcp.WithNumber("limit", mcp.Description("Optionally, the maximum number of results to return")),
+			mcp.WithArray("matches", mcp.Description("Optionally, a list of selectors to filter the results by"),
+				func(schema map[string]interface{}) {
+					schema["type"] = "array"
+					schema["items"] = map[string]interface{}{
+						"type": "string",
+					}
+				},
+			),
+		), Handler: s.prometheusListLabelValues},
 		{Tool: mcp.NewTool("prometheus_get_alerts",
 			mcp.WithDescription("Tool for getting active Prometheus alerts. Retrieves all currently firing alerts in the Prometheus server. Use this tool to monitor the current alert state and identify ongoing issues. Returns details about alert names, labels, and when they started firing."),
 		), Handler: s.prometheusGetAlerts},
@@ -924,4 +953,72 @@ func (s *Server) prometheusWALReplay(ctx context.Context, _ mcp.CallToolRequest)
 
 	// Add context to the response if there are active operations
 	return NewTextResult("WAL REPLAY STATUS: Write-Ahead Log (WAL) replay status shows the progress of WAL replay operations. 'current' represents the current replay position, 'max' is the highest position, and 'min' is the lowest position.\n\n"+ret, nil), nil
+}
+
+// prometheusListLabelNames handles the prometheus_list_label_names tool request
+func (s *Server) prometheusListLabelNames(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract optional parameters
+	startRfc3339 := ctr.GetString("startRfc3339", "")
+	endRfc3339 := ctr.GetString("endRfc3339", "")
+	limit := int(ctr.GetFloat("limit", 0))
+
+	// Extract matches parameter using GetRawArguments
+	var matches []string
+	args := ctr.GetRawArguments()
+	if argsMap, ok := args.(map[string]interface{}); ok {
+		if matchesArg, exists := argsMap["matches"]; exists && matchesArg != nil {
+			if matchesArr, ok := matchesArg.([]interface{}); ok {
+				for _, m := range matchesArr {
+					if matchStr, ok := m.(string); ok {
+						matches = append(matches, matchStr)
+					}
+				}
+			}
+		}
+	}
+
+	// Call the Kubernetes function
+	ret, err := s.k.ListPrometheusLabelNames(startRfc3339, endRfc3339, limit, matches)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to list Prometheus label names: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
+}
+
+// prometheusListLabelValues handles the prometheus_list_label_values tool request
+func (s *Server) prometheusListLabelValues(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract required parameters
+	labelName := ctr.GetString("labelName", "")
+	if labelName == "" {
+		return NewTextResult("", errors.New("missing required parameter: labelName")), nil
+	}
+
+	// Extract optional parameters
+	startRfc3339 := ctr.GetString("startRfc3339", "")
+	endRfc3339 := ctr.GetString("endRfc3339", "")
+	limit := int(ctr.GetFloat("limit", 0))
+
+	// Extract matches parameter using GetRawArguments
+	var matches []string
+	args := ctr.GetRawArguments()
+	if argsMap, ok := args.(map[string]interface{}); ok {
+		if matchesArg, exists := argsMap["matches"]; exists && matchesArg != nil {
+			if matchesArr, ok := matchesArg.([]interface{}); ok {
+				for _, m := range matchesArr {
+					if matchStr, ok := m.(string); ok {
+						matches = append(matches, matchStr)
+					}
+				}
+			}
+		}
+	}
+
+	// Call the Kubernetes function
+	ret, err := s.k.ListPrometheusLabelValues(labelName, startRfc3339, endRfc3339, limit, matches)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to list Prometheus label values: %v", err)), nil
+	}
+
+	return NewTextResult(ret, nil), nil
 }
