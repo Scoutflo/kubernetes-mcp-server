@@ -164,9 +164,9 @@ podLabels: {}
 ## @param argocd.namespace ArgoCD namespace
 argocd:
   endpoint: "https://argocd-sf-test-preprod-odyd.scoutflo.agency/"
-  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhcmdvY2QiLCJzdWIiOiJhZG1pbjphcGlLZXkiLCJuYmYiOjE3NDkxNDI4MzQsImlhdCI6MTc0OTE0MjgzNCwianRpIjoiYjZhN2RmOGItMWY1OS00MzM0LWE0YTEtNWU3NGRiNzQ0MjMyIn0.bCxeywHJ_alZofgUucirFJ0ZscmHl5bbIniy6elSt88"
-  username: "admin"
   namespace: "argocd-sf-test-preprod-odyd"  
+
+## Inside application secret name and username is fixed inside the application 
 
 ## @section Prometheus parameters
 ## @param prometheus.endpoint Prometheus endpoint URL

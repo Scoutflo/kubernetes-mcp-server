@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ArgoCD API paths
@@ -23,6 +25,16 @@ const (
 
 // ArgoCD connection config - this should be moved to a proper config manager
 // TODO: Move these to a secure configuration store
+
+// ArgoCD session request/response structures
+type SessionRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type SessionResponse struct {
+	Token string `json:"token"`
+}
 
 // ArgoClient represents a client for ArgoCD REST API
 type ArgoClient struct {
@@ -275,24 +287,120 @@ type JWTToken struct {
 
 // NewArgoClient creates a new ArgoCD HTTP client
 func (k *Kubernetes) NewArgoClient(ctx context.Context, requestNamespace string) (*ArgoClient, io.Closer, error) {
+	namespace := func() string {
+		if requestNamespace != "" {
+			return requestNamespace
+		}
+		return namespaceOrDefault(k.ArgoCDNamespace)
+	}()
+
+	// Get ArgoCD credentials and generate token
+	username := "admin" // Default ArgoCD username
+	password, err := k.getArgoCDPassword(ctx, namespace)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get ArgoCD password: %w", err)
+	}
+
+	token, err := k.fetchArgoToken(ctx, username, password)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to fetch ArgoCD token: %w", err)
+	}
+
 	client := &ArgoClient{
 		serverURL: k.ArgoCDEndpoint,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		namespace: func() string {
-			if requestNamespace != "" {
-				return requestNamespace
-			}
-			return namespaceOrDefault(k.ArgoCDNamespace)
-		}(),
-		authToken: k.ArgoCDToken,
+		namespace: namespace,
+		authToken: token,
 	}
 
 	// Create a closer function that does nothing since we don't have a persistent connection
 	closer := io.NopCloser(strings.NewReader(""))
 
 	return client, closer, nil
+}
+
+// getArgoCDPassword retrieves the ArgoCD admin password from Kubernetes secret
+func (k *Kubernetes) getArgoCDPassword(ctx context.Context, namespace string) (string, error) {
+	secretName := "argocd-initial-admin-secret"
+
+	secret, err := k.clientSet.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get ArgoCD secret %s in namespace %s: %w", secretName, namespace, err)
+	}
+
+	passwordBytes, exists := secret.Data["password"]
+	if !exists {
+		return "", fmt.Errorf("password key not found in ArgoCD secret %s", secretName)
+	}
+
+	return string(passwordBytes), nil
+}
+
+// fetchArgoToken authenticates with ArgoCD and returns an authentication token
+func (k *Kubernetes) fetchArgoToken(ctx context.Context, username, password string) (string, error) {
+	if k.ArgoCDEndpoint == "" {
+		return "", fmt.Errorf("ArgoCD endpoint not configured")
+	}
+
+	// Ensure ArgoCD URL ends with /
+	argoURL := k.ArgoCDEndpoint
+	if !strings.HasSuffix(argoURL, "/") {
+		argoURL = argoURL + "/"
+	}
+
+	sessionURL := fmt.Sprintf("%sapi/v1/session", argoURL)
+
+	// Create session request
+	sessionReq := SessionRequest{
+		Username: username,
+		Password: password,
+	}
+
+	// Marshal request body
+	reqBody, err := json.Marshal(sessionReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal session request: %w", err)
+	}
+
+	// Create HTTP request
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, sessionURL, strings.NewReader(string(reqBody)))
+	if err != nil {
+		return "", fmt.Errorf("failed to create session request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	// Execute request
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to execute session request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check response status
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("ArgoCD authentication failed with status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var sessionResp SessionResponse
+	if err := json.NewDecoder(resp.Body).Decode(&sessionResp); err != nil {
+		return "", fmt.Errorf("failed to parse session response: %w", err)
+	}
+
+	if sessionResp.Token == "" {
+		return "", fmt.Errorf("empty token received from ArgoCD")
+	}
+
+	return sessionResp.Token, nil
 }
 
 // doRequest is a helper function to make HTTP requests to ArgoCD API

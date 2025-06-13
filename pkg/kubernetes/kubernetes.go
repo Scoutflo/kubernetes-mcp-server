@@ -47,7 +47,6 @@ type Kubernetes struct {
 
 	// ArgoCD and Prometheus config
 	ArgoCDEndpoint     string
-	ArgoCDToken        string
 	ArgoCDNamespace    string
 	PrometheusEndpoint string
 }
@@ -81,7 +80,6 @@ func NewKubernetes() (*Kubernetes, error) {
 
 	// Load ArgoCD and Prometheus config from environment variables
 	k8s.ArgoCDEndpoint = os.Getenv("ARGOCD_ENDPOINT")
-	k8s.ArgoCDToken = os.Getenv("ARGOCD_TOKEN")
 	k8s.ArgoCDNamespace = os.Getenv("ARGOCD_NAMESPACE")
 	k8s.PrometheusEndpoint = os.Getenv("PROMETHEUS_ENDPOINT")
 

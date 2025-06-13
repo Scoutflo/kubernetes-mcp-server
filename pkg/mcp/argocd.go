@@ -375,17 +375,32 @@ func (s *Server) argocdListApplications(ctx context.Context, ctr mcp.CallToolReq
 		return NewTextResult("", fmt.Errorf("failed to list ArgoCD applications: %w", err)), nil
 	}
 
-	// Format the output to be more user-friendly
+	// Format the output as compact JSON
 	if len(appList.Items) == 0 {
-		return NewTextResult("No applications found matching the criteria", nil), nil
+		return NewTextResult(`{"applications": [], "count": 0, "message": "No applications found matching the criteria"}`, nil), nil
 	}
 
-	// Create a more readable summary format
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Found %d applications:\n\n", len(appList.Items)))
-	sb.WriteString("NAME                    PROJECT        SYNC STATUS   HEALTH STATUS\n")
-	sb.WriteString("----                    -------        -----------   -------------\n")
+	// Create a simplified structure for easier reading
+	type ApplicationSummary struct {
+		Name           string `json:"name"`
+		Project        string `json:"project"`
+		SyncStatus     string `json:"sync_status"`
+		HealthStatus   string `json:"health_status"`
+		RepoURL        string `json:"repo_url"`
+		Path           string `json:"path"`
+		TargetRevision string `json:"target_revision"`
+		Namespace      string `json:"namespace"`
+		DestNamespace  string `json:"dest_namespace"`
+		Server         string `json:"dest_server"`
+	}
 
+	type ApplicationListResponse struct {
+		Applications []ApplicationSummary `json:"applications"`
+		Count        int                  `json:"count"`
+		Filters      map[string]string    `json:"filters,omitempty"`
+	}
+
+	var summaries []ApplicationSummary
 	for _, app := range appList.Items {
 		syncStatus := "Unknown"
 		if app.Status.Sync.Status != "" {
@@ -397,15 +412,55 @@ func (s *Server) argocdListApplications(ctx context.Context, ctr mcp.CallToolReq
 			healthStatus = app.Status.Health.Status
 		}
 
-		sb.WriteString(fmt.Sprintf("%-24s %-14s %-14s %s\n",
-			app.Metadata.Name,
-			app.Spec.Project,
-			syncStatus,
-			healthStatus))
+		summary := ApplicationSummary{
+			Name:           app.Metadata.Name,
+			Project:        app.Spec.Project,
+			SyncStatus:     syncStatus,
+			HealthStatus:   healthStatus,
+			RepoURL:        app.Spec.Source.RepoURL,
+			Path:           app.Spec.Source.Path,
+			TargetRevision: app.Spec.Source.TargetRevision,
+			Namespace:      app.Metadata.Namespace,
+			DestNamespace:  app.Spec.Destination.Namespace,
+			Server:         app.Spec.Destination.Server,
+		}
+		summaries = append(summaries, summary)
 	}
 
-	// Return summary table view by default
-	return NewTextResult(sb.String(), nil), nil
+	// Build filters map
+	filters := make(map[string]string)
+	if project != "" {
+		filters["project"] = project
+	}
+	if name != "" {
+		filters["name"] = name
+	}
+	if repo != "" {
+		filters["repo"] = repo
+	}
+	if namespace != "" {
+		filters["namespace"] = namespace
+	}
+	if refresh != "" {
+		filters["refresh"] = refresh
+	}
+
+	response := ApplicationListResponse{
+		Applications: summaries,
+		Count:        len(summaries),
+	}
+
+	if len(filters) > 0 {
+		response.Filters = filters
+	}
+
+	// Return as compact JSON
+	jsonResult, err := json.Marshal(response)
+	if err != nil {
+		return NewTextResult("", fmt.Errorf("failed to marshal applications list: %w", err)), nil
+	}
+
+	return NewTextResult(string(jsonResult), nil), nil
 }
 
 // argocdGetApplication gets detailed information about a specific application

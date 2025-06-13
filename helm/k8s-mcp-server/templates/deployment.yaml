@@ -75,16 +75,6 @@ spec:
                 secretKeyRef:
                   name: {{ include "k8s-mcp-server.fullname" . }}-argocd-credentials
                   key: ARGOCD_ENDPOINT
-            - name: ARGOCD_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "k8s-mcp-server.fullname" . }}-argocd-credentials
-                  key: ARGOCD_TOKEN
-            - name: ARGOCD_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "k8s-mcp-server.fullname" . }}-argocd-credentials
-                  key: ARGOCD_USERNAME
             - name: ARGOCD_NAMESPACE
               valueFrom:
                 secretKeyRef:
