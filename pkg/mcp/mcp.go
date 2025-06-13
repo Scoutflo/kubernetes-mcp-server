@@ -168,6 +168,7 @@ func (s *Server) ServeSse(baseUrl string) *server.SSEServer {
 	options := make([]server.SSEOption, 0)
 	if baseUrl != "" {
 		options = append(options, server.WithBaseURL(baseUrl))
+	        options = append(options, server.WithKeepAlive(true))
 	}
 
 	// Create the SSE server with the configured options
