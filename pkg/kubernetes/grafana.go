@@ -491,3 +491,134 @@ func (k *Kubernetes) HealthCheck() (string, error) {
 
 	return string(resultJSON), nil
 }
+
+// ListAlertRules lists Grafana alert rules with optional filtering and pagination
+func (k *Kubernetes) ListAlertRules(limit, page int, labelSelectors []map[string]interface{}) (string, error) {
+	endpoint := "/api/ruler/grafana/api/v1/rules"
+
+	result, err := k.makeGrafanaRequest(endpoint)
+	if err != nil {
+		return "", fmt.Errorf("failed to get alert rules: %v", err)
+	}
+
+	// Process the alert rules and apply filtering/pagination
+	alertRules, err := k.processAlertRules(result, limit, page, labelSelectors)
+	if err != nil {
+		return "", fmt.Errorf("failed to process alert rules: %v", err)
+	}
+
+	// Convert result to JSON string
+	resultJSON, err := json.Marshal(alertRules)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal alert rules result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}
+
+// processAlertRules processes raw alert rules data and applies filtering/pagination
+func (k *Kubernetes) processAlertRules(rawData map[string]interface{}, limit, page int, labelSelectors []map[string]interface{}) ([]map[string]interface{}, error) {
+	var allRules []map[string]interface{}
+
+	// Navigate through the nested structure to extract rules
+	if groups, ok := rawData["groups"].([]interface{}); ok {
+		for _, group := range groups {
+			if groupMap, ok := group.(map[string]interface{}); ok {
+				if rules, ok := groupMap["rules"].([]interface{}); ok {
+					for _, rule := range rules {
+						if ruleMap, ok := rule.(map[string]interface{}); ok {
+							// Create a summary of the rule
+							ruleSummary := map[string]interface{}{
+								"uid":    ruleMap["uid"],
+								"title":  ruleMap["title"],
+								"state":  ruleMap["state"],
+								"labels": ruleMap["labels"],
+							}
+
+							// Apply label selector filtering if provided
+							if len(labelSelectors) == 0 || k.matchesLabelSelectors(ruleMap, labelSelectors) {
+								allRules = append(allRules, ruleSummary)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Apply pagination
+	if limit <= 0 {
+		limit = 100 // default
+	}
+	if page <= 0 {
+		page = 1 // default
+	}
+
+	start := (page - 1) * limit
+	end := start + limit
+
+	if start >= len(allRules) {
+		return []map[string]interface{}{}, nil
+	}
+
+	if end > len(allRules) {
+		end = len(allRules)
+	}
+
+	return allRules[start:end], nil
+}
+
+// matchesLabelSelectors checks if a rule matches the provided label selectors
+func (k *Kubernetes) matchesLabelSelectors(rule map[string]interface{}, selectors []map[string]interface{}) bool {
+	labels, ok := rule["labels"].(map[string]interface{})
+	if !ok {
+		return len(selectors) == 0
+	}
+
+	for _, selector := range selectors {
+		name, nameOk := selector["name"].(string)
+		selectorType, typeOk := selector["type"].(string)
+		value, valueOk := selector["value"].(string)
+
+		if !nameOk || !typeOk || !valueOk {
+			continue // Skip invalid selectors
+		}
+
+		labelValue, labelExists := labels[name].(string)
+
+		switch selectorType {
+		case "=":
+			if !labelExists || labelValue != value {
+				return false
+			}
+		case "!=":
+			if labelExists && labelValue == value {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// GetAlertRuleByUID retrieves a specific alert rule by its UID
+func (k *Kubernetes) GetAlertRuleByUID(uid string) (string, error) {
+	endpoint := fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", uid)
+
+	result, err := k.makeGrafanaRequest(endpoint)
+	if err != nil {
+		// Check if it's a 404 error and provide a better message
+		if strings.Contains(err.Error(), "404") {
+			return "", fmt.Errorf("alert rule with UID '%s' not found. Please check if the alert rule exists and is accessible", uid)
+		}
+		return "", fmt.Errorf("failed to get alert rule: %v", err)
+	}
+
+	// Convert result to JSON string
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal alert rule result: %v", err)
+	}
+
+	return string(resultJSON), nil
+}

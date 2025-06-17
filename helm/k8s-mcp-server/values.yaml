@@ -40,7 +40,7 @@ ingress:
 ## @param image.dockerConfigSecret Docker config secret for private registry
 image:
   repository: scoutflo/kubernetes_mcp_server
-  tag: pre-prod-51
+  tag: pre-prod-55
   pullPolicy: IfNotPresent
   dockerConfigSecret: ""
 
@@ -175,4 +175,4 @@ prometheus:
 
 grafana:
   endpoint: "https://kgrafana-cost-analyzer-sf-test-preprod-fzsje.scoutflo.agency/"
-  apitoken: "glsa_dy1vWy69nNa2aBKE5JqN5c7M9v5WhWo1_f5c8e0a2"  
+  apitoken: "glsa_h0wUkBBAG14fEBJTBtuZa2R1Efs2h0qn_81577969"  

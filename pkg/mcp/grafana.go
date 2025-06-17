@@ -46,6 +46,16 @@ func (s *Server) initGrafana() []server.ServerTool {
 			mcp.WithDescription("Retrieves detailed information about a specific datasource using its name. Returns the full datasource model, including UID, type, URL, access settings, JSON data, and secure JSON field status."),
 			mcp.WithString("name", mcp.Description("The name of the datasource"), mcp.Required()),
 		), Handler: s.grafanaGetDatasourceByName},
+		{Tool: mcp.NewTool("grafana_list_alert_rules",
+			mcp.WithDescription("Lists Grafana alert rules, returning a summary including UID, title, current state (e.g., 'pending', 'firing', 'inactive'), and labels. Supports filtering by labels using selectors and pagination. Example label selector: `[{'name': 'severity', 'type': '=', 'value': 'critical'}]`. Inactive state means the alert state is normal, not firing."),
+			mcp.WithNumber("limit", mcp.Description("The maximum number of results to return. Default is 100.")),
+			mcp.WithNumber("page", mcp.Description("The page number to return.")),
+			mcp.WithArray("label_selectors", mcp.Description("Optionally, a list of matchers to filter alert rules by labels. Each selector should have 'name', 'type' ('=' or '!='), and 'value' fields.")),
+		), Handler: s.grafanaListAlertRules},
+		{Tool: mcp.NewTool("grafana_get_alert_rule_by_uid",
+			mcp.WithDescription("Retrieves the full configuration and detailed status of a specific Grafana alert rule identified by its unique ID (UID). The response includes fields like title, condition, query data, folder UID, rule group, state settings (no data, error), evaluation interval, annotations, and labels."),
+			mcp.WithString("uid", mcp.Description("The uid of the alert rule"), mcp.Required()),
+		), Handler: s.grafanaGetAlertRuleByUID},
 	}
 }
 
@@ -185,6 +195,62 @@ func (s *Server) grafanaGetDatasourceByName(ctx context.Context, ctr mcp.CallToo
 
 	// Call the Kubernetes client to get the datasource by name
 	result, err := s.k.GetDatasourceByName(name)
+	if err != nil {
+		return NewTextResult("", err), nil
+	}
+
+	return NewTextResult(result, nil), nil
+}
+
+// grafanaListAlertRules handles the list_alert_rules tool request
+func (s *Server) grafanaListAlertRules(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract optional parameters
+	args := ctr.GetRawArguments().(map[string]interface{})
+
+	limit := 100 // default
+	if limitArg, exists := args["limit"]; exists && limitArg != nil {
+		if limitFloat, ok := limitArg.(float64); ok {
+			limit = int(limitFloat)
+		}
+	}
+
+	page := 1 // default
+	if pageArg, exists := args["page"]; exists && pageArg != nil {
+		if pageFloat, ok := pageArg.(float64); ok {
+			page = int(pageFloat)
+		}
+	}
+
+	var labelSelectors []map[string]interface{}
+	if selectorsArg, exists := args["label_selectors"]; exists && selectorsArg != nil {
+		if selectorsArray, ok := selectorsArg.([]interface{}); ok {
+			for _, selectorInterface := range selectorsArray {
+				if selector, ok := selectorInterface.(map[string]interface{}); ok {
+					labelSelectors = append(labelSelectors, selector)
+				}
+			}
+		}
+	}
+
+	// Call the Kubernetes client to list alert rules
+	result, err := s.k.ListAlertRules(limit, page, labelSelectors)
+	if err != nil {
+		return NewTextResult("", err), nil
+	}
+
+	return NewTextResult(result, nil), nil
+}
+
+// grafanaGetAlertRuleByUID handles the get_alert_rule_by_uid tool request
+func (s *Server) grafanaGetAlertRuleByUID(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// Extract required uid parameter
+	uid := ctr.GetString("uid", "")
+	if uid == "" {
+		return NewTextResult("", errors.New("missing required parameter: uid")), nil
+	}
+
+	// Call the Kubernetes client to get the alert rule by UID
+	result, err := s.k.GetAlertRuleByUID(uid)
 	if err != nil {
 		return NewTextResult("", err), nil
 	}

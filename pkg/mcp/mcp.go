@@ -168,8 +168,11 @@ func (s *Server) ServeSse(baseUrl string) *server.SSEServer {
 	options := make([]server.SSEOption, 0)
 	if baseUrl != "" {
 		options = append(options, server.WithBaseURL(baseUrl))
-	        options = append(options, server.WithKeepAlive(true))
 	}
+
+	// Configure keep-alive settings for long-lived SSE connections
+	options = append(options, server.WithKeepAlive(true))
+	options = append(options, server.WithKeepAliveInterval(30*time.Minute))
 
 	// Create the SSE server with the configured options
 	sseServer := server.NewSSEServer(s.server, options...)
