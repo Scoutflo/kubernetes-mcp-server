@@ -2,70 +2,75 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func (k *Kubernetes) EventsList(ctx context.Context, namespace string, fieldSelectors []string) (string, error) {
-	options := metav1.ListOptions{}
+	// Create the API endpoint URL with query parameters
+	endpoint := "/apis/v1/get-events"
 
-	// Apply field selectors if provided
-	if len(fieldSelectors) > 0 {
-		options.FieldSelector = strings.Join(fieldSelectors, ",")
+	// Add query parameters
+	queryParams := url.Values{}
+
+	if namespace != "" {
+		queryParams.Add("namespace", namespace)
 	}
 
-	gvk := &schema.GroupVersionKind{
-		Group: "", Version: "v1", Kind: "Event",
+	// Extract field selectors for involved objects
+	for _, selector := range fieldSelectors {
+		parts := strings.Split(selector, "=")
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := parts[0]
+		value := parts[1]
+
+		switch key {
+		case "involvedObject.name":
+			queryParams.Add("involved_object_name", value)
+		case "involvedObject.kind":
+			queryParams.Add("involved_object_kind", value)
+		case "involvedObject.apiVersion":
+			queryParams.Add("involved_object_api_version", value)
+		}
 	}
 
-	gvr, err := k.resourceFor(gvk)
+	// Append query parameters to the endpoint if any
+	if len(queryParams) > 0 {
+		endpoint = endpoint + "?" + queryParams.Encode()
+	}
+
+	// Make the API request
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {
 		return "", err
 	}
 
-	unstructuredList, err := k.dynamicClient.Resource(*gvr).Namespace(namespace).List(ctx, options)
-
-	if err != nil {
-		return "", err
-	}
-	if len(unstructuredList.Items) == 0 {
+	// Check for empty response
+	if len(response) == 0 || string(response) == "null" {
 		return "No events found", nil
 	}
-	var eventMap []map[string]any
-	for _, item := range unstructuredList.Items {
-		event := &v1.Event{}
-		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, event); err != nil {
-			return "", err
-		}
-		timestamp := event.EventTime.Time
-		if timestamp.IsZero() && event.Series != nil {
-			timestamp = event.Series.LastObservedTime.Time
-		} else if timestamp.IsZero() && event.Count > 1 {
-			timestamp = event.LastTimestamp.Time
-		} else if timestamp.IsZero() {
-			timestamp = event.FirstTimestamp.Time
-		}
-		eventMap = append(eventMap, map[string]any{
-			"Namespace": event.Namespace,
-			"Timestamp": timestamp.String(),
-			"Type":      event.Type,
-			"Reason":    event.Reason,
-			"InvolvedObject": map[string]string{
-				"apiVersion": event.InvolvedObject.APIVersion,
-				"Kind":       event.InvolvedObject.Kind,
-				"Name":       event.InvolvedObject.Name,
-			},
-			"Message": strings.TrimSpace(event.Message),
-		})
+
+	// Parse the response
+	var eventMap []map[string]interface{}
+	if err = json.Unmarshal(response, &eventMap); err != nil {
+		return "", fmt.Errorf("failed to parse events response: %v", err)
 	}
+
+	// If we have a message response (like "No events found")
+	if len(eventMap) == 1 && eventMap[0]["message"] != nil {
+		return eventMap[0]["message"].(string), nil
+	}
+
+	// Convert to YAML
 	yamlEvents, err := marshal(eventMap)
 	if err != nil {
 		return "", err
 	}
+
 	return fmt.Sprintf("The following events (YAML format) were found:\n%s", yamlEvents), nil
 }

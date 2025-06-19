@@ -228,16 +228,8 @@ func (s *Server) helmAddRepository(ctx context.Context, ctr mcp.CallToolRequest)
 		return NewTextResult("", errors.New("failed to add repository: missing or invalid repository URL")), nil
 	}
 
-	namespace := ctr.GetString("namespace", "")
-
-	// Create Helm client
-	helmClient, err := s.k.NewHelmClient(namespace)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to initialize Helm client: %v", err)), nil
-	}
-
-	// Add repository
-	if err := helmClient.AddRepository(ctx, name, url); err != nil {
+	// Add repository using kubernetes client
+	if err := s.k.AddRepository(ctx, name, url); err != nil {
 		return NewTextResult("", fmt.Errorf("failed to add repository: %v", err)), nil
 	}
 
@@ -246,14 +238,8 @@ func (s *Server) helmAddRepository(ctx context.Context, ctr mcp.CallToolRequest)
 }
 
 func (s *Server) helmListRepositories(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// Create Helm client with default namespace
-	helmClient, err := s.k.NewHelmClient("")
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to initialize Helm client: %v", err)), nil
-	}
-
-	// List repositories
-	repos, err := helmClient.ListRepositories(ctx)
+	// List repositories using kubernetes client
+	repos, err := s.k.ListRepositories(ctx)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to list repositories: %v", err)), nil
 	}
@@ -277,12 +263,6 @@ func (s *Server) helmListRepositories(ctx context.Context, ctr mcp.CallToolReque
 }
 
 func (s *Server) helmUpdateRepositories(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// Create Helm client with default namespace
-	helmClient, err := s.k.NewHelmClient("")
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to initialize Helm client: %v", err)), nil
-	}
-
 	// Check if specific repo was specified
 	var repoNames []string
 	repoName := ctr.GetString("repo_name", "")
@@ -290,8 +270,8 @@ func (s *Server) helmUpdateRepositories(ctx context.Context, ctr mcp.CallToolReq
 		repoNames = []string{repoName}
 	}
 
-	// Update repositories
-	result, err := helmClient.UpdateRepositories(ctx, repoNames...)
+	// Update repositories using kubernetes client
+	result, err := s.k.UpdateRepositories(ctx, repoNames...)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to update repositories: %v", err)), nil
 	}
@@ -308,17 +288,8 @@ func (s *Server) helmGetRelease(ctx context.Context, ctr mcp.CallToolRequest) (*
 
 	namespace := ctr.GetString("namespace", "")
 
-	resource := ""
-	resource = ctr.GetString("resource", "")
-
-	// Create Helm client
-	helmClient, err := s.k.NewHelmClient(namespace)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to initialize Helm client: %v", err)), nil
-	}
-
-	// Get release information
-	result, err := helmClient.GetRelease(ctx, name, resource)
+	// Get release information using kubernetes client
+	result, err := s.k.GetRelease(ctx, name, namespace)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to get release: %v", err)), nil
 	}
@@ -327,9 +298,6 @@ func (s *Server) helmGetRelease(ctx context.Context, ctr mcp.CallToolRequest) (*
 }
 
 func (s *Server) helmListReleases(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// Extract parameters
-	namespace := ctr.GetString("namespace", "")
-
 	// Build the list options
 	opts := kubernetes.ListOptions{}
 
@@ -353,14 +321,8 @@ func (s *Server) helmListReleases(ctx context.Context, ctr mcp.CallToolRequest) 
 
 	opts.Output = ctr.GetString("output", "")
 
-	// Create Helm client
-	helmClient, err := s.k.NewHelmClient(namespace)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to initialize Helm client: %v", err)), nil
-	}
-
-	// List releases
-	result, err := helmClient.ListReleases(ctx, opts)
+	// List releases using kubernetes client
+	result, err := s.k.ListReleases(ctx, opts)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to list releases: %v", err)), nil
 	}
@@ -388,14 +350,8 @@ func (s *Server) helmUninstallRelease(ctx context.Context, ctr mcp.CallToolReque
 
 	opts.Wait = strings.ToLower(ctr.GetString("wait", "false")) == "true"
 
-	// Create Helm client
-	helmClient, err := s.k.NewHelmClient(namespace)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to initialize Helm client: %v", err)), nil
-	}
-
-	// Uninstall the release
-	result, err := helmClient.UninstallRelease(ctx, name, opts)
+	// Uninstall the release using kubernetes client
+	result, err := s.k.UninstallRelease(ctx, name, namespace, opts)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to uninstall release: %v", err)), nil
 	}
@@ -449,14 +405,8 @@ func (s *Server) helmInstallRelease(ctx context.Context, ctr mcp.CallToolRequest
 		}
 	}
 
-	// Create Helm client
-	helmClient, err := s.k.NewHelmClient(namespace)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to initialize Helm client: %v", err)), nil
-	}
-
-	// Install the release
-	result, err := helmClient.InstallRelease(ctx, name, chart, opts)
+	// Install the release using kubernetes client
+	result, err := s.k.InstallRelease(ctx, name, chart, opts)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to install release: %v", err)), nil
 	}
@@ -507,14 +457,8 @@ func (s *Server) helmUpgradeRelease(ctx context.Context, ctr mcp.CallToolRequest
 		}
 	}
 
-	// Create Helm client
-	helmClient, err := s.k.NewHelmClient(namespace)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to initialize Helm client: %v", err)), nil
-	}
-
-	// Upgrade the release
-	result, err := helmClient.UpgradeRelease(ctx, name, chart, opts)
+	// Upgrade the release using kubernetes client
+	result, err := s.k.UpgradeRelease(ctx, name, chart, opts)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to upgrade release: %v", err)), nil
 	}

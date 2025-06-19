@@ -9,8 +9,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ArgoCD API paths
@@ -296,7 +294,7 @@ func (k *Kubernetes) NewArgoClient(ctx context.Context, requestNamespace string)
 
 	// Get ArgoCD credentials and generate token
 	username := "admin" // Default ArgoCD username
-	password, err := k.getArgoCDPassword(ctx, namespace)
+	password, err := k.GetArgoCDPassword(ctx, namespace)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get ArgoCD password: %w", err)
 	}
@@ -321,21 +319,26 @@ func (k *Kubernetes) NewArgoClient(ctx context.Context, requestNamespace string)
 	return client, closer, nil
 }
 
-// getArgoCDPassword retrieves the ArgoCD admin password from Kubernetes secret
-func (k *Kubernetes) getArgoCDPassword(ctx context.Context, namespace string) (string, error) {
-	secretName := "argocd-initial-admin-secret"
+// GetArgoCDPassword retrieves the ArgoCD admin password from Kubernetes secret via API
+func (k *Kubernetes) GetArgoCDPassword(ctx context.Context, namespace string) (string, error) {
+	// Create query parameters for the API call
+	endpoint := fmt.Sprintf("/apis/v1/get-argocd-password?namespace=%s", url.QueryEscape(namespace))
 
-	secret, err := k.clientSet.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
+	// Make API request to get ArgoCD password
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to get ArgoCD secret %s in namespace %s: %w", secretName, namespace, err)
+		return "", fmt.Errorf("failed to get ArgoCD password: %w", err)
 	}
 
-	passwordBytes, exists := secret.Data["password"]
-	if !exists {
-		return "", fmt.Errorf("password key not found in ArgoCD secret %s", secretName)
+	// Parse the response to extract the password
+	var result struct {
+		Password string `json:"password"`
+	}
+	if err := json.Unmarshal(response, &result); err != nil {
+		return "", fmt.Errorf("failed to parse ArgoCD password response: %v", err)
 	}
 
-	return string(passwordBytes), nil
+	return result.Password, nil
 }
 
 // fetchArgoToken authenticates with ArgoCD and returns an authentication token

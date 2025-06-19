@@ -95,6 +95,16 @@ spec:
                 secretKeyRef:
                   name: {{ include "k8s-mcp-server.fullname" . }}-grafana-credentials
                   key: GRAFANA_API_KEY
+            - name: K8S_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-kubernetes-credentials
+                  key: K8S_URL
+            - name: K8S_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-mcp-server.fullname" . }}-kubernetes-credentials
+                  key: K8S_TOKEN
           {{- if .Values.probes.liveness.enabled }}
           livenessProbe:
             httpGet:

@@ -1,10 +1,9 @@
 package kubernetes
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -65,28 +64,46 @@ func GetGroupVersionResource(resource string) (schema.GroupVersionResource, erro
 }
 
 func (k *Kubernetes) CreateCrdResource(resource string, unstructuredObj map[string]interface{}, namespace string) error {
-	gvr, exists := resourceMap[resource]
-	if !exists {
-		return fmt.Errorf("unsupported resource type: %s", resource)
+	// Create request body for the API
+	requestBody := map[string]interface{}{
+		"resource":     resource,
+		"namespace":    namespace,
+		"resource_obj": unstructuredObj,
 	}
 
-	unstructuredCRD := &unstructured.Unstructured{Object: unstructuredObj}
+	// Convert to JSON
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request body: %v", err)
+	}
 
-	_, err := k.dynamicClient.Resource(gvr).Namespace(namespace).Create(context.TODO(), unstructuredCRD, metav1.CreateOptions{})
+	// Make API request to the create-crd-resource endpoint
+	_, err = k.MakeAPIRequest("POST", "/apis/v1/create-crd-resource", jsonData)
+	if err != nil {
+		return fmt.Errorf("failed to create CRD resource: %v", err)
+	}
 
-	return err
+	return nil
 }
 
 func (k *Kubernetes) DeleteCrdResource(resource, name, namespace string) error {
-	gvr, exists := resourceMap[resource]
-	if !exists {
-		return fmt.Errorf("unsupported resource type: %s", resource)
+	// Create request body for the API
+	requestBody := map[string]interface{}{
+		"resource":  resource,
+		"name":      name,
+		"namespace": namespace,
 	}
 
-	// Call the Delete method on the dynamic client
-	err := k.dynamicClient.Resource(gvr).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	// Convert to JSON
+	jsonData, err := json.Marshal(requestBody)
 	if err != nil {
-		return fmt.Errorf("failed to delete CRD resource %s: %w", name, err)
+		return fmt.Errorf("failed to marshal request body: %v", err)
+	}
+
+	// Make API request to the delete-crd-resource endpoint
+	_, err = k.MakeAPIRequest("POST", "/apis/v1/delete-crd-resource", jsonData)
+	if err != nil {
+		return fmt.Errorf("failed to delete CRD resource: %v", err)
 	}
 
 	fmt.Printf("CRD resource %s deleted successfully from namespace %s\n", name, namespace)
@@ -94,26 +111,50 @@ func (k *Kubernetes) DeleteCrdResource(resource, name, namespace string) error {
 }
 
 func (k *Kubernetes) UpdateCrdResource(resource string, unstructuredObj map[string]interface{}, namespace string) error {
-	gvr, exists := resourceMap[resource]
-	if !exists {
-		return fmt.Errorf("unsupported resource type: %s", resource)
+	// Create request body for the API
+	requestBody := map[string]interface{}{
+		"resource":     resource,
+		"namespace":    namespace,
+		"resource_obj": unstructuredObj,
 	}
 
-	unstructuredCRD := &unstructured.Unstructured{Object: unstructuredObj}
+	// Convert to JSON
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request body: %v", err)
+	}
 
-	_, err := k.dynamicClient.Resource(gvr).Namespace(namespace).Update(context.TODO(), unstructuredCRD, metav1.UpdateOptions{})
+	// Make API request to the update-crd-resource endpoint
+	_, err = k.MakeAPIRequest("POST", "/apis/v1/update-crd-resource", jsonData)
+	if err != nil {
+		return fmt.Errorf("failed to update CRD resource: %v", err)
+	}
 
-	return err
+	return nil
 }
 
 func (k *Kubernetes) GetCrdResource(resource string, name string, namespace string) (*unstructured.Unstructured, error) {
-	gvr, exists := resourceMap[resource]
-	if !exists {
-		return nil, fmt.Errorf("unsupported resource type: %s", resource)
+	// Create query parameters for the GET request
+	url := fmt.Sprintf("/apis/v1/get-crd-resource?resource=%s&name=%s", resource, name)
+	if namespace != "" {
+		url += fmt.Sprintf("&namespace=%s", namespace)
 	}
-	resourceObject, err := k.dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+
+	// Make API request to the get-crd-resource endpoint
+	response, err := k.MakeAPIRequest("GET", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get CRD resource: %v", err)
 	}
+
+	// Parse the response
+	var result struct {
+		Resource map[string]interface{} `json:"resource"`
+	}
+	if err := json.Unmarshal(response, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	// Convert back to unstructured
+	resourceObject := &unstructured.Unstructured{Object: result.Resource}
 	return resourceObject, nil
 }

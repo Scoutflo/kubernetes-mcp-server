@@ -1,127 +1,117 @@
 package kubernetes
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
+	"time"
 
-	"github.com/fsnotify/fsnotify"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/yaml"
 )
 
-// InClusterConfig is a variable that holds the function to get the in-cluster config
-// Exposed for testing
-var InClusterConfig = func() (*rest.Config, error) {
-	// TODO use kubernetes.default.svc instead of resolved server
-	// Currently running into: `http: server gave HTTP response to HTTPS client`
-	inClusterConfig, err := rest.InClusterConfig()
-	if inClusterConfig != nil {
-		inClusterConfig.Host = "https://kubernetes.default.svc"
-	}
-	return inClusterConfig, err
+// HTTPClient represents an HTTP client for communicating with K8s Dashboard API
+type HTTPClient struct {
+	BaseURL string
+	Token   string
+	Client  *http.Client
 }
 
-type CloseWatchKubeConfig func() error
+// NewHTTPClient creates a new HTTP client for K8s Dashboard API
+func NewHTTPClient(baseURL, token string) *HTTPClient {
+	return &HTTPClient{
+		BaseURL: baseURL,
+		Token:   token,
+		Client: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+}
+
+// MakeRequest makes an HTTP request to the K8s Dashboard API
+func (h *HTTPClient) MakeRequest(method, endpoint string, body interface{}) ([]byte, error) {
+	var reqBody io.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		reqBody = bytes.NewBuffer(jsonBody)
+	}
+
+	url := strings.TrimSuffix(h.BaseURL, "/") + "/" + strings.TrimPrefix(endpoint, "/")
+	req, err := http.NewRequest(method, url, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set headers
+	req.Header.Set("Authorization", "Bearer "+h.Token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := h.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(responseBody))
+	}
+
+	return responseBody, nil
+}
 
 type Kubernetes struct {
-	cfg                         *rest.Config
-	kubeConfigFiles             []string
-	CloseWatchKubeConfig        CloseWatchKubeConfig
-	scheme                      *runtime.Scheme
-	parameterCodec              runtime.ParameterCodec
-	clientSet                   kubernetes.Interface
-	discoveryClient             *discovery.DiscoveryClient
-	deferredDiscoveryRESTMapper *restmapper.DeferredDiscoveryRESTMapper
-	dynamicClient               *dynamic.DynamicClient
+	// HTTP Client for K8s Dashboard API
+	HTTPClient *HTTPClient
 
-	// ArgoCD and Prometheus config
+	// External service endpoints and tokens
 	ArgoCDEndpoint     string
 	ArgoCDNamespace    string
 	PrometheusEndpoint string
+	GrafanaEndpoint    string
+	GrafanaToken       string
 }
 
 func NewKubernetes() (*Kubernetes, error) {
 	k8s := &Kubernetes{}
-	var err error
-	k8s.cfg, err = resolveClientConfig()
-	if err != nil {
-		return nil, err
-	}
-	k8s.kubeConfigFiles = getKubeConfigFiles()
-	k8s.clientSet, err = kubernetes.NewForConfig(k8s.cfg)
-	if err != nil {
-		return nil, err
-	}
-	k8s.discoveryClient, err = discovery.NewDiscoveryClientForConfig(k8s.cfg)
-	if err != nil {
-		return nil, err
-	}
-	k8s.deferredDiscoveryRESTMapper = restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(k8s.discoveryClient))
-	k8s.dynamicClient, err = dynamic.NewForConfig(k8s.cfg)
-	if err != nil {
-		return nil, err
-	}
-	k8s.scheme = runtime.NewScheme()
-	if err = v1.AddToScheme(k8s.scheme); err != nil {
-		return nil, err
-	}
-	k8s.parameterCodec = runtime.NewParameterCodec(k8s.scheme)
 
-	// Load ArgoCD and Prometheus config from environment variables
+	// Check if K8S_URL and K8S_TOKEN are set for HTTP mode
+	k8sURL := os.Getenv("K8S_URL")
+	k8sToken := os.Getenv("K8S_TOKEN")
+
+	if k8sURL == "" || k8sToken == "" {
+		return nil, fmt.Errorf("K8S_URL and K8S_TOKEN environment variables must be set")
+	}
+
+	// Initialize HTTP client mode
+	k8s.HTTPClient = NewHTTPClient(k8sURL, k8sToken)
+
+	// Test the connection with a health check
+	_, err := k8s.HTTPClient.MakeRequest("GET", "/healthz", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to K8s Dashboard API: %w", err)
+	}
+
+	// Load external service configurations from environment variables
 	k8s.ArgoCDEndpoint = os.Getenv("ARGOCD_ENDPOINT")
 	k8s.ArgoCDNamespace = os.Getenv("ARGOCD_NAMESPACE")
 	k8s.PrometheusEndpoint = os.Getenv("PROMETHEUS_ENDPOINT")
+	k8s.GrafanaEndpoint = os.Getenv("GRAFANA_ENDPOINT")
+	k8s.GrafanaToken = os.Getenv("GRAFANA_TOKEN")
 
 	return k8s, nil
-}
-
-func (k *Kubernetes) WatchKubeConfig(onKubeConfigChange func() error) {
-	if len(k.kubeConfigFiles) == 0 {
-		return
-	}
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return
-	}
-	for _, file := range k.kubeConfigFiles {
-		_ = watcher.Add(file)
-	}
-	go func() {
-		for {
-			select {
-			case _, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				_ = onKubeConfigChange()
-			case _, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-			}
-		}
-	}()
-	if k.CloseWatchKubeConfig != nil {
-		_ = k.CloseWatchKubeConfig()
-	}
-	k.CloseWatchKubeConfig = watcher.Close
-}
-
-func (k *Kubernetes) Close() {
-	if k.CloseWatchKubeConfig != nil {
-		_ = k.CloseWatchKubeConfig()
-	}
 }
 
 func marshal(v any) (string, error) {
@@ -146,91 +136,15 @@ func marshal(v any) (string, error) {
 	return string(ret), nil
 }
 
-// getKubeConfigFiles returns all kubeconfig files to watch
-func getKubeConfigFiles() []string {
-	// Check for KUBECONFIG environment variable
-	kubeconfig := os.Getenv("KUBECONFIG")
-	if kubeconfig != "" {
-		// KUBECONFIG can contain multiple paths separated by : (Linux/Mac) or ; (Windows)
-		var separator string
-		if os.PathSeparator == '\\' { // Windows
-			separator = ";"
-		} else { // Linux/Mac
-			separator = ":"
-		}
-
-		paths := strings.Split(kubeconfig, separator)
-		// Clean up paths and make sure they exist
-		validPaths := make([]string, 0, len(paths))
-		for _, path := range paths {
-			if path = strings.TrimSpace(path); path != "" {
-				// Check if file exists
-				if _, err := os.Stat(path); err == nil {
-					validPaths = append(validPaths, path)
-				}
-			}
-		}
-		return validPaths
-	}
-
-	// Default path if KUBECONFIG is not set
-	home := os.Getenv("HOME")
-	if home == "" {
-		home = os.Getenv("USERPROFILE") // Windows
-	}
-	if home != "" {
-		defaultPath := filepath.Join(home, ".kube", "config")
-		if _, err := os.Stat(defaultPath); err == nil {
-			return []string{defaultPath}
-		}
-	}
-
-	return nil
-}
-
-func resolveConfig() clientcmd.ClientConfig {
-	// Check for KUBECONFIG environment variable
-	kubeconfig := os.Getenv("KUBECONFIG")
-
-	var loadingRules *clientcmd.ClientConfigLoadingRules
-	if kubeconfig != "" {
-		loadingRules = &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfig}
-	} else {
-		loadingRules = clientcmd.NewDefaultClientConfigLoadingRules()
-	}
-
-	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		loadingRules,
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: ""}})
-}
-
-func resolveClientConfig() (*rest.Config, error) {
-	inClusterConfig, err := InClusterConfig()
-	if err == nil && inClusterConfig != nil {
-		return inClusterConfig, nil
-	}
-	cfg, err := resolveConfig().ClientConfig()
-	if cfg != nil && cfg.UserAgent == "" {
-		cfg.UserAgent = rest.DefaultKubernetesUserAgent()
-	}
-	return cfg, err
-}
-
-func configuredNamespace() string {
-	if ns, _, nsErr := resolveConfig().Namespace(); nsErr == nil {
-		return ns
-	}
-	return ""
-}
-
+// namespaceOrDefault returns the provided namespace or "default" if empty
 func namespaceOrDefault(namespace string) string {
 	if namespace == "" {
-		return configuredNamespace()
+		return "default"
 	}
 	return namespace
 }
 
-// GetRESTConfig returns the Kubernetes REST config
-func (k *Kubernetes) GetRESTConfig() *rest.Config {
-	return k.cfg
+// MakeAPIRequest is a convenience method to make API requests to K8s Dashboard API
+func (k *Kubernetes) MakeAPIRequest(method, endpoint string, body interface{}) ([]byte, error) {
+	return k.HTTPClient.MakeRequest(method, endpoint, body)
 }

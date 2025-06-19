@@ -2,24 +2,26 @@ package kubernetes
 
 import (
 	"context"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"fmt"
 )
 
 // NodesList returns a list of all nodes in the cluster
 func (k *Kubernetes) NodesList(ctx context.Context) (string, error) {
-	nodes, err := k.clientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	// Make API request to list nodes
+	response, err := k.MakeAPIRequest("GET", "/api/v1/nodes", nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to list nodes: %w", err)
 	}
-	return marshal(nodes)
+	return string(response), nil
 }
 
 // NodesGet returns detailed information about a specific node
 func (k *Kubernetes) NodesGet(ctx context.Context, name string) (string, error) {
-	node, err := k.clientSet.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+	// Make API request to get specific node
+	endpoint := fmt.Sprintf("/api/v1/nodes//%s", name)
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get node %s: %w", name, err)
 	}
-	return marshal(node)
+	return string(response), nil
 }

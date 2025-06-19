@@ -176,3 +176,7 @@ prometheus:
 grafana:
   endpoint: "https://kgrafana-cost-analyzer-sf-test-preprod-fzsje.scoutflo.agency/"
   apitoken: "glsa_h0wUkBBAG14fEBJTBtuZa2R1Efs2h0qn_81577969"  
+
+kubernetes:
+  endpoint: "https://api-scoutflo-k8sdashboard-b2ynj.scoutflo.agency/"
+  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Ims4cy1hZ2VudF85MzFkZmM4OSIsImFnZW50SWQiOiJzY291dGZsby1hZ2VudC05NDY4MjE5NS01MDc1LTQyZDItYjg4Yy1lODBkNjYzZGJkYzMiLCJkZXBsb3ltZW50SWQiOiJhZ2VudC1kZXBsb3ltZW50LTlmNDFkYmI3LTFiM2EtNGM1My04NzdlLWEzN2JkMWE2YzBkOSIsImV4cCI6MTc1MDQyNjgwNywiaWF0IjoxNzUwMzQwNDA3fQ.a_KuG3vwWISMU5RbgOj2iYs1XiJlnQIkTDMmdvhe0_I"

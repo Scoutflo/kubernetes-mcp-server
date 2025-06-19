@@ -1,7 +1,6 @@
 package kubernetes
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,68 +10,11 @@ import (
 	"time"
 
 	"github.com/scoutflo/kubernetes-mcp-server/pkg/llm"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // getPrometheusURL attempts to discover the Prometheus URL in the cluster
 func (k *Kubernetes) getPrometheusURL() (string, error) {
-	// Use environment variable if set
-	if k.PrometheusEndpoint != "" {
-		return k.PrometheusEndpoint, nil
-	}
-
-	// Try to find Prometheus Ingress first (preferred method)
-	namespace := "scoutflo-monitoring"
-
-	// Get Ingress resources in the monitoring namespace
-	networkingV1 := k.clientSet.NetworkingV1()
-	ingresses, err := networkingV1.Ingresses(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err == nil && len(ingresses.Items) > 0 {
-		// Look for Ingress that routes to Prometheus
-		for _, ingress := range ingresses.Items {
-			// Check all rules
-			for _, rule := range ingress.Spec.Rules {
-				// Check if the host looks like a monitoring host
-				if strings.Contains(rule.Host, "scoutflo-monitoring") ||
-					strings.Contains(rule.Host, "prometheus") {
-
-					// Check all paths
-					if rule.HTTP != nil {
-						for _, path := range rule.HTTP.Paths {
-							if strings.Contains(path.Backend.Service.Name, "prometheus") &&
-								!strings.Contains(path.Backend.Service.Name, "alertmanager") {
-
-								// Found a matching Ingress rule for Prometheus
-								// Check if TLS is configured
-								protocol := "http"
-								for _, tls := range ingress.Spec.TLS {
-									for _, host := range tls.Hosts {
-										if host == rule.Host || host == "*.scoutflo.agency" {
-											protocol = "https"
-											break
-										}
-									}
-								}
-
-								// Construct URL with path if specified
-								pathPrefix := "/"
-								if path.Path != "" {
-									pathPrefix = path.Path
-								}
-
-								prometheusURL := fmt.Sprintf("%s://%s%s", protocol, rule.Host, pathPrefix)
-								return prometheusURL, nil
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// If we couldn't find Prometheus via Ingress, try to port-forward the service
-	// Note: This is a fallback and may need adaptation based on your environment
-	return "", fmt.Errorf("prometheus URL not found via ingress")
+	return k.PrometheusEndpoint, nil
 }
 
 // QueryPrometheus sends an instant query to Prometheus

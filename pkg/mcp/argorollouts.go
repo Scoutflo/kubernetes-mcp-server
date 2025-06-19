@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -254,14 +253,8 @@ func (s *Server) createArgoRolloutsConfig(ctx context.Context, ctr mcp.CallToolR
 		"analysis_templates":       ctr.GetString("analysis_templates", ""),
 	}
 
-	// Create ArgoRolloutsClient
-	argoClient, err := s.k.NewArgoRolloutsClient(namespace)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to create Argo Rollouts client: %w", err)), nil
-	}
-
-	// Generate YAML using the client
-	yamlConfig, err := argoClient.GenerateRolloutYAML(
+	// Generate YAML using the Kubernetes client
+	yamlConfig, err := s.k.GenerateRolloutYAML(
 		name, namespace, image, strategy, selectorLabels,
 		replicas, minReadySeconds, progressDeadlineSeconds, cpuRequest, memoryRequest, scaleDownDelaySeconds,
 		blueGreenOptions, canaryOptions,
@@ -289,14 +282,8 @@ func (s *Server) promoteArgoRollout(ctx context.Context, ctr mcp.CallToolRequest
 	// Extract optional parameters
 	fullPromote := ctr.GetBool("full", false)
 
-	// Create ArgoRolloutsClient
-	argoClient, err := s.k.NewArgoRolloutsClient(namespace)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to create Argo Rollouts client: %w", err)), nil
-	}
-
-	// Promote the rollout
-	result, err := argoClient.PromoteRollout(ctx, name, namespace, fullPromote)
+	// Promote the rollout using the Kubernetes client
+	result, err := s.k.PromoteRollout(ctx, name, namespace, fullPromote)
 	if err != nil {
 		return NewTextResult("", err), nil
 	}
@@ -317,14 +304,8 @@ func (s *Server) abortArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) 
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
-	// Create ArgoRolloutsClient
-	argoClient, err := s.k.NewArgoRolloutsClient(namespace)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to create Argo Rollouts client: %w", err)), nil
-	}
-
-	// Abort the rollout
-	result, err := argoClient.AbortRollout(ctx, name, namespace)
+	// Abort the rollout using the Kubernetes client
+	result, err := s.k.AbortRollout(ctx, name, namespace)
 	if err != nil {
 		return NewTextResult("", err), nil
 	}
@@ -347,20 +328,14 @@ func (s *Server) getArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*
 
 	output := ctr.GetString("output", "")
 
-	// Create ArgoRolloutsClient
-	argoClient, err := s.k.NewArgoRolloutsClient(namespace)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to create Argo Rollouts client: %w", err)), nil
-	}
-
-	// Get the rollout
-	rollout, err := argoClient.GetRollout(ctx, name, namespace)
+	// Get the rollout using the Kubernetes client
+	rollout, err := s.k.GetRollout(ctx, name, namespace)
 	if err != nil {
 		return NewTextResult("", err), nil
 	}
 
-	// Format the output
-	result, err := argoClient.FormatRolloutOutput(rollout, output)
+	// Format the output using the Kubernetes client
+	result, err := s.k.FormatRolloutOutput(rollout, output)
 	if err != nil {
 		return NewTextResult("", err), nil
 	}
@@ -391,14 +366,8 @@ func (s *Server) setArgoRolloutWeight(ctx context.Context, ctr mcp.CallToolReque
 		return NewTextResult("", fmt.Errorf("invalid weight value '%s': %w", weightStr, err)), nil
 	}
 
-	// Create ArgoRolloutsClient
-	argoClient, err := s.k.NewArgoRolloutsClient(namespace)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to create Argo Rollouts client: %w", err)), nil
-	}
-
-	// Set the rollout weight
-	result, err := argoClient.SetRolloutWeight(ctx, name, namespace, weight)
+	// Set the rollout weight using the Kubernetes client
+	result, err := s.k.SetRolloutWeight(ctx, name, namespace, weight)
 	if err != nil {
 		return NewTextResult("", err), nil
 	}
@@ -419,14 +388,8 @@ func (s *Server) pauseArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) 
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
-	// Create ArgoRolloutsClient
-	argoClient, err := s.k.NewArgoRolloutsClient(namespace)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to create Argo Rollouts client: %w", err)), nil
-	}
-
-	// Pause the rollout
-	result, err := argoClient.PauseRollout(ctx, name, namespace)
+	// Pause the rollout using the Kubernetes client
+	result, err := s.k.PauseRollout(ctx, name, namespace)
 	if err != nil {
 		return NewTextResult("", err), nil
 	}
@@ -455,48 +418,11 @@ func (s *Server) setArgoRolloutImage(ctx context.Context, ctr mcp.CallToolReques
 	// Extract optional parameters
 	containerName := ctr.GetString("container", "")
 
-	// Create ArgoRolloutsClient
-	argoClient, err := s.k.NewArgoRolloutsClient(namespace)
-	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to create Argo Rollouts client: %w", err)), nil
-	}
-
-	// Set the rollout image
-	result, err := argoClient.SetRolloutImage(ctx, name, namespace, containerName, image)
+	// Set the rollout image using the Kubernetes client
+	result, err := s.k.SetRolloutImage(ctx, name, namespace, containerName, image)
 	if err != nil {
 		return NewTextResult("", err), nil
 	}
 
 	return NewTextResult(result, nil), nil
-}
-
-// Helper function to get string parameters with default values
-func getStringParam(args map[string]interface{}, key, defaultValue string) string {
-	if val, ok := args[key].(string); ok && val != "" {
-		return val
-	}
-	return defaultValue
-}
-
-// Helper function for string to bool conversion
-func getBoolParam(args map[string]interface{}, key string, defaultValue bool) bool {
-	if val, ok := args[key].(string); ok && val != "" {
-		lower := strings.ToLower(val)
-		if lower == "true" {
-			return true
-		} else if lower == "false" {
-			return false
-		}
-	}
-	return defaultValue
-}
-
-// Helper function for string to int conversion
-func getIntParam(args map[string]interface{}, key string, defaultValue int) int {
-	if val, ok := args[key].(string); ok && val != "" {
-		if i, err := strconv.Atoi(val); err == nil {
-			return i
-		}
-	}
-	return defaultValue
 }

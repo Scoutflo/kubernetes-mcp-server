@@ -1,21 +1,12 @@
 package kubernetes
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/url"
 
-	"github.com/scoutflo/kubernetes-mcp-server/pkg/version"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	labelutil "k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/client-go/tools/remotecommand"
 )
 
 func (k *Kubernetes) PodsListInAllNamespaces(ctx context.Context) (string, error) {
@@ -37,157 +28,175 @@ func (k *Kubernetes) PodsGet(ctx context.Context, namespace, name string) (strin
 }
 
 func (k *Kubernetes) PodsDelete(ctx context.Context, namespace, name string) (string, error) {
-	namespace = namespaceOrDefault(namespace)
-	pod, err := k.clientSet.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
+	queryParams := url.Values{}
+	queryParams.Add("namespace", namespace)
+	queryParams.Add("pod_name", name)
+
+	endpoint := "/apis/v1/pod-delete?" + queryParams.Encode()
+
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to delete pod: %v", err)
 	}
 
-	isManaged := pod.GetLabels()[AppKubernetesManagedBy] == version.BinaryName
-	managedLabelSelector := labelutil.Set{
-		AppKubernetesManagedBy: version.BinaryName,
-		AppKubernetesName:      pod.GetLabels()[AppKubernetesName],
-	}.AsSelector()
-
-	// Delete managed service
-	if isManaged {
-		if sl, _ := k.clientSet.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: managedLabelSelector.String(),
-		}); sl != nil {
-			for _, svc := range sl.Items {
-				_ = k.clientSet.CoreV1().Services(namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
-			}
-		}
+	var result map[string]interface{}
+	if err := json.Unmarshal(response, &result); err != nil {
+		return "", fmt.Errorf("failed to parse response: %v", err)
 	}
-	return "Pod deleted successfully",
-		k.clientSet.CoreV1().Pods(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+
+	if message, ok := result["message"].(string); ok {
+		return message, nil
+	}
+
+	return "Pod deleted successfully", nil
 }
 
-func (k *Kubernetes) PodsLog(ctx context.Context, namespace, name string) (string, error) {
-	tailLines := int64(256)
-	req := k.clientSet.CoreV1().Pods(namespaceOrDefault(namespace)).GetLogs(name, &v1.PodLogOptions{
-		TailLines: &tailLines,
-	})
-	res := req.Do(ctx)
-	if res.Error() != nil {
-		return "", res.Error()
-	}
-	rawData, err := res.Raw()
+func (k *Kubernetes) PodsLog(ctx context.Context, namespace, name string, tailLines int) (string, error) {
+	queryParams := url.Values{}
+	queryParams.Add("namespace", namespace)
+	queryParams.Add("pod_name", name)
+	// Use the provided tailLines parameter
+	queryParams.Add("tail_lines", fmt.Sprintf("%d", tailLines))
+
+	endpoint := "/apis/v1/pod-logs?" + queryParams.Encode()
+
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get pod logs: %v", err)
 	}
-	return string(rawData), nil
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(response, &result); err != nil {
+		return "", fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	if logs, ok := result["logs"].(string); ok {
+		return logs, nil
+	}
+
+	return "", fmt.Errorf("logs not found in response")
 }
 
 func (k *Kubernetes) PodsRun(ctx context.Context, namespace, name, image string, port int32) (string, error) {
-	if name == "" {
-		name = version.BinaryName + "-run-" + rand.String(5)
-	}
-	labels := map[string]string{
-		AppKubernetesName:      name,
-		AppKubernetesComponent: name,
-		AppKubernetesManagedBy: version.BinaryName,
-		AppKubernetesPartOf:    version.BinaryName + "-run-sandbox",
-	}
-	// NewPod
-	var resources []any
-	pod := &v1.Pod{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceOrDefault(namespace), Labels: labels},
-		Spec: v1.PodSpec{Containers: []v1.Container{{
-			Name:            name,
-			Image:           image,
-			ImagePullPolicy: v1.PullAlways,
-		}}},
-	}
-	resources = append(resources, pod)
-	if port > 0 {
-		pod.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: port}}
-		resources = append(resources, &v1.Service{
-			TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceOrDefault(namespace), Labels: labels},
-			Spec: v1.ServiceSpec{
-				Selector: labels,
-				Type:     v1.ServiceTypeClusterIP,
-				Ports:    []v1.ServicePort{{Port: port, TargetPort: intstr.FromInt32(port)}},
-			},
-		})
+	// Create request body
+	requestBody := map[string]interface{}{
+		"namespace": namespaceOrDefault(namespace),
+		"image":     image,
 	}
 
-	// Convert the objects to Unstructured and reuse resourcesCreateOrUpdate functionality
-	converter := runtime.DefaultUnstructuredConverter
-	var toCreate []*unstructured.Unstructured
-	for _, obj := range resources {
-		m, err := converter.ToUnstructured(obj)
-		if err != nil {
-			return "", err
-		}
-		u := &unstructured.Unstructured{}
-		if err = converter.FromUnstructured(m, u); err != nil {
-			return "", err
-		}
-		toCreate = append(toCreate, u)
+	// Add name if specified
+	if name != "" {
+		requestBody["pod_name"] = name
 	}
-	return k.resourcesCreateOrUpdate(ctx, toCreate)
+
+	// Add port if specified
+	if port > 0 {
+		requestBody["port"] = port
+	}
+
+	// Convert to JSON
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request body: %v", err)
+	}
+
+	// Make API request
+	response, err := k.MakeAPIRequest("POST", "/apis/v1/pod-run", jsonData)
+	if err != nil {
+		return "", fmt.Errorf("failed to run pod: %v", err)
+	}
+
+	// Parse response
+	var result map[string]interface{}
+	if err := json.Unmarshal(response, &result); err != nil {
+		return "", fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	// Check for error
+	if errMsg, ok := result["error"].(string); ok {
+		return "", fmt.Errorf("pod run error: %s", errMsg)
+	}
+
+	// Format the resources information into YAML format
+	if resources, ok := result["resources"].([]interface{}); ok && len(resources) > 0 {
+		yamlOutput := ""
+		for _, resource := range resources {
+			if resourceMap, ok := resource.(map[string]interface{}); ok {
+				kind := resourceMap["kind"].(string)
+				name := resourceMap["name"].(string)
+				namespace := resourceMap["namespace"].(string)
+
+				yamlOutput += fmt.Sprintf("---\napiVersion: v1\nkind: %s\nmetadata:\n  name: %s\n  namespace: %s\n",
+					kind, name, namespace)
+
+				if kind == "Pod" {
+					image := resourceMap["image"].(string)
+					yamlOutput += fmt.Sprintf("spec:\n  containers:\n  - name: %s\n    image: %s\n", name, image)
+
+					if port > 0 {
+						yamlOutput += fmt.Sprintf("    ports:\n    - containerPort: %d\n", port)
+					}
+				} else if kind == "Service" {
+					if portVal, ok := resourceMap["port"].(float64); ok {
+						yamlOutput += fmt.Sprintf("spec:\n  selector:\n    app.kubernetes.io/name: %s\n  ports:\n  - port: %d\n    targetPort: %d\n",
+							name, int(portVal), int(portVal))
+					}
+				}
+			}
+		}
+		return yamlOutput, nil
+	}
+
+	return fmt.Sprintf("Pod %s created successfully in namespace %s",
+		result["pod"].(string), result["namespace"].(string)), nil
+
 }
 
 func (k *Kubernetes) PodsExec(ctx context.Context, namespace, name, container string, command []string) (string, error) {
-	namespace = namespaceOrDefault(namespace)
-	pod, err := k.clientSet.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+	// Create request body
+	requestBody := map[string]interface{}{
+		"namespace": namespaceOrDefault(namespace),
+		"pod_name":  name,
+		"command":   command,
 	}
-	// https://github.com/kubernetes/kubectl/blob/5366de04e168bcbc11f5e340d131a9ca8b7d0df4/pkg/cmd/exec/exec.go#L350-L352
-	if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-		return "", fmt.Errorf("cannot exec into a container in a completed pod; current phase is %s", pod.Status.Phase)
-	}
-	podExecOptions := &v1.PodExecOptions{
-		Command: command,
-		Stdout:  true,
-		Stderr:  true,
-	}
-	executor, err := k.createExecutor(namespace, name, podExecOptions)
-	if err != nil {
-		return "", err
-	}
-	if container == "" {
-		container = pod.Spec.Containers[0].Name
-	}
-	stdout := bytes.NewBuffer(make([]byte, 0))
-	stderr := bytes.NewBuffer(make([]byte, 0))
-	if err = executor.StreamWithContext(ctx, remotecommand.StreamOptions{
-		Stdout: stdout, Stderr: stderr, Tty: false,
-	}); err != nil {
-		return "", err
-	}
-	if stdout.Len() > 0 {
-		return stdout.String(), nil
-	}
-	if stderr.Len() > 0 {
-		return stderr.String(), nil
-	}
-	return "", nil
-}
 
-func (k *Kubernetes) createExecutor(namespace, name string, podExecOptions *v1.PodExecOptions) (remotecommand.Executor, error) {
-	// Compute URL
-	// https://github.com/kubernetes/kubectl/blob/5366de04e168bcbc11f5e340d131a9ca8b7d0df4/pkg/cmd/exec/exec.go#L382-L397
-	req := k.clientSet.CoreV1().RESTClient().
-		Post().
-		Resource("pods").
-		Namespace(namespace).
-		Name(name).
-		SubResource("exec")
-	req.VersionedParams(podExecOptions, k.parameterCodec)
-	spdyExec, err := remotecommand.NewSPDYExecutor(k.cfg, "POST", req.URL())
-	if err != nil {
-		return nil, err
+	// Add container if specified
+	if container != "" {
+		requestBody["container"] = container
 	}
-	webSocketExec, err := remotecommand.NewWebSocketExecutor(k.cfg, "GET", req.URL().String())
+
+	// Convert to JSON
+	jsonData, err := json.Marshal(requestBody)
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("failed to marshal request body: %v", err)
 	}
-	return remotecommand.NewFallbackExecutor(webSocketExec, spdyExec, func(err error) bool {
-		return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
-	})
+
+	// Make API request
+	response, err := k.MakeAPIRequest("POST", "/apis/v1/pod-exec", jsonData)
+	if err != nil {
+		return "", fmt.Errorf("failed to execute command in pod: %v", err)
+	}
+
+	// Parse response
+	var result map[string]interface{}
+	if err := json.Unmarshal(response, &result); err != nil {
+		return "", fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	// Check for error
+	if errMsg, ok := result["error"].(string); ok {
+		return "", fmt.Errorf("pod exec error: %s", errMsg)
+	}
+
+	// Return stdout if available
+	if stdout, ok := result["stdout"].(string); ok {
+		return stdout, nil
+	}
+
+	// Return stderr if stdout is empty
+	if stderr, ok := result["stderr"].(string); ok {
+		return stderr, nil
+	}
+
+	return "", fmt.Errorf("no output from command execution")
 }

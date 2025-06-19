@@ -54,14 +54,14 @@ func NewSever() (*Server, error) {
 		mode:        UnknownMode,
 		healthCheck: health.NewHealthChecker(),
 	}
-	if err := s.reloadKubernetesClient(); err != nil {
+	if err := s.initializeKubernetesClient(); err != nil {
 		return nil, err
 	}
-	s.k.WatchKubeConfig(s.reloadKubernetesClient)
+
 	return s, nil
 }
 
-func (s *Server) reloadKubernetesClient() error {
+func (s *Server) initializeKubernetesClient() error {
 	k, err := kubernetes.NewKubernetes()
 	if err != nil {
 		return err
@@ -74,7 +74,6 @@ func (s *Server) reloadKubernetesClient() error {
 		s.initNamespaces(),
 		s.initPods(),
 		s.initResources(),
-		s.initPortForward(),
 		s.initNodes(),
 		s.initMetricsServer(),
 		s.initPrometheus(),
@@ -92,6 +91,11 @@ func (s *Server) reloadKubernetesClient() error {
 	s.initDocumentationResources()
 
 	return nil
+}
+
+// reloadKubernetesClient for legacy kubeconfig watching (only used in non-HTTP mode)
+func (s *Server) reloadKubernetesClient() error {
+	return s.initializeKubernetesClient()
 }
 
 // GetServerMode returns the current server mode
@@ -218,10 +222,6 @@ func (s *Server) Close() {
 		}
 		return true
 	})
-
-	if s.k != nil {
-		s.k.Close()
-	}
 
 	// Close health server if it exists
 	if s.healthServer != nil {
