@@ -2,8 +2,6 @@ package kubernetes
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/url"
 	"strings"
 )
@@ -50,27 +48,5 @@ func (k *Kubernetes) EventsList(ctx context.Context, namespace string, fieldSele
 		return "", err
 	}
 
-	// Check for empty response
-	if len(response) == 0 || string(response) == "null" {
-		return "No events found", nil
-	}
-
-	// Parse the response
-	var eventMap []map[string]interface{}
-	if err = json.Unmarshal(response, &eventMap); err != nil {
-		return "", fmt.Errorf("failed to parse events response: %v", err)
-	}
-
-	// If we have a message response (like "No events found")
-	if len(eventMap) == 1 && eventMap[0]["message"] != nil {
-		return eventMap[0]["message"].(string), nil
-	}
-
-	// Convert to YAML
-	yamlEvents, err := marshal(eventMap)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("The following events (YAML format) were found:\n%s", yamlEvents), nil
+	return string(response), nil
 }
