@@ -54,89 +54,45 @@ func getResourceTypeFromGVK(gvk *schema.GroupVersionKind) string {
 }
 
 func (k *Kubernetes) ResourcesList(ctx context.Context, gvk *schema.GroupVersionKind, namespace string) (string, error) {
-	// Check if this is a Custom Resource
-	if isCustomResource(gvk) {
-		// For Custom Resources, we need to use a different approach
-		// Since we can't directly list CRDs through our CRD functions, we'll use the API approach
-		// but with proper CRD handling
-		resourceType := getResourceTypeFromGVK(gvk)
-
-		// Create request body for listing CRD resources
-		requestBody := map[string]interface{}{
-			"resource":  resourceType,
-			"namespace": namespace,
-			"action":    "list",
-		}
-
-		// Use a generic API call for listing CRD resources - pass the map directly
-		response, err := k.MakeAPIRequest("POST", "/apis/v1/list-crd-resources", requestBody)
-		if err != nil {
-			return "", fmt.Errorf("failed to list custom resources: %v", err)
-		}
-
-		return string(response), nil
+	// Create a JSON payload for the list-resources endpoint
+	requestBody := map[string]interface{}{
+		"apiVersion": gvk.GroupVersion().String(),
+		"kind":       gvk.Kind,
 	}
 
-	// For standard Kubernetes resources, use the existing logic
-	resourceName := strings.ToLower(gvk.Kind)
-	if gvk.Group != "" {
-		resourceName = resourceName + "." + gvk.Group
-	}
-
-	// Build API endpoint
-	endpoint := fmt.Sprintf("/api/v1/%s", resourceName)
-
-	// Add namespace as query parameter if provided
+	// Add namespace if provided
 	if namespace != "" {
-		endpoint = endpoint + "?namespace=" + namespace
+		requestBody["namespace"] = namespace
 	}
 
-	// Make API request
-	response, err := k.MakeAPIRequest("GET", endpoint, nil)
+	// Make API request to the dedicated MCP endpoint
+	response, err := k.MakeAPIRequest("POST", "/apis/v1/list-resources", requestBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to list resources: %w", err)
+		return "", fmt.Errorf("failed to list resources: %v", err)
 	}
 
 	return string(response), nil
 }
 
 func (k *Kubernetes) ResourcesGet(ctx context.Context, gvk *schema.GroupVersionKind, namespace, name string) (string, error) {
-	// Check if this is a Custom Resource
-	if isCustomResource(gvk) {
-		// Use CRD-specific function for Custom Resources
-		resourceType := getResourceTypeFromGVK(gvk)
-
-		// Use the GetCrdResource function
-		result, err := k.GetCrdResource(resourceType, name, namespace)
-		if err != nil {
-			return "", fmt.Errorf("failed to get custom resource: %v", err)
-		}
-
-		// Convert result to JSON string
-		jsonData, err := json.Marshal(result.Object)
-		if err != nil {
-			return "", fmt.Errorf("failed to marshal custom resource: %v", err)
-		}
-
-		return string(jsonData), nil
+	// Create a JSON payload for the get-resources endpoint
+	requestBody := map[string]interface{}{
+		"apiVersion": gvk.GroupVersion().String(),
+		"kind":       gvk.Kind,
+		"name":       name,
 	}
 
-	// For standard Kubernetes resources, use the existing logic
-	resourceName := strings.ToLower(gvk.Kind)
-	if gvk.Group != "" {
-		resourceName = resourceName + "." + gvk.Group
+	// Add namespace if provided, otherwise use default
+	if namespace != "" {
+		requestBody["namespace"] = namespace
+	} else {
+		requestBody["namespace"] = "default"
 	}
 
-	// If namespace is empty, use default namespace
-	namespace = namespaceOrDefault(namespace)
-
-	// Build API endpoint
-	endpoint := fmt.Sprintf("/api/v1/%s/%s/%s", resourceName, namespace, name)
-
-	// Make API request
-	response, err := k.MakeAPIRequest("GET", endpoint, nil)
+	// Make API request to the dedicated MCP endpoint
+	response, err := k.MakeAPIRequest("POST", "/apis/v1/get-resources", requestBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to get resource: %w", err)
+		return "", fmt.Errorf("failed to get resource: %v", err)
 	}
 
 	return string(response), nil
