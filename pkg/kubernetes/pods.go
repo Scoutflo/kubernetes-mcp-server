@@ -94,14 +94,8 @@ func (k *Kubernetes) PodsRun(ctx context.Context, namespace, name, image string,
 		requestBody["port"] = port
 	}
 
-	// Convert to JSON
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal request body: %v", err)
-	}
-
-	// Make API request
-	response, err := k.MakeAPIRequest("POST", "/apis/v1/pod-run", jsonData)
+	// Make API request - pass the map directly, not as JSON bytes
+	response, err := k.MakeAPIRequest("POST", "/apis/v1/pod-run", requestBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to run pod: %v", err)
 	}
@@ -165,14 +159,8 @@ func (k *Kubernetes) PodsExec(ctx context.Context, namespace, name, container st
 		requestBody["container"] = container
 	}
 
-	// Convert to JSON
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal request body: %v", err)
-	}
-
-	// Make API request
-	response, err := k.MakeAPIRequest("POST", "/apis/v1/pod-exec", jsonData)
+	// Make API request - pass the map directly, not as JSON bytes
+	response, err := k.MakeAPIRequest("POST", "/apis/v1/pod-exec", requestBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to execute command in pod: %v", err)
 	}

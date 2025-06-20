@@ -175,7 +175,7 @@ func (s *Server) podsRun(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 	port := ctr.GetFloat("port", 0)
 	ret, err := s.k.PodsRun(ctx, ns, name, image, int32(port))
 	if err != nil {
-		return NewTextResult("", fmt.Errorf("failed to get pod %s log in namespace %s: %v", name, ns, err)), nil
+		return NewTextResult("", fmt.Errorf("failed to run pod %s in namespace %s: %v", name, ns, err)), nil
 	}
 	return NewTextResult(ret, err), nil
 }

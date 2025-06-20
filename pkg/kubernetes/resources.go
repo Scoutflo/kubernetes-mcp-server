@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -69,13 +68,8 @@ func (k *Kubernetes) ResourcesList(ctx context.Context, gvk *schema.GroupVersion
 			"action":    "list",
 		}
 
-		jsonData, err := json.Marshal(requestBody)
-		if err != nil {
-			return "", fmt.Errorf("failed to marshal request body: %v", err)
-		}
-
-		// Use a generic API call for listing CRD resources
-		response, err := k.MakeAPIRequest("POST", "/apis/v1/list-crd-resources", jsonData)
+		// Use a generic API call for listing CRD resources - pass the map directly
+		response, err := k.MakeAPIRequest("POST", "/apis/v1/list-crd-resources", requestBody)
 		if err != nil {
 			return "", fmt.Errorf("failed to list custom resources: %v", err)
 		}
@@ -149,85 +143,14 @@ func (k *Kubernetes) ResourcesGet(ctx context.Context, gvk *schema.GroupVersionK
 }
 
 func (k *Kubernetes) ResourcesCreateOrUpdate(ctx context.Context, resource string) (string, error) {
-	// Parse the resource to determine if it's a Custom Resource
-	var resourceObj map[string]interface{}
+	// Use the /apply endpoint which handles all resource types including Custom Resources
+	// This is more robust than trying to detect and handle different resource types separately
 
-	// Try JSON parsing first
-	if err := json.Unmarshal([]byte(resource), &resourceObj); err != nil {
-		// Try YAML parsing if JSON fails
-		if err := yaml.Unmarshal([]byte(resource), &resourceObj); err != nil {
-			return "", fmt.Errorf("failed to parse resource as JSON or YAML: %v", err)
-		}
-	}
-
-	// Extract apiVersion and kind to determine if it's a Custom Resource
-	apiVersion, ok := resourceObj["apiVersion"].(string)
-	if !ok {
-		return "", fmt.Errorf("missing or invalid apiVersion in resource")
-	}
-
-	kind, ok := resourceObj["kind"].(string)
-	if !ok {
-		return "", fmt.Errorf("missing or invalid kind in resource")
-	}
-
-	// Parse the apiVersion to get Group and Version
-	gv, err := schema.ParseGroupVersion(apiVersion)
+	// The /apply endpoint expects raw YAML/JSON content in the request body
+	// Make API request to the apply endpoint with the raw content
+	response, err := k.MakeAPIRequest("POST", "/apis/v1/apply", []byte(resource))
 	if err != nil {
-		return "", fmt.Errorf("invalid apiVersion: %v", err)
-	}
-
-	gvk := &schema.GroupVersionKind{
-		Group:   gv.Group,
-		Version: gv.Version,
-		Kind:    kind,
-	}
-
-	// Check if this is a Custom Resource
-	if isCustomResource(gvk) {
-		// Use CRD-specific function for Custom Resources
-		resourceType := getResourceTypeFromGVK(gvk)
-
-		// Extract namespace from metadata if present
-		namespace := ""
-		if metadata, ok := resourceObj["metadata"].(map[string]interface{}); ok {
-			if ns, ok := metadata["namespace"].(string); ok {
-				namespace = ns
-			}
-		}
-
-		// Try to create first, if it fails with "already exists", try update
-		err := k.CreateCrdResource(resourceType, resourceObj, namespace)
-		if err != nil {
-			// If creation fails, try update
-			if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "conflict") {
-				err = k.UpdateCrdResource(resourceType, resourceObj, namespace)
-				if err != nil {
-					return "", fmt.Errorf("failed to update custom resource: %v", err)
-				}
-				return "Custom resource updated successfully", nil
-			}
-			return "", fmt.Errorf("failed to create custom resource: %v", err)
-		}
-
-		return "Custom resource created successfully", nil
-	}
-
-	// For standard Kubernetes resources, use the existing API logic
-	requestBody := map[string]interface{}{
-		"resource": resource,
-	}
-
-	// Convert to JSON
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal request body: %v", err)
-	}
-
-	// Make API request to the resource-create-or-update endpoint
-	response, err := k.MakeAPIRequest("POST", "/apis/v1/resource-create-or-update", jsonData)
-	if err != nil {
-		return "", fmt.Errorf("failed to create or update resource: %v", err)
+		return "", fmt.Errorf("failed to apply resource: %v", err)
 	}
 
 	return string(response), nil
@@ -255,14 +178,8 @@ func (k *Kubernetes) ResourcesDelete(ctx context.Context, gvk *schema.GroupVersi
 		"namespace":  namespace,
 	}
 
-	// Convert to JSON
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request body: %v", err)
-	}
-
-	// Make API request to the delete endpoint
-	_, err = k.MakeAPIRequest("POST", "/apis/v1/delete", jsonData)
+	// Make API request to the delete endpoint - pass the map directly
+	_, err := k.MakeAPIRequest("POST", "/apis/v1/delete", requestBody)
 	if err != nil {
 		return fmt.Errorf("failed to delete resource: %v", err)
 	}
@@ -295,14 +212,8 @@ func (k *Kubernetes) ResourcesPatch(ctx context.Context, gvk *schema.GroupVersio
 			"is_custom_resource": true,
 		}
 
-		// Convert to JSON
-		jsonData, err := json.Marshal(requestBody)
-		if err != nil {
-			return "", fmt.Errorf("failed to marshal request body: %v", err)
-		}
-
-		// Make API request to the resource-patch endpoint
-		response, err := k.MakeAPIRequest("POST", "/apis/v1/resource-patch", jsonData)
+		// Make API request to the resource-patch endpoint - pass the map directly
+		response, err := k.MakeAPIRequest("POST", "/apis/v1/resource-patch", requestBody)
 		if err != nil {
 			return "", fmt.Errorf("failed to patch custom resource: %v", err)
 		}
@@ -327,14 +238,8 @@ func (k *Kubernetes) ResourcesPatch(ctx context.Context, gvk *schema.GroupVersio
 		"patch_type":    patchType,
 	}
 
-	// Convert to JSON
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal request body: %v", err)
-	}
-
-	// Make API request to the resource-patch endpoint
-	response, err := k.MakeAPIRequest("POST", "/apis/v1/resource-patch", jsonData)
+	// Make API request to the resource-patch endpoint - pass the map directly
+	response, err := k.MakeAPIRequest("POST", "/apis/v1/resource-patch", requestBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to patch resource: %v", err)
 	}

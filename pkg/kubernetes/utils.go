@@ -71,14 +71,8 @@ func (k *Kubernetes) CreateCrdResource(resource string, unstructuredObj map[stri
 		"resource_obj": unstructuredObj,
 	}
 
-	// Convert to JSON
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request body: %v", err)
-	}
-
-	// Make API request to the create-crd-resource endpoint
-	_, err = k.MakeAPIRequest("POST", "/apis/v1/create-crd-resource", jsonData)
+	// Make API request to the create-crd-resource endpoint - pass the map directly
+	_, err := k.MakeAPIRequest("POST", "/apis/v1/create-crd-resource", requestBody)
 	if err != nil {
 		return fmt.Errorf("failed to create CRD resource: %v", err)
 	}
@@ -94,14 +88,8 @@ func (k *Kubernetes) DeleteCrdResource(resource, name, namespace string) error {
 		"namespace": namespace,
 	}
 
-	// Convert to JSON
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request body: %v", err)
-	}
-
-	// Make API request to the delete-crd-resource endpoint
-	_, err = k.MakeAPIRequest("POST", "/apis/v1/delete-crd-resource", jsonData)
+	// Make API request to the delete-crd-resource endpoint - pass the map directly
+	_, err := k.MakeAPIRequest("POST", "/apis/v1/delete-crd-resource", requestBody)
 	if err != nil {
 		return fmt.Errorf("failed to delete CRD resource: %v", err)
 	}
@@ -118,14 +106,8 @@ func (k *Kubernetes) UpdateCrdResource(resource string, unstructuredObj map[stri
 		"resource_obj": unstructuredObj,
 	}
 
-	// Convert to JSON
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request body: %v", err)
-	}
-
-	// Make API request to the update-crd-resource endpoint
-	_, err = k.MakeAPIRequest("POST", "/apis/v1/update-crd-resource", jsonData)
+	// Make API request to the update-crd-resource endpoint - pass the map directly
+	_, err := k.MakeAPIRequest("POST", "/apis/v1/update-crd-resource", requestBody)
 	if err != nil {
 		return fmt.Errorf("failed to update CRD resource: %v", err)
 	}

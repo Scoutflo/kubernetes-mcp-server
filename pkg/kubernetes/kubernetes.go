@@ -35,12 +35,21 @@ func NewHTTPClient(baseURL, token string) *HTTPClient {
 // MakeRequest makes an HTTP request to the K8s Dashboard API
 func (h *HTTPClient) MakeRequest(method, endpoint string, body interface{}) ([]byte, error) {
 	var reqBody io.Reader
+	var contentType string = "application/json"
+
 	if body != nil {
-		jsonBody, err := json.Marshal(body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		// Check if body is already raw bytes (for YAML content)
+		if rawBytes, ok := body.([]byte); ok {
+			reqBody = bytes.NewBuffer(rawBytes)
+			contentType = "application/yaml"
+		} else {
+			// Marshal as JSON for structured data
+			jsonBody, err := json.Marshal(body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal request body: %w", err)
+			}
+			reqBody = bytes.NewBuffer(jsonBody)
 		}
-		reqBody = bytes.NewBuffer(jsonBody)
 	}
 
 	url := strings.TrimSuffix(h.BaseURL, "/") + "/" + strings.TrimPrefix(endpoint, "/")
@@ -51,7 +60,7 @@ func (h *HTTPClient) MakeRequest(method, endpoint string, body interface{}) ([]b
 
 	// Set headers
 	req.Header.Set("Authorization", "Bearer "+h.Token)
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := h.Client.Do(req)
