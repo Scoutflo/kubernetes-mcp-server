@@ -7,8 +7,14 @@ import (
 
 // NodesList returns a list of all nodes in the cluster
 func (k *Kubernetes) NodesList(ctx context.Context) (string, error) {
-	// Make API request to list nodes
-	response, err := k.MakeAPIRequest("GET", "/api/v1/nodes", nil)
+	// Create a JSON payload for the list-resources endpoint
+	requestBody := map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Node",
+	}
+
+	// Make API request to the dedicated MCP endpoint
+	response, err := k.MakeAPIRequest("POST", "/apis/v1/list-resources", requestBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to list nodes: %w", err)
 	}
@@ -17,9 +23,15 @@ func (k *Kubernetes) NodesList(ctx context.Context) (string, error) {
 
 // NodesGet returns detailed information about a specific node
 func (k *Kubernetes) NodesGet(ctx context.Context, name string) (string, error) {
-	// Make API request to get specific node
-	endpoint := fmt.Sprintf("/api/v1/nodes//%s", name)
-	response, err := k.MakeAPIRequest("GET", endpoint, nil)
+	// Create a JSON payload for the get-resources endpoint
+	requestBody := map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Node",
+		"name":       name,
+	}
+
+	// Make API request to the dedicated MCP endpoint
+	response, err := k.MakeAPIRequest("POST", "/apis/v1/get-resources", requestBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to get node %s: %w", name, err)
 	}

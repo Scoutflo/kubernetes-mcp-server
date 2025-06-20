@@ -7,6 +7,7 @@ import (
 
 // GetNodeMetrics returns CPU and memory metrics for all nodes or a specific node
 func (k *Kubernetes) GetNodeMetrics(ctx context.Context, nodeName string) (string, error) {
+	// The metrics endpoint is different from regular resources, so we'll keep using the direct metrics API
 	// Build API endpoint
 	endpoint := "/apis/v1/metrics.k8s.io/v1beta1/nodes"
 
