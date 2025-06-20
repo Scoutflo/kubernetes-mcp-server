@@ -21,6 +21,7 @@ func isCustomResource(gvk *schema.GroupVersionKind) bool {
 	// Standard Kubernetes API groups that are NOT custom resources
 	standardGroups := map[string]bool{
 		"":                             true, // core/v1
+		"v1":                           true, // core/v1
 		"apps":                         true,
 		"extensions":                   true,
 		"networking.k8s.io":            true,
@@ -113,20 +114,7 @@ func (k *Kubernetes) ResourcesCreateOrUpdate(ctx context.Context, resource strin
 }
 
 func (k *Kubernetes) ResourcesDelete(ctx context.Context, gvk *schema.GroupVersionKind, namespace, name string) error {
-	// Check if this is a Custom Resource
-	if isCustomResource(gvk) {
-		// Use CRD-specific function for Custom Resources
-		resourceType := getResourceTypeFromGVK(gvk)
-
-		err := k.DeleteCrdResource(resourceType, name, namespace)
-		if err != nil {
-			return fmt.Errorf("failed to delete custom resource: %v", err)
-		}
-
-		return nil
-	}
-
-	// For standard Kubernetes resources, use the existing API logic
+	// Create a common request format for all resource types
 	requestBody := map[string]interface{}{
 		"apiVersion": gvk.GroupVersion().String(),
 		"kind":       gvk.Kind,
@@ -134,7 +122,7 @@ func (k *Kubernetes) ResourcesDelete(ctx context.Context, gvk *schema.GroupVersi
 		"namespace":  namespace,
 	}
 
-	// Make API request to the delete endpoint - pass the map directly
+	// Make API request to the delete endpoint
 	_, err := k.MakeAPIRequest("POST", "/apis/v1/delete", requestBody)
 	if err != nil {
 		return fmt.Errorf("failed to delete resource: %v", err)
