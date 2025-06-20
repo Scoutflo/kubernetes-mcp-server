@@ -200,13 +200,22 @@ func (k *Kubernetes) ListPrometheusMetrics() (string, error) {
 		return "", fmt.Errorf("failed to decode Prometheus response: %v", err)
 	}
 
-	// Convert result to JSON string
-	resultJSON, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
+	// Create a custom encoder that outputs compact JSON with no whitespace
+	var buf strings.Builder
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false) // Don't escape HTML characters
+	encoder.SetIndent("", "")    // No indentation
+
+	// Encode the result directly to the buffer
+	if err := encoder.Encode(result); err != nil {
 		return "", fmt.Errorf("failed to marshal Prometheus result: %v", err)
 	}
 
-	return string(resultJSON), nil
+	// Get the string from the buffer and remove any trailing newline
+	jsonStr := buf.String()
+	jsonStr = strings.TrimSuffix(jsonStr, "\n")
+
+	return jsonStr, nil
 }
 
 // GetPrometheusMetricInfo retrieves detailed information about a specific metric

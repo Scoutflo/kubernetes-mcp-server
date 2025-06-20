@@ -229,11 +229,11 @@ func (s *Server) helmAddRepository(ctx context.Context, ctr mcp.CallToolRequest)
 	}
 
 	// Add repository using kubernetes client
-	if err := s.k.AddRepository(ctx, name, url); err != nil {
+	result, err := s.k.AddRepository(ctx, name, url)
+	if err != nil {
 		return NewTextResult("", fmt.Errorf("failed to add repository: %v", err)), nil
 	}
 
-	result := fmt.Sprintf("Successfully added Helm repository '%s' with URL '%s'", name, url)
 	return NewTextResult(result, nil), nil
 }
 

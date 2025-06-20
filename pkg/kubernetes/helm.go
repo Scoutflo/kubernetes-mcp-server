@@ -8,7 +8,7 @@ import (
 )
 
 // AddRepository adds a Helm chart repository via API call
-func (k *Kubernetes) AddRepository(ctx context.Context, name, url string) error {
+func (k *Kubernetes) AddRepository(ctx context.Context, name, url string) (string, error) {
 	// Prepare request payload for API call
 	requestPayload := map[string]interface{}{
 		"name": name,
@@ -16,12 +16,21 @@ func (k *Kubernetes) AddRepository(ctx context.Context, name, url string) error 
 	}
 
 	// Make API call to K8s Dashboard
-	_, err := k.MakeAPIRequest("POST", "api/v1/helm/repositories", requestPayload)
+	response, err := k.MakeAPIRequest("POST", "api/v1/helm/repositories", requestPayload)
 	if err != nil {
-		return fmt.Errorf("failed to add repository: %v", err)
+		return "", fmt.Errorf("failed to add repository: %v", err)
 	}
 
-	return nil
+	var result map[string]interface{}
+	if err := json.Unmarshal(response, &result); err != nil {
+		return "", fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	if message, ok := result["message"].(string); ok {
+		return message, nil
+	}
+
+	return string(response), nil
 }
 
 // ListRepositories returns a list of configured Helm repositories via API call
@@ -68,7 +77,7 @@ func (k *Kubernetes) UpdateRepositories(ctx context.Context, repoNames ...string
 		return message, nil
 	}
 
-	return "Repositories updated successfully", nil
+	return string(response), nil
 }
 
 // GetRelease retrieves specific information about a Helm release via API call
@@ -193,7 +202,13 @@ func (k *Kubernetes) UninstallRelease(ctx context.Context, name, namespace strin
 		return message, nil
 	}
 
-	return fmt.Sprintf("Release %q has been uninstalled", name), nil
+	// also want to return the result as a string
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal result: %v", err)
+	}
+
+	return string(resultJSON), nil
 }
 
 // InstallOptions contains options for installing a release
@@ -242,7 +257,13 @@ func (k *Kubernetes) InstallRelease(ctx context.Context, name, chart string, opt
 		return message, nil
 	}
 
-	return fmt.Sprintf("Release %q has been installed. Happy Helming!", name), nil
+	// also want to return the result as a string
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal result: %v", err)
+	}
+
+	return string(resultJSON), nil
 }
 
 // UpgradeOptions contains options for upgrading a release
@@ -291,5 +312,11 @@ func (k *Kubernetes) UpgradeRelease(ctx context.Context, name, chart string, opt
 		return message, nil
 	}
 
-	return fmt.Sprintf("Release %q has been upgraded. Happy Helming!", name), nil
+	// also want to return the result as a string
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal result: %v", err)
+	}
+
+	return string(resultJSON), nil
 }
