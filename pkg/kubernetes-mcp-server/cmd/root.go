@@ -133,7 +133,7 @@ Note:
 
 func init() {
 	rootCmd.Flags().BoolP("version", "v", false, "Print version information and quit")
-	rootCmd.Flags().IntP("log-level", "", 1, "Set the log level (from 0 to 9, default 1 to show tool calls)")
+	rootCmd.Flags().IntP("log-level", "", 2, "Set the log level (from 0 to 9, default 2 to show all tool calls and details)")
 	rootCmd.Flags().IntP("sse-port", "", 0, "Start a SSE server on the specified port")
 	rootCmd.Flags().StringP("sse-base-url", "", "", "SSE public base URL to use when sending the endpoint message (e.g. https://example.com)")
 	_ = viper.BindPFlags(rootCmd.Flags())
@@ -152,7 +152,7 @@ func initLogging() {
 	klog.InitFlags(flagSet)
 	logLevel := viper.GetInt("log-level")
 	if logLevel < 0 {
-		logLevel = 1 // Default to level 1 to show tool calls
+		logLevel = 2 // Default to level 2 to show all tool calls and details
 	}
 	_ = flagSet.Parse([]string{"--v", strconv.Itoa(logLevel)})
 	klog.V(0).Infof("Logging initialized with level %d", logLevel)

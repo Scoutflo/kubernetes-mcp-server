@@ -281,16 +281,16 @@ func NewTextResult(content string, err error) *mcp.CallToolResult {
 func logToolStart(toolName string, params ...interface{}) time.Time {
 	start := time.Now()
 	if len(params) > 0 {
-		klog.V(1).Infof("Tool call: %s - %v", toolName, params)
+		klog.V(0).Infof("Tool call: %s - %v", toolName, params)
 	} else {
-		klog.V(1).Infof("Tool call: %s", toolName)
+		klog.V(0).Infof("Tool call: %s", toolName)
 	}
 	return start
 }
 
 func logToolSuccess(toolName string, start time.Time) {
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: %s completed successfully in %v", toolName, duration)
+	klog.V(0).Infof("Tool call: %s completed successfully in %v", toolName, duration)
 }
 
 func logToolError(toolName string, start time.Time, err error) {
