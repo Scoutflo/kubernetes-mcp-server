@@ -265,11 +265,7 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		return NewTextResult("", fmt.Errorf("failed to get YAML, %s", err)), nil
 	}
 
-	name, err := ctr.RequireString("name")
-	if err != nil {
-		klog.Errorf("Tool call: get_resources_yaml failed after %v: missing name parameter", time.Since(start))
-		return NewTextResult("", errors.New("failed to get YAML, missing argument name")), nil
-	}
+	name := ctr.GetString("name", "")
 
 	klog.V(1).Infof("Tool: get_resources_yaml - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called", gvk.Version, gvk.Kind, namespace, name)
 
