@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"k8s.io/klog/v2"
 )
 
 func (s *Server) initConverters() []server.ServerTool {
@@ -32,20 +34,26 @@ func (s *Server) initConverters() []server.ServerTool {
 
 // dockerComposeToK8sManifest handles the docker_compose_to_k8s_manifest tool request
 func (s *Server) dockerComposeToK8sManifest(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	// Extract required docker_compose parameter
 	dockerCompose, err := ctr.RequireString("docker_compose")
 	if err != nil {
+		klog.Errorf("Tool call: docker_compose_to_k8s_manifest failed after %v: missing required parameter: docker_compose", time.Since(start))
 		return NewTextResult("", errors.New("missing required parameter: docker_compose")), nil
 	}
 
 	// Extract optional namespace parameter
-	namespace := ""
-	namespace = ctr.GetString("namespace", "")
+	namespace := ctr.GetString("namespace", "")
+
+	klog.V(1).Infof("Tool call: docker_compose_to_k8s_manifest - namespace: %s, docker_compose_length: %d", namespace, len(dockerCompose))
 
 	// Generate the Kubernetes manifest
 	k8sManifest, err := s.k.DockerComposeToK8sManifest(dockerCompose, namespace)
+	duration := time.Since(start)
+
 	if err != nil {
 		errMsg := err.Error()
+		klog.Errorf("Tool call: docker_compose_to_k8s_manifest failed after %v: %v", duration, err)
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return NewTextResult("", fmt.Errorf("ERROR: Time limit exceeded while generating the Kubernetes manifest. Please try with a simpler Docker Compose file or try again later.")), nil
 		} else if errors.Is(err, context.Canceled) {
@@ -58,28 +66,36 @@ func (s *Server) dockerComposeToK8sManifest(ctx context.Context, ctr mcp.CallToo
 
 	// Check if the manifest is empty
 	if len(k8sManifest) < 50 {
+		klog.Errorf("Tool call: docker_compose_to_k8s_manifest failed after %v: generated manifest too short", duration)
 		return NewTextResult("", fmt.Errorf("ERROR: The generated Kubernetes manifest is too short or empty. The Docker Compose file may be invalid or not contain enough information.")), nil
 	}
 
+	klog.V(1).Infof("Tool call: docker_compose_to_k8s_manifest completed successfully in %v, manifest_length: %d", duration, len(k8sManifest))
 	return NewTextResult(k8sManifest, nil), nil
 }
 
 // k8sManifestToHelmChart handles the k8s_manifest_to_helm_chart tool request
 func (s *Server) k8sManifestToHelmChart(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	// Extract required k8s_manifest parameter
 	k8sManifest, err := ctr.RequireString("k8s_manifest")
 	if err != nil {
+		klog.Errorf("Tool call: k8s_manifest_to_helm_chart failed after %v: missing required parameter: k8s_manifest", time.Since(start))
 		return NewTextResult("", errors.New("missing required parameter: k8s_manifest")), nil
 	}
 
 	// Extract optional chart_name parameter
-	chartName := ""
-	chartName = ctr.GetString("chart_name", "")
+	chartName := ctr.GetString("chart_name", "")
+
+	klog.V(1).Infof("Tool call: k8s_manifest_to_helm_chart - chart_name: %s, k8s_manifest_length: %d", chartName, len(k8sManifest))
 
 	// Generate the Helm chart
 	helmChart, err := s.k.K8sManifestToHelmChart(k8sManifest, chartName)
+	duration := time.Since(start)
+
 	if err != nil {
 		errMsg := err.Error()
+		klog.Errorf("Tool call: k8s_manifest_to_helm_chart failed after %v: %v", duration, err)
 		if errors.Is(err, context.DeadlineExceeded) {
 			return NewTextResult("", fmt.Errorf("ERROR: Time limit exceeded while generating the Helm chart. Please try with a simpler Kubernetes manifest or try again later.")), nil
 		} else if errors.Is(err, context.Canceled) {
@@ -92,32 +108,39 @@ func (s *Server) k8sManifestToHelmChart(ctx context.Context, ctr mcp.CallToolReq
 
 	// Check if the chart content is empty
 	if len(helmChart) < 50 {
+		klog.Errorf("Tool call: k8s_manifest_to_helm_chart failed after %v: generated chart too short", duration)
 		return NewTextResult("", fmt.Errorf("ERROR: The generated Helm chart is too short or empty. The Kubernetes manifest may be invalid or not contain enough information.")), nil
 	}
 
+	klog.V(1).Infof("Tool call: k8s_manifest_to_helm_chart completed successfully in %v, chart_length: %d", duration, len(helmChart))
 	return NewTextResult(helmChart, nil), nil
 }
 
 // k8sManifestToArgoRollout handles the k8s_manifest_to_argo_rollout tool request
 func (s *Server) k8sManifestToArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	// Extract required k8s_manifest parameter
 	k8sManifest, err := ctr.RequireString("k8s_manifest")
 	if err != nil {
+		klog.Errorf("Tool call: k8s_manifest_to_argo_rollout failed after %v: missing required parameter: k8s_manifest", time.Since(start))
 		return NewTextResult("", errors.New("missing required parameter: k8s_manifest")), nil
 	}
 
 	// Extract optional strategy parameter
-	strategy := "canary" // Default to canary strategy if not specified
-	strategy = ctr.GetString("strategy", "canary")
+	strategy := ctr.GetString("strategy", "canary") // Default to canary strategy if not specified
 
 	// Extract optional canary_config parameter
-	canaryConfig := ""
-	canaryConfig = ctr.GetString("canary_config", "")
+	canaryConfig := ctr.GetString("canary_config", "")
+
+	klog.V(1).Infof("Tool call: k8s_manifest_to_argo_rollout - strategy: %s, canary_config_length: %d, k8s_manifest_length: %d", strategy, len(canaryConfig), len(k8sManifest))
 
 	// Generate the Argo Rollout manifest
 	argoRollout, err := s.k.DeploymentToArgoRollout(k8sManifest, strategy, canaryConfig)
+	duration := time.Since(start)
+
 	if err != nil {
 		errMsg := err.Error()
+		klog.Errorf("Tool call: k8s_manifest_to_argo_rollout failed after %v: %v", duration, err)
 		if errors.Is(err, context.DeadlineExceeded) {
 			return NewTextResult("", fmt.Errorf("ERROR: Time limit exceeded while generating the Argo Rollout. Please try with a simpler Kubernetes manifest or try again later.")), nil
 		} else if errors.Is(err, context.Canceled) {
@@ -130,8 +153,10 @@ func (s *Server) k8sManifestToArgoRollout(ctx context.Context, ctr mcp.CallToolR
 
 	// Check if the rollout content is empty
 	if len(argoRollout) < 50 {
+		klog.Errorf("Tool call: k8s_manifest_to_argo_rollout failed after %v: generated rollout too short", duration)
 		return NewTextResult("", fmt.Errorf("ERROR: The generated Argo Rollout is too short or empty. The Kubernetes manifest may be invalid or not contain enough information.")), nil
 	}
 
+	klog.V(1).Infof("Tool call: k8s_manifest_to_argo_rollout completed successfully in %v, rollout_length: %d", duration, len(argoRollout))
 	return NewTextResult(argoRollout, nil), nil
 }

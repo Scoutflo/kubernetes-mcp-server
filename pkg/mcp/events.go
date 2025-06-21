@@ -3,9 +3,11 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"k8s.io/klog/v2"
 )
 
 func (s *Server) initEvents() []server.ServerTool {
@@ -25,6 +27,7 @@ func (s *Server) initEvents() []server.ServerTool {
 }
 
 func (s *Server) eventsList(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	namespace := ctr.GetString("namespace", "")
 
 	// Extract field selector parameters
@@ -45,9 +48,17 @@ func (s *Server) eventsList(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.
 		fieldSelectors = append(fieldSelectors, fmt.Sprintf("involvedObject.apiVersion=%s", involvedObjectAPIVersion))
 	}
 
+	klog.V(1).Infof("Tool call: events_list - namespace: %s, involved_object_name: %s, involved_object_kind: %s, involved_object_api_version: %s, field_selectors_count: %d",
+		namespace, involvedObjectName, involvedObjectKind, involvedObjectAPIVersion, len(fieldSelectors))
+
 	ret, err := s.k.EventsList(ctx, namespace, fieldSelectors)
+	duration := time.Since(start)
+
 	if err != nil {
+		klog.Errorf("Tool call: events_list failed after %v: %v", duration, err)
 		return NewTextResult("", fmt.Errorf("failed to list events: %v", err)), nil
 	}
+
+	klog.V(1).Infof("Tool call: events_list completed successfully in %v, result_length: %d", duration, len(ret))
 	return NewTextResult(ret, err), nil
 }

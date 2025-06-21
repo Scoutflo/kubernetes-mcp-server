@@ -3,10 +3,12 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/scoutflo/kubernetes-mcp-server/pkg/kubernetes"
+	"k8s.io/klog/v2"
 )
 
 func (s *Server) initConfiguration() []server.ServerTool {
@@ -18,9 +20,12 @@ func (s *Server) initConfiguration() []server.ServerTool {
 }
 
 func (s *Server) getAvailableAPIResources(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	ret, err := kubernetes.GetAvailableAPIResources(ctx)
 	if err != nil {
+		klog.Errorf("Tool call: get_available_API_resources failed after %v: %v", time.Since(start), err)
 		err = fmt.Errorf("failed to get available API resources: %v", err)
 	}
+	klog.V(1).Infof("Tool call: get_available_API_resources completed successfully in %v", time.Since(start))
 	return NewTextResult(ret, err), nil
 }

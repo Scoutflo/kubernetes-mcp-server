@@ -15,6 +15,7 @@ import (
 	"github.com/scoutflo/kubernetes-mcp-server/pkg/health"
 	"github.com/scoutflo/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/scoutflo/kubernetes-mcp-server/pkg/version"
+	"k8s.io/klog/v2"
 )
 
 // ServerMode represents the mode the server is running in
@@ -54,6 +55,9 @@ func NewSever() (*Server, error) {
 		mode:        UnknownMode,
 		healthCheck: health.NewHealthChecker(),
 	}
+
+	klog.V(0).Infof("Initializing MCP server %s version %s", version.BinaryName, version.Version)
+
 	if err := s.initializeKubernetesClient(); err != nil {
 		return nil, err
 	}
@@ -62,12 +66,18 @@ func NewSever() (*Server, error) {
 }
 
 func (s *Server) initializeKubernetesClient() error {
+	klog.V(0).Infof("Initializing Kubernetes client...")
+
 	k, err := kubernetes.NewKubernetes()
 	if err != nil {
+		klog.Errorf("Failed to initialize Kubernetes client: %v", err)
 		return err
 	}
 	s.k = k
-	s.server.SetTools(slices.Concat(
+
+	klog.V(0).Infof("Registering MCP tools...")
+
+	tools := slices.Concat(
 		s.initConfiguration(),
 		s.initEvents(),
 		s.initRollouts(),
@@ -85,10 +95,14 @@ func (s *Server) initializeKubernetesClient() error {
 		s.initConverters(),
 		s.initPromptGenerator(),
 		s.initGrafana(),
-	)...)
+	)
+
+	s.server.SetTools(tools...)
+	klog.V(0).Infof("Registered %d MCP tools", len(tools))
 
 	// Initialize MCP resources for Kubernetes documentation
 	s.initDocumentationResources()
+	klog.V(0).Infof("Kubernetes MCP server initialization complete")
 
 	return nil
 }
@@ -261,4 +275,25 @@ func NewTextResult(content string, err error) *mcp.CallToolResult {
 			},
 		},
 	}
+}
+
+// Tool call logging utilities
+func logToolStart(toolName string, params ...interface{}) time.Time {
+	start := time.Now()
+	if len(params) > 0 {
+		klog.V(1).Infof("Tool call: %s - %v", toolName, params)
+	} else {
+		klog.V(1).Infof("Tool call: %s", toolName)
+	}
+	return start
+}
+
+func logToolSuccess(toolName string, start time.Time) {
+	duration := time.Since(start)
+	klog.V(1).Infof("Tool call: %s completed successfully in %v", toolName, duration)
+}
+
+func logToolError(toolName string, start time.Time, err error) {
+	duration := time.Since(start)
+	klog.Errorf("Tool call: %s failed after %v: %v", toolName, duration, err)
 }

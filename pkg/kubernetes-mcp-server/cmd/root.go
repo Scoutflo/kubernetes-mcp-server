@@ -133,7 +133,7 @@ Note:
 
 func init() {
 	rootCmd.Flags().BoolP("version", "v", false, "Print version information and quit")
-	rootCmd.Flags().IntP("log-level", "", 0, "Set the log level (from 0 to 9)")
+	rootCmd.Flags().IntP("log-level", "", 1, "Set the log level (from 0 to 9, default 1 to show tool calls)")
 	rootCmd.Flags().IntP("sse-port", "", 0, "Start a SSE server on the specified port")
 	rootCmd.Flags().StringP("sse-base-url", "", "", "SSE public base URL to use when sending the endpoint message (e.g. https://example.com)")
 	_ = viper.BindPFlags(rootCmd.Flags())
@@ -150,7 +150,10 @@ func initLogging() {
 	klog.SetLoggerWithOptions(logger)
 	flagSet := flag.NewFlagSet("kubernetes-mcp-server", flag.ContinueOnError)
 	klog.InitFlags(flagSet)
-	if logLevel := viper.GetInt("log-level"); logLevel >= 0 {
-		_ = flagSet.Parse([]string{"--v", strconv.Itoa(logLevel)})
+	logLevel := viper.GetInt("log-level")
+	if logLevel < 0 {
+		logLevel = 1 // Default to level 1 to show tool calls
 	}
+	_ = flagSet.Parse([]string{"--v", strconv.Itoa(logLevel)})
+	klog.V(0).Infof("Logging initialized with level %d", logLevel)
 }

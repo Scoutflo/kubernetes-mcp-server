@@ -3,9 +3,11 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"k8s.io/klog/v2"
 )
 
 func (s *Server) initMetricsServer() []server.ServerTool {
@@ -24,30 +26,47 @@ func (s *Server) initMetricsServer() []server.ServerTool {
 
 // nodesMetrics handles the nodes_metrics tool request
 func (s *Server) nodesMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	nodeName := ctr.GetString("name", "")
+
+	klog.V(1).Infof("Tool call: nodes_metrics - name=%s", nodeName)
 
 	ret, err := s.k.GetNodeMetrics(ctx, nodeName)
 	if err != nil {
+		duration := time.Since(start)
 		if nodeName != "" {
+			klog.Errorf("Tool call: nodes_metrics failed after %v: failed to get metrics for node '%s': %v", duration, nodeName, err)
 			return NewTextResult("", fmt.Errorf("failed to get metrics for node '%s': %v", nodeName, err)), nil
 		}
+		klog.Errorf("Tool call: nodes_metrics failed after %v: failed to list node metrics: %v", duration, err)
 		return NewTextResult("", fmt.Errorf("failed to list node metrics: %v", err)), nil
 	}
+
+	duration := time.Since(start)
+	klog.V(1).Infof("Tool call: nodes_metrics completed successfully in %v", duration)
 	return NewTextResult(ret, nil), nil
 }
 
 // podsMetrics handles the pods_metrics tool request
 func (s *Server) podsMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	namespace := ctr.GetString("namespace", "")
-
 	podName := ctr.GetString("name", "")
+
+	klog.V(1).Infof("Tool call: pods_metrics - namespace=%s, name=%s", namespace, podName)
 
 	ret, err := s.k.GetPodMetrics(ctx, namespace, podName)
 	if err != nil {
+		duration := time.Since(start)
 		if podName != "" {
+			klog.Errorf("Tool call: pods_metrics failed after %v: failed to get metrics for pod '%s' in namespace '%s': %v", duration, podName, namespace, err)
 			return NewTextResult("", fmt.Errorf("failed to get metrics for pod '%s' in namespace '%s': %v", podName, namespace, err)), nil
 		}
+		klog.Errorf("Tool call: pods_metrics failed after %v: failed to get pod metrics in namespace '%s': %v", duration, namespace, err)
 		return NewTextResult("", fmt.Errorf("failed to get pod metrics in namespace '%s': %v", namespace, err)), nil
 	}
+
+	duration := time.Since(start)
+	klog.V(1).Infof("Tool call: pods_metrics completed successfully in %v", duration)
 	return NewTextResult(ret, nil), nil
 }

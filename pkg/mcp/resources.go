@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2"
 )
 
 func (s *Server) initResources() []server.ServerTool {
@@ -126,70 +128,112 @@ func (s *Server) initResources() []server.ServerTool {
 }
 
 func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
 		namespace = ""
 	}
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
+		klog.Errorf("Tool call: resources_list failed after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to list resources, %s", err)), nil
 	}
+
+	klog.V(1).Infof("Tool call: resources_list - apiVersion: %s, kind: %s, namespace: %s", gvk.Version, gvk.Kind, namespace)
+
 	ret, err := s.k.ResourcesList(ctx, gvk, namespace)
+	duration := time.Since(start)
+
 	if err != nil {
+		klog.Errorf("Tool call: resources_list failed after %v: %v", duration, err)
 		return NewTextResult("", fmt.Errorf("failed to list resources: %v", err)), nil
 	}
+
+	klog.V(1).Infof("Tool call: resources_list completed successfully in %v", duration)
 	return NewTextResult(ret, err), nil
 }
 
 func (s *Server) resourcesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
 		namespace = ""
 	}
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
+		klog.Errorf("Tool call: resources_get failed after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to get resource, %s", err)), nil
 	}
 	name, err := ctr.RequireString("name")
 	if err != nil {
+		klog.Errorf("Tool call: resources_get failed after %v: missing name parameter", time.Since(start))
 		return NewTextResult("", errors.New("failed to get resource, missing argument name")), nil
 	}
+
+	klog.V(1).Infof("Tool call: resources_get - apiVersion: %s, kind: %s, namespace: %s, name: %s", gvk.Version, gvk.Kind, namespace, name)
+
 	ret, err := s.k.ResourcesGet(ctx, gvk, namespace, name)
+	duration := time.Since(start)
+
 	if err != nil {
+		klog.Errorf("Tool call: resources_get failed after %v: %v", duration, err)
 		return NewTextResult("", fmt.Errorf("failed to get resource: %v", err)), nil
 	}
+
+	klog.V(1).Infof("Tool call: resources_get completed successfully in %v", duration)
 	return NewTextResult(ret, err), nil
 }
 
 func (s *Server) resourcesCreateOrUpdate(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	resource, err := ctr.RequireString("resource")
 	if err != nil {
+		klog.Errorf("Tool call: resources_create_or_update failed after %v: missing resource parameter", time.Since(start))
 		return NewTextResult("", errors.New("failed to create or update resources, missing argument resource")), nil
 	}
+
+	klog.V(1).Infof("Tool call: resources_create_or_update - resource YAML/JSON provided (length: %d)", len(resource))
+
 	ret, err := s.k.ResourcesCreateOrUpdate(ctx, resource)
+	duration := time.Since(start)
+
 	if err != nil {
+		klog.Errorf("Tool call: resources_create_or_update failed after %v: %v", duration, err)
 		return NewTextResult("", fmt.Errorf("failed to create or update resources: %v", err)), nil
 	}
+
+	klog.V(1).Infof("Tool call: resources_create_or_update completed successfully in %v", duration)
 	return NewTextResult(ret, err), nil
 }
 
 func (s *Server) resourcesDelete(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
 		namespace = ""
 	}
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
+		klog.Errorf("Tool call: resources_delete failed after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to delete resource, %s", err)), nil
 	}
 	name, err := ctr.RequireString("name")
 	if err != nil {
+		klog.Errorf("Tool call: resources_delete failed after %v: missing name parameter", time.Since(start))
 		return NewTextResult("", errors.New("failed to delete resource, missing argument name")), nil
 	}
+
+	klog.V(1).Infof("Tool call: resources_delete - apiVersion: %s, kind: %s, namespace: %s, name: %s", gvk.Version, gvk.Kind, namespace, name)
+
 	err = s.k.ResourcesDelete(ctx, gvk, namespace, name)
+	duration := time.Since(start)
+
 	if err != nil {
+		klog.Errorf("Tool call: resources_delete failed after %v: %v", duration, err)
 		return NewTextResult("", fmt.Errorf("failed to delete resource: %v", err)), nil
 	}
+
+	klog.V(1).Infof("Tool call: resources_delete completed successfully in %v", duration)
 	return NewTextResult("Resource deleted successfully", err), nil
 }
 
@@ -210,42 +254,58 @@ func parseGroupVersionKind(arguments map[string]interface{}) (*schema.GroupVersi
 }
 
 func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
 		namespace = ""
 	}
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
+		klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to get YAML, %s", err)), nil
 	}
 
 	name, err := ctr.RequireString("name")
 	if err != nil {
+		klog.Errorf("Tool call: get_resources_yaml failed after %v: missing name parameter", time.Since(start))
 		return NewTextResult("", errors.New("failed to get YAML, missing argument name")), nil
 	}
+
+	klog.V(1).Infof("Tool call: get_resources_yaml - apiVersion: %s, kind: %s, namespace: %s, name: %s", gvk.Version, gvk.Kind, namespace, name)
+
 	if name != "" {
 		// Get a specific resource
 		ret, err := s.k.ResourcesGet(ctx, gvk, namespace, name)
+		duration := time.Since(start)
 		if err != nil {
+			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
 			return NewTextResult("", fmt.Errorf("failed to get resource YAML: %v", err)), nil
 		}
+		klog.V(1).Infof("Tool call: get_resources_yaml completed successfully in %v", duration)
 		return NewTextResult(ret, err), nil
 	} else {
 		// Get all resources of this type in the namespace
 		ret, err := s.k.ResourcesList(ctx, gvk, namespace)
+		duration := time.Since(start)
 		if err != nil {
+			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
 			return NewTextResult("", fmt.Errorf("failed to list resources YAML: %v", err)), nil
 		}
+		klog.V(1).Infof("Tool call: get_resources_yaml completed successfully in %v", duration)
 		return NewTextResult(ret, err), nil
 	}
 }
 
 func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	manifestPath := ctr.GetString("manifest_path", "")
 	yamlContent := ctr.GetString("yaml_content", "")
 
+	klog.V(1).Infof("Tool call: apply_manifest - manifest_path: %s, yaml_content_length: %d", manifestPath, len(yamlContent))
+
 	// Ensure at least one of manifest_path or yaml_content is provided
 	if manifestPath == "" && yamlContent == "" {
+		klog.Errorf("Tool call: apply_manifest failed after %v: neither manifest_path nor yaml_content provided", time.Since(start))
 		return NewTextResult("", errors.New("failed to apply manifest, either manifest_path or yaml_content must be provided")), nil
 	}
 
@@ -256,6 +316,7 @@ func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	if manifestPath != "" {
 		contentBytes, err := os.ReadFile(manifestPath)
 		if err != nil {
+			klog.Errorf("Tool call: apply_manifest failed after %v: failed to read file %s: %v", time.Since(start), manifestPath, err)
 			return NewTextResult("", fmt.Errorf("failed to read manifest file: %v", err)), nil
 		}
 		content = string(contentBytes)
@@ -266,14 +327,19 @@ func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*m
 
 	// Apply the manifest content
 	ret, err := s.k.ResourcesCreateOrUpdate(ctx, content)
+	duration := time.Since(start)
+
 	if err != nil {
+		klog.Errorf("Tool call: apply_manifest failed after %v: %v", duration, err)
 		return NewTextResult("", fmt.Errorf("failed to apply manifest: %v", err)), nil
 	}
 
+	klog.V(1).Infof("Tool call: apply_manifest completed successfully in %v", duration)
 	return NewTextResult(ret, nil), nil
 }
 
 func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
 		namespace = ""
@@ -281,16 +347,19 @@ func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*
 
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
+		klog.Errorf("Tool call: resources_patch failed after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to patch resource, %s", err)), nil
 	}
 
 	resourceName, err := ctr.RequireString("resource_name")
 	if err != nil {
+		klog.Errorf("Tool call: resources_patch failed after %v: missing resource_name parameter", time.Since(start))
 		return NewTextResult("", errors.New("failed to patch resource, missing argument resource_name")), nil
 	}
 
 	patch, err := ctr.RequireString("patch")
 	if err != nil {
+		klog.Errorf("Tool call: resources_patch failed after %v: missing patch parameter", time.Since(start))
 		return NewTextResult("", errors.New("failed to patch resource, missing argument patch")), nil
 	}
 
@@ -299,22 +368,30 @@ func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*
 		patchType = pt
 	}
 
+	klog.V(1).Infof("Tool call: resources_patch - apiVersion: %s, kind: %s, namespace: %s, name: %s, patch_type: %s", gvk.Version, gvk.Kind, namespace, resourceName, patchType)
+
 	// Validate patch type
 	if patchType != "json" && patchType != "merge" && patchType != "strategic" {
+		klog.Errorf("Tool call: resources_patch failed after %v: invalid patch_type: %s", time.Since(start), patchType)
 		return NewTextResult("", fmt.Errorf("invalid patch_type: %s. Must be one of: json, merge, strategic", patchType)), nil
 	}
 
 	// Convert the patch to JSON
 	patchJSON, err := json.Marshal(patch)
 	if err != nil {
+		klog.Errorf("Tool call: resources_patch failed after %v: failed to marshal patch: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to marshal patch data: %v", err)), nil
 	}
 
 	// Apply the patch
 	ret, err := s.k.ResourcesPatch(ctx, gvk, namespace, resourceName, patchType, patchJSON)
+	duration := time.Since(start)
+
 	if err != nil {
+		klog.Errorf("Tool call: resources_patch failed after %v: %v", duration, err)
 		return NewTextResult("", fmt.Errorf("failed to patch resource: %v", err)), nil
 	}
 
+	klog.V(1).Infof("Tool call: resources_patch completed successfully in %v", duration)
 	return NewTextResult(ret, nil), nil
 }

@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"k8s.io/klog/v2"
 )
 
 func (s *Server) initRollouts() []server.ServerTool {
@@ -28,19 +30,27 @@ func (s *Server) initRollouts() []server.ServerTool {
 
 // rollout handler for the rollout MCP tool
 func (s *Server) rollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
+
 	// Extract required parameters
 	action, err := ctr.RequireString("action")
 	if err != nil {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: rollout failed after %v: missing required parameter: action", duration)
 		return NewTextResult("", errors.New("missing required parameter: action")), nil
 	}
 
 	resourceType, err := ctr.RequireString("resource_type")
 	if err != nil {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: rollout failed after %v: missing required parameter: resource_type", duration)
 		return NewTextResult("", errors.New("missing required parameter: resource_type")), nil
 	}
 
 	resourceName, err := ctr.RequireString("resource_name")
 	if err != nil {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: rollout failed after %v: missing required parameter: resource_name", duration)
 		return NewTextResult("", errors.New("missing required parameter: resource_name")), nil
 	}
 
@@ -49,19 +59,28 @@ func (s *Server) rollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 
 	// Handle revision for undo action
 	revision := 0
-	if revStr := ctr.GetString("revision", ""); revStr != "" {
-		var err error
+	revStr := ctr.GetString("revision", "")
+	if revStr != "" {
 		revision, err = strconv.Atoi(revStr)
 		if err != nil {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: rollout failed after %v: invalid revision: %s", duration, revStr)
 			return NewTextResult("", fmt.Errorf("invalid revision: %s", revStr)), nil
 		}
 	}
 
+	klog.V(1).Infof("Tool call: rollout - action=%s, resource_type=%s, resource_name=%s, namespace=%s, revision=%d",
+		action, resourceType, resourceName, namespace, revision)
+
 	// Call the Kubernetes rollout function
 	result, err := s.k.ResourceRollout(ctx, namespace, resourceType, resourceName, action, revision)
 	if err != nil {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: rollout failed after %v: %v", duration, err)
 		return NewTextResult("", fmt.Errorf("rollout failed: %v", err)), nil
 	}
 
+	duration := time.Since(start)
+	klog.V(1).Infof("Tool call: rollout completed successfully in %v", duration)
 	return NewTextResult(result, nil), nil
 }
