@@ -66,7 +66,7 @@ func (s *Server) initPods() []server.ServerTool {
 
 func (s *Server) podsListInAllNamespaces(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool call: pods_list - listing all pods in all namespaces")
+	klog.V(1).Infof("Tool: pods_list - listing all pods in all namespaces - got called")
 
 	ret, err := s.k.PodsListInAllNamespaces(ctx)
 	duration := time.Since(start)
@@ -83,7 +83,7 @@ func (s *Server) podsListInAllNamespaces(ctx context.Context, _ mcp.CallToolRequ
 func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	ns := ctr.GetString("namespace", "")
-	klog.V(1).Infof("Tool call: pods_list_in_namespace - namespace: %s", ns)
+	klog.V(1).Infof("Tool: pods_list_in_namespace - listing all pods in namespace: %s - got called", ns)
 
 	if ns == "" {
 		klog.Errorf("Tool call: pods_list_in_namespace failed after %v: missing namespace parameter", time.Since(start))
@@ -106,7 +106,7 @@ func (s *Server) podsGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 	start := time.Now()
 	ns := ctr.GetString("namespace", "")
 	name := ctr.GetString("name", "")
-	klog.V(1).Infof("Tool call: pods_get - namespace: %s, name: %s", ns, name)
+	klog.V(1).Infof("Tool: pods_get - getting pod: %s in namespace: %s - got called", name, ns)
 
 	if name == "" {
 		klog.Errorf("Tool call: pods_get failed after %v: missing name parameter", time.Since(start))
@@ -129,7 +129,7 @@ func (s *Server) podsDelete(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.
 	start := time.Now()
 	ns := ctr.GetString("namespace", "")
 	name := ctr.GetString("name", "")
-	klog.V(1).Infof("Tool call: pods_delete - namespace: %s, name: %s", ns, name)
+	klog.V(1).Infof("Tool: pods_delete - deleting pod: %s in namespace: %s - got called", name, ns)
 
 	if name == "" {
 		klog.Errorf("Tool call: pods_delete failed after %v: missing name parameter", time.Since(start))
@@ -184,7 +184,7 @@ func (s *Server) podsExec(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Ca
 		return NewTextResult("", errors.New("failed to exec in pod, invalid command argument")), nil
 	}
 
-	klog.V(1).Infof("Tool call: pods_exec - namespace: %s, name: %s, command: %v", ns, name, command)
+	klog.V(1).Infof("Tool: pods_exec - executing command: %v in pod: %s in namespace: %s - got called", command, name, ns)
 
 	ret, err := s.k.PodsExec(ctx, ns, name, "", command)
 	duration := time.Since(start)
@@ -205,7 +205,7 @@ func (s *Server) podsLog(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 	ns := ctr.GetString("namespace", "")
 	name := ctr.GetString("name", "")
 	tailLines := ctr.GetFloat("tail_lines", 256)
-	klog.V(1).Infof("Tool call: pods_log - namespace: %s, name: %s, tail_lines: %.0f", ns, name, tailLines)
+	klog.V(1).Infof("Tool: pods_log - getting logs of pod: %s in namespace: %s with tail lines: %.0f - got called", name, ns, tailLines)
 
 	if name == "" {
 		klog.Errorf("Tool call: pods_log failed after %v: missing name parameter", time.Since(start))
@@ -235,7 +235,7 @@ func (s *Server) podsRun(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 	}
 	image := ctr.GetString("image", "")
 	port := ctr.GetFloat("port", 0)
-	klog.V(1).Infof("Tool call: pods_run - namespace: %s, name: %s, image: %s, port: %.0f", ns, name, image, port)
+	klog.V(1).Infof("Tool: pods_run - running pod: %s in namespace: %s with image: %s and port: %.0f - got called", name, ns, image, port)
 
 	if image == "" {
 		klog.Errorf("Tool call: pods_run failed after %v: missing image parameter", time.Since(start))

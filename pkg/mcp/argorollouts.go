@@ -261,7 +261,7 @@ func (s *Server) createArgoRolloutsConfig(ctx context.Context, ctr mcp.CallToolR
 		"analysis_templates":       ctr.GetString("analysis_templates", ""),
 	}
 
-	klog.V(1).Infof("Tool call: create_argo_rollout_config - name: %s, namespace: %s, image: %s, strategy: %s, selector_labels: %s, replicas: %s",
+	klog.V(1).Infof("Tool: create_argo_rollout_config - name: %s, namespace: %s, image: %s, strategy: %s, selector_labels: %s, replicas: %s - got called",
 		name, namespace, image, strategy, selectorLabels, replicas)
 
 	// Generate YAML using the Kubernetes client
@@ -300,7 +300,7 @@ func (s *Server) promoteArgoRollout(ctx context.Context, ctr mcp.CallToolRequest
 	// Extract optional parameters
 	fullPromote := ctr.GetBool("full", false)
 
-	klog.V(1).Infof("Tool call: promote_argo_rollout - name: %s, namespace: %s, full: %t", name, namespace, fullPromote)
+	klog.V(1).Infof("Tool: promote_argo_rollout - name: %s, namespace: %s, full: %t - got called", name, namespace, fullPromote)
 
 	// Promote the rollout using the Kubernetes client
 	result, err := s.k.PromoteRollout(ctx, name, namespace, fullPromote)
@@ -331,7 +331,7 @@ func (s *Server) abortArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) 
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
-	klog.V(1).Infof("Tool call: abort_argo_rollout - name: %s, namespace: %s", name, namespace)
+	klog.V(1).Infof("Tool: abort_argo_rollout - name: %s, namespace: %s - got called", name, namespace)
 
 	// Abort the rollout using the Kubernetes client
 	result, err := s.k.AbortRollout(ctx, name, namespace)
@@ -364,7 +364,7 @@ func (s *Server) getArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*
 
 	output := ctr.GetString("output", "")
 
-	klog.V(1).Infof("Tool call: get_argo_rollout - name: %s, namespace: %s, output: %s", name, namespace, output)
+	klog.V(1).Infof("Tool: get_argo_rollout - name: %s, namespace: %s, output: %s - got called", name, namespace, output)
 
 	// Get the rollout using the Kubernetes client
 	rollout, err := s.k.GetRollout(ctx, name, namespace)
@@ -416,7 +416,7 @@ func (s *Server) setArgoRolloutWeight(ctx context.Context, ctr mcp.CallToolReque
 		return NewTextResult("", fmt.Errorf("invalid weight value '%s': %w", weightStr, err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: set_argo_rollout_weight - name: %s, namespace: %s, weight: %d", name, namespace, weight)
+	klog.V(1).Infof("Tool: set_argo_rollout_weight - name: %s, namespace: %s, weight: %d - got called", name, namespace, weight)
 
 	// Set the rollout weight using the Kubernetes client
 	result, err := s.k.SetRolloutWeight(ctx, name, namespace, weight)
@@ -447,7 +447,7 @@ func (s *Server) pauseArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) 
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
-	klog.V(1).Infof("Tool call: pause_argo_rollout - name: %s, namespace: %s", name, namespace)
+	klog.V(1).Infof("Tool: pause_argo_rollout - name: %s, namespace: %s - got called", name, namespace)
 
 	// Pause the rollout using the Kubernetes client
 	result, err := s.k.PauseRollout(ctx, name, namespace)
@@ -487,7 +487,7 @@ func (s *Server) setArgoRolloutImage(ctx context.Context, ctr mcp.CallToolReques
 	// Extract optional parameters
 	containerName := ctr.GetString("container", "")
 
-	klog.V(1).Infof("Tool call: set_argo_rollout_image - name: %s, namespace: %s, image: %s, container: %s", name, namespace, image, containerName)
+	klog.V(1).Infof("Tool: set_argo_rollout_image - name: %s, namespace: %s, image: %s, container: %s - got called", name, namespace, image, containerName)
 
 	// Set the rollout image using the Kubernetes client
 	result, err := s.k.SetRolloutImage(ctx, name, namespace, containerName, image)

@@ -359,7 +359,7 @@ func (s *Server) argocdListApplications(ctx context.Context, ctr mcp.CallToolReq
 	namespace := ctr.GetString("namespace", "")
 	refresh := ctr.GetString("refresh", "")
 
-	klog.V(1).Infof("Tool call: argocd_list_applications - project: %s, name: %s, repo: %s, namespace: %s, refresh: %s",
+	klog.V(1).Infof("Tool: argocd_list_applications - project: %s, name: %s, repo: %s, namespace: %s, refresh: %s - got called",
 		project, name, repo, namespace, refresh)
 
 	// Create ArgoCD client
@@ -487,7 +487,7 @@ func (s *Server) argocdGetApplication(ctx context.Context, ctr mcp.CallToolReque
 	namespace := ctr.GetString("namespace", "")
 	refresh := ctr.GetString("refresh", "")
 
-	klog.V(1).Infof("Tool call: argocd_get_application - name: %s, namespace: %s, refresh: %s", name, namespace, refresh)
+	klog.V(1).Infof("Tool: argocd_get_application - name: %s, namespace: %s, refresh: %s - got called", name, namespace, refresh)
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
@@ -561,7 +561,7 @@ func (s *Server) argocdSyncApplication(ctx context.Context, ctr mcp.CallToolRequ
 	// Extract resources array
 	resources := ctr.GetStringSlice("resources", []string{})
 
-	klog.V(1).Infof("Tool call: argocd_sync_application - name: %s, namespace: %s, revision: %s, prune: %t, dry_run: %t, resources: %v",
+	klog.V(1).Infof("Tool: argocd_sync_application - name: %s, namespace: %s, revision: %s, prune: %t, dry_run: %t, resources: %v - got called",
 		name, namespace, revision, prune, dryRun, resources)
 
 	// Create ArgoCD client
@@ -693,7 +693,7 @@ func (s *Server) argocdCreateApplication(ctx context.Context, ctr mcp.CallToolRe
 	validate := ctr.GetBool("validate", true)
 	upsert := ctr.GetBool("upsert", false)
 
-	klog.V(1).Infof("Tool call: argocd_create_application - name: %s, project: %s, repo_url: %s, path: %s, dest_server: %s, dest_namespace: %s, revision: %s, automated_sync: %t, prune: %t, self_heal: %t, namespace: %s, validate: %t, upsert: %t",
+	klog.V(1).Infof("Tool: argocd_create_application - name: %s, project: %s, repo_url: %s, path: %s, dest_server: %s, dest_namespace: %s, revision: %s, automated_sync: %t, prune: %t, self_heal: %t, namespace: %s, validate: %t, upsert: %t - got called",
 		name, project, repoURL, path, destServer, destNamespace, revision, automatedSync, prune, selfHeal, namespace, validate, upsert)
 
 	// Parse boolean flags with defaults
@@ -777,7 +777,7 @@ func (s *Server) argocdUpdateApplication(ctx context.Context, ctr mcp.CallToolRe
 	// Default validate to true if not specified
 	validate := validateStr == "" || strings.ToLower(validateStr) == "true"
 
-	klog.V(1).Infof("Tool call: argocd_update_application - name: %s, project: %s, repo_url: %s, path: %s, dest_server: %s, dest_namespace: %s, revision: %s, validate: %t",
+	klog.V(1).Infof("Tool: argocd_update_application - name: %s, project: %s, repo_url: %s, path: %s, dest_server: %s, dest_namespace: %s, revision: %s, validate: %t - got called",
 		name, project, repoURL, path, destServer, destNamespace, revision, validate)
 
 	// Create ArgoCD client
@@ -872,7 +872,7 @@ func (s *Server) argocdDeleteApplication(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("invalid propagation policy: must be 'foreground', 'background', or 'orphan'")), nil
 	}
 
-	klog.V(1).Infof("Tool call: argocd_delete_application - name: %s, cascade: %t, propagation_policy: %s, namespace: %s",
+	klog.V(1).Infof("Tool: argocd_delete_application - name: %s, cascade: %t, propagation_policy: %s, namespace: %s - got called",
 		name, cascade, propagationPolicy, namespace)
 
 	// Log the operation for debugging
@@ -960,7 +960,7 @@ func (s *Server) argocdGetApplicationResourceTree(ctx context.Context, ctr mcp.C
 
 	namespace := ctr.GetString("namespace", "")
 
-	klog.V(1).Infof("Tool call: argocd_get_application_resource_tree - name: %s, namespace: %s", name, namespace)
+	klog.V(1).Infof("Tool: argocd_get_application_resource_tree - name: %s, namespace: %s - got called", name, namespace)
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
@@ -1026,7 +1026,7 @@ func (s *Server) argocdGetApplicationManagedResources(ctx context.Context, ctr m
 
 	namespace := ctr.GetString("namespace", "")
 
-	klog.V(1).Infof("Tool call: argocd_get_application_managed_resources - name: %s, namespace: %s", name, namespace)
+	klog.V(1).Infof("Tool: argocd_get_application_managed_resources - name: %s, namespace: %s - got called", name, namespace)
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
@@ -1182,7 +1182,7 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 	followStr := ctr.GetString("follow", "false")
 	follow := strings.ToLower(followStr) == "true"
 
-	klog.V(1).Infof("Tool call: argocd_get_application_workload_logs - application: %s, namespace: %s, resource: %s/%s/%s, tail: %s, follow: %t",
+	klog.V(1).Infof("Tool: argocd_get_application_workload_logs - application: %s, namespace: %s, resource: %s/%s/%s, tail: %s, follow: %t - got called",
 		name, appNamespace, resourceRef.Kind, resourceRef.Namespace, resourceRef.Name, tailStr, follow)
 
 	// Create ArgoCD client
@@ -1265,7 +1265,7 @@ func (s *Server) argocdGetResourceEvents(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
 	}
 
-	klog.V(1).Infof("Tool call: argocd_get_resource_events - application: %s, app_namespace: %s, resource: %s/%s",
+	klog.V(1).Infof("Tool: argocd_get_resource_events - application: %s, app_namespace: %s, resource: %s/%s - got called",
 		name, appNamespace, resourceNamespace, resourceName)
 
 	// Create ArgoCD client
@@ -1408,7 +1408,7 @@ func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolR
 		return NewTextResult("", fmt.Errorf("resource_ref.version is required")), nil
 	}
 
-	klog.V(1).Infof("Tool call: argocd_get_resource_actions - application: %s, app_namespace: %s, resource: %s/%s/%s/%s/%s",
+	klog.V(1).Infof("Tool: argocd_get_resource_actions - application: %s, app_namespace: %s, resource: %s/%s/%s/%s/%s - got called",
 		name, appNamespace, resourceGroup, resourceVersion, resourceKind, resourceNamespace, resourceName)
 
 	// Create ArgoCD client
@@ -1526,7 +1526,7 @@ func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("action name is required")), nil
 	}
 
-	klog.V(1).Infof("Tool call: argocd_run_resource_action - application: %s, app_namespace: %s, resource: %s/%s/%s/%s/%s, action: %s",
+	klog.V(1).Infof("Tool: argocd_run_resource_action - application: %s, app_namespace: %s, resource: %s/%s/%s/%s/%s, action: %s - got called",
 		name, appNamespace, resourceGroup, resourceVersion, resourceKind, resourceNamespace, resourceName, action)
 
 	// Create ArgoCD client
@@ -1586,7 +1586,7 @@ func (s *Server) argocdGetApplicationEvents(ctx context.Context, ctr mcp.CallToo
 		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
 	}
 
-	klog.V(1).Infof("Tool call: argocd_get_application_events - application: %s, namespace: %s", name, namespace)
+	klog.V(1).Infof("Tool: argocd_get_application_events - application: %s, namespace: %s - got called", name, namespace)
 
 	// Create ArgoCD client
 	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)

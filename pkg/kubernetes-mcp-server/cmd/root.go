@@ -146,14 +146,25 @@ func Execute() {
 }
 
 func initLogging() {
-	logger := textlogger.NewLogger(textlogger.NewConfig(textlogger.Output(os.Stdout)))
-	klog.SetLoggerWithOptions(logger)
-	flagSet := flag.NewFlagSet("kubernetes-mcp-server", flag.ContinueOnError)
-	klog.InitFlags(flagSet)
 	logLevel := viper.GetInt("log-level")
 	if logLevel < 0 {
 		logLevel = 2 // Default to level 2 to show all tool calls and details
 	}
-	_ = flagSet.Parse([]string{"--v", strconv.Itoa(logLevel)})
+
+	// Configure klog with proper verbosity
+	config := textlogger.NewConfig(
+		textlogger.Output(os.Stdout),
+		textlogger.Verbosity(logLevel),
+	)
+	logger := textlogger.NewLogger(config)
+	klog.SetLoggerWithOptions(logger)
+
+	// Also set the traditional klog verbosity flags as backup
+	flagSet := flag.NewFlagSet("kubernetes-mcp-server", flag.ContinueOnError)
+	klog.InitFlags(flagSet)
+	if err := flagSet.Parse([]string{"--v", strconv.Itoa(logLevel)}); err != nil {
+		fmt.Printf("Error parsing log level: %v\n", err)
+	}
+
 	klog.V(0).Infof("Logging initialized with level %d", logLevel)
 }

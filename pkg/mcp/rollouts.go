@@ -69,7 +69,7 @@ func (s *Server) rollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 		}
 	}
 
-	klog.V(1).Infof("Tool call: rollout - action=%s, resource_type=%s, resource_name=%s, namespace=%s, revision=%d",
+	klog.V(1).Infof("Tool: rollout - action=%s, resource_type=%s, resource_name=%s, namespace=%s, revision=%d -- got called",
 		action, resourceType, resourceName, namespace, revision)
 
 	// Call the Kubernetes rollout function

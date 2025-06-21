@@ -233,7 +233,7 @@ func (s *Server) helmAddRepository(ctx context.Context, ctr mcp.CallToolRequest)
 		return NewTextResult("", errors.New("failed to add repository: missing or invalid repository URL")), nil
 	}
 
-	klog.V(1).Infof("Tool call: helm_add_repository - name: %s, url: %s", name, url)
+	klog.V(1).Infof("Tool: helm_add_repository - name: %s, url: %s - got called", name, url)
 
 	// Add repository using kubernetes client
 	result, err := s.k.AddRepository(ctx, name, url)
@@ -250,7 +250,7 @@ func (s *Server) helmAddRepository(ctx context.Context, ctr mcp.CallToolRequest)
 
 func (s *Server) helmListRepositories(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool call: helm_list_repositories")
+	klog.V(1).Infof("Tool: helm_list_repositories - got called")
 
 	// List repositories using kubernetes client
 	repos, err := s.k.ListRepositories(ctx)
@@ -290,7 +290,7 @@ func (s *Server) helmUpdateRepositories(ctx context.Context, ctr mcp.CallToolReq
 		repoNames = []string{repoName}
 	}
 
-	klog.V(1).Infof("Tool call: helm_update_repositories - repo_name: %s, repos_to_update: %d", repoName, len(repoNames))
+	klog.V(1).Infof("Tool: helm_update_repositories - repo_name: %s, repos_to_update: %d - got called", repoName, len(repoNames))
 
 	// Update repositories using kubernetes client
 	result, err := s.k.UpdateRepositories(ctx, repoNames...)
@@ -316,7 +316,7 @@ func (s *Server) helmGetRelease(ctx context.Context, ctr mcp.CallToolRequest) (*
 
 	namespace := ctr.GetString("namespace", "")
 
-	klog.V(1).Infof("Tool call: helm_get_release - name: %s, namespace: %s", name, namespace)
+	klog.V(1).Infof("Tool: helm_get_release - name: %s, namespace: %s - got called", name, namespace)
 
 	// Get release information using kubernetes client
 	result, err := s.k.GetRelease(ctx, name, namespace)
@@ -356,7 +356,7 @@ func (s *Server) helmListReleases(ctx context.Context, ctr mcp.CallToolRequest) 
 
 	opts.Output = ctr.GetString("output", "")
 
-	klog.V(1).Infof("Tool call: helm_list_releases - all_namespaces: %t, all: %t, filter: %s, output: %s",
+	klog.V(1).Infof("Tool: helm_list_releases - all_namespaces: %t, all: %t, filter: %s, output: %s - got called",
 		opts.AllNamespaces, opts.All, opts.Filter, opts.Output)
 
 	// List releases using kubernetes client
@@ -395,7 +395,7 @@ func (s *Server) helmUninstallRelease(ctx context.Context, ctr mcp.CallToolReque
 
 	opts.Wait = strings.ToLower(ctr.GetString("wait", "false")) == "true"
 
-	klog.V(1).Infof("Tool call: helm_uninstall_release - name: %s, namespace: %s, dry_run: %t, wait: %t",
+	klog.V(1).Infof("Tool: helm_uninstall_release - name: %s, namespace: %s, dry_run: %t, wait: %t - got called",
 		name, namespace, opts.DryRun, opts.Wait)
 
 	// Uninstall the release using kubernetes client
@@ -460,7 +460,7 @@ func (s *Server) helmInstallRelease(ctx context.Context, ctr mcp.CallToolRequest
 		}
 	}
 
-	klog.V(1).Infof("Tool call: helm_install_release - name: %s, chart: %s, namespace: %s, repo_url: %s, version: %s, set_count: %d, values_count: %d",
+	klog.V(1).Infof("Tool: helm_install_release - name: %s, chart: %s, namespace: %s, repo_url: %s, version: %s, set_count: %d, values_count: %d - got called",
 		name, chart, namespace, opts.RepoURL, opts.Version, len(opts.Set), len(opts.Values))
 
 	// Install the release using kubernetes client
@@ -522,7 +522,7 @@ func (s *Server) helmUpgradeRelease(ctx context.Context, ctr mcp.CallToolRequest
 		}
 	}
 
-	klog.V(1).Infof("Tool call: helm_upgrade_release - name: %s, chart: %s, namespace: %s, version: %s, set_count: %d, values_count: %d",
+	klog.V(1).Infof("Tool: helm_upgrade_release - name: %s, chart: %s, namespace: %s, version: %s, set_count: %d, values_count: %d - got called",
 		name, chart, namespace, opts.Version, len(opts.Set), len(opts.Values))
 
 	// Upgrade the release using kubernetes client

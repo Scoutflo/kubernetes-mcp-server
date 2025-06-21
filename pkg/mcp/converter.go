@@ -45,7 +45,7 @@ func (s *Server) dockerComposeToK8sManifest(ctx context.Context, ctr mcp.CallToo
 	// Extract optional namespace parameter
 	namespace := ctr.GetString("namespace", "")
 
-	klog.V(1).Infof("Tool call: docker_compose_to_k8s_manifest - namespace: %s, docker_compose_length: %d", namespace, len(dockerCompose))
+	klog.V(1).Infof("Tool: docker_compose_to_k8s_manifest - namespace: %s, docker_compose_length: %d - got called", namespace, len(dockerCompose))
 
 	// Generate the Kubernetes manifest
 	k8sManifest, err := s.k.DockerComposeToK8sManifest(dockerCompose, namespace)
@@ -87,7 +87,7 @@ func (s *Server) k8sManifestToHelmChart(ctx context.Context, ctr mcp.CallToolReq
 	// Extract optional chart_name parameter
 	chartName := ctr.GetString("chart_name", "")
 
-	klog.V(1).Infof("Tool call: k8s_manifest_to_helm_chart - chart_name: %s, k8s_manifest_length: %d", chartName, len(k8sManifest))
+	klog.V(1).Infof("Tool: k8s_manifest_to_helm_chart - chart_name: %s, k8s_manifest_length: %d - got called", chartName, len(k8sManifest))
 
 	// Generate the Helm chart
 	helmChart, err := s.k.K8sManifestToHelmChart(k8sManifest, chartName)

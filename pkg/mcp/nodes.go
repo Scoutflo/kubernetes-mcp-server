@@ -26,7 +26,7 @@ func (s *Server) initNodes() []server.ServerTool {
 // nodesList handles the nodes_list tool request
 func (s *Server) nodesList(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool call: nodes_list - listing all nodes")
+	klog.V(1).Infof("Tool: nodes_list - listing all nodes - got called")
 
 	ret, err := s.k.NodesList(ctx)
 	duration := time.Since(start)
@@ -44,7 +44,7 @@ func (s *Server) nodesList(ctx context.Context, _ mcp.CallToolRequest) (*mcp.Cal
 func (s *Server) nodesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	name := ctr.GetString("name", "")
-	klog.V(1).Infof("Tool call: nodes_get - name: %s", name)
+	klog.V(1).Infof("Tool: nodes_get - name: %s - got called", name)
 
 	if name == "" {
 		klog.Errorf("Tool call: nodes_get failed after %v: missing name parameter", time.Since(start))

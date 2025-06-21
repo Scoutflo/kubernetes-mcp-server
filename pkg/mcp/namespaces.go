@@ -22,7 +22,7 @@ func (s *Server) initNamespaces() []server.ServerTool {
 
 func (s *Server) namespacesList(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool call: namespaces_list - listing all namespaces")
+	klog.V(1).Infof("Tool: namespaces_list - listing all namespaces - got called")
 
 	ret, err := s.k.NamespacesList(ctx)
 	duration := time.Since(start)

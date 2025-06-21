@@ -139,7 +139,7 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		return NewTextResult("", fmt.Errorf("failed to list resources, %s", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: resources_list - apiVersion: %s, kind: %s, namespace: %s", gvk.Version, gvk.Kind, namespace)
+	klog.V(1).Infof("Tool: resources_list - apiVersion: %s, kind: %s, namespace: %s - got called", gvk.Version, gvk.Kind, namespace)
 
 	ret, err := s.k.ResourcesList(ctx, gvk, namespace)
 	duration := time.Since(start)
@@ -170,7 +170,7 @@ func (s *Server) resourcesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mc
 		return NewTextResult("", errors.New("failed to get resource, missing argument name")), nil
 	}
 
-	klog.V(1).Infof("Tool call: resources_get - apiVersion: %s, kind: %s, namespace: %s, name: %s", gvk.Version, gvk.Kind, namespace, name)
+	klog.V(1).Infof("Tool: resources_get - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called", gvk.Version, gvk.Kind, namespace, name)
 
 	ret, err := s.k.ResourcesGet(ctx, gvk, namespace, name)
 	duration := time.Since(start)
@@ -192,7 +192,7 @@ func (s *Server) resourcesCreateOrUpdate(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", errors.New("failed to create or update resources, missing argument resource")), nil
 	}
 
-	klog.V(1).Infof("Tool call: resources_create_or_update - resource YAML/JSON provided (length: %d)", len(resource))
+	klog.V(1).Infof("Tool: resources_create_or_update - resource YAML/JSON provided (length: %d) - got called", len(resource))
 
 	ret, err := s.k.ResourcesCreateOrUpdate(ctx, resource)
 	duration := time.Since(start)
@@ -223,7 +223,7 @@ func (s *Server) resourcesDelete(ctx context.Context, ctr mcp.CallToolRequest) (
 		return NewTextResult("", errors.New("failed to delete resource, missing argument name")), nil
 	}
 
-	klog.V(1).Infof("Tool call: resources_delete - apiVersion: %s, kind: %s, namespace: %s, name: %s", gvk.Version, gvk.Kind, namespace, name)
+	klog.V(1).Infof("Tool: resources_delete - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called", gvk.Version, gvk.Kind, namespace, name)
 
 	err = s.k.ResourcesDelete(ctx, gvk, namespace, name)
 	duration := time.Since(start)
@@ -271,7 +271,7 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		return NewTextResult("", errors.New("failed to get YAML, missing argument name")), nil
 	}
 
-	klog.V(1).Infof("Tool call: get_resources_yaml - apiVersion: %s, kind: %s, namespace: %s, name: %s", gvk.Version, gvk.Kind, namespace, name)
+	klog.V(1).Infof("Tool: get_resources_yaml - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called", gvk.Version, gvk.Kind, namespace, name)
 
 	if name != "" {
 		// Get a specific resource
@@ -301,7 +301,7 @@ func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	manifestPath := ctr.GetString("manifest_path", "")
 	yamlContent := ctr.GetString("yaml_content", "")
 
-	klog.V(1).Infof("Tool call: apply_manifest - manifest_path: %s, yaml_content_length: %d", manifestPath, len(yamlContent))
+	klog.V(1).Infof("Tool: apply_manifest - manifest_path: %s, yaml_content_length: %d - got called", manifestPath, len(yamlContent))
 
 	// Ensure at least one of manifest_path or yaml_content is provided
 	if manifestPath == "" && yamlContent == "" {
@@ -368,7 +368,7 @@ func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*
 		patchType = pt
 	}
 
-	klog.V(1).Infof("Tool call: resources_patch - apiVersion: %s, kind: %s, namespace: %s, name: %s, patch_type: %s", gvk.Version, gvk.Kind, namespace, resourceName, patchType)
+	klog.V(1).Infof("Tool: resources_patch - apiVersion: %s, kind: %s, namespace: %s, name: %s, patch_type: %s - got called", gvk.Version, gvk.Kind, namespace, resourceName, patchType)
 
 	// Validate patch type
 	if patchType != "json" && patchType != "merge" && patchType != "strategic" {

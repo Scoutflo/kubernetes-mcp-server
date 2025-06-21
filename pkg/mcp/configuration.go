@@ -21,6 +21,7 @@ func (s *Server) initConfiguration() []server.ServerTool {
 
 func (s *Server) getAvailableAPIResources(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	klog.V(1).Infof("Tool: get_available_API_resources - got called")
 	ret, err := kubernetes.GetAvailableAPIResources(ctx)
 	if err != nil {
 		klog.Errorf("Tool call: get_available_API_resources failed after %v: %v", time.Since(start), err)

@@ -32,6 +32,7 @@ func (s *Server) initConnectivity() []server.ServerTool {
 
 func (s *Server) checkServiceConnectivity(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	klog.V(1).Infof("Tool: check_service_connectivity - got called")
 	serviceName, err := ctr.RequireString("service_name")
 	if err != nil {
 		klog.Errorf("Tool call: check_service_connectivity failed after %v: missing or invalid service_name", time.Since(start))
@@ -49,6 +50,7 @@ func (s *Server) checkServiceConnectivity(ctx context.Context, ctr mcp.CallToolR
 
 func (s *Server) checkIngressConnectivity(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	klog.V(1).Infof("Tool: check_ingress_connectivity - got called")
 	ingressHost, err := ctr.RequireString("ingress_host")
 	if err != nil {
 		klog.Errorf("Tool call: check_ingress_connectivity failed after %v: missing or invalid ingress_host", time.Since(start))

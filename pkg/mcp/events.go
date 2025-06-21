@@ -48,7 +48,7 @@ func (s *Server) eventsList(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.
 		fieldSelectors = append(fieldSelectors, fmt.Sprintf("involvedObject.apiVersion=%s", involvedObjectAPIVersion))
 	}
 
-	klog.V(1).Infof("Tool call: events_list - namespace: %s, involved_object_name: %s, involved_object_kind: %s, involved_object_api_version: %s, field_selectors_count: %d",
+	klog.V(1).Infof("Tool: events_list - namespace: %s, involved_object_name: %s, involved_object_kind: %s, involved_object_api_version: %s, field_selectors_count: %d -- got called",
 		namespace, involvedObjectName, involvedObjectKind, involvedObjectAPIVersion, len(fieldSelectors))
 
 	ret, err := s.k.EventsList(ctx, namespace, fieldSelectors)

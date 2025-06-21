@@ -351,7 +351,7 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 // prometheusListMetrics handles the prometheus_list_metrics tool request
 func (s *Server) prometheusListMetrics(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool call: prometheus_list_metrics")
+	klog.V(1).Infof("Tool: prometheus_list_metrics - got called")
 
 	ret, err := s.k.ListPrometheusMetrics()
 	if err != nil {
@@ -371,7 +371,7 @@ func (s *Server) prometheusMetricInfo(ctx context.Context, ctr mcp.CallToolReque
 	metric := ctr.GetString("metric", "")
 	includeStatsArg := ctr.GetString("include_statistics", "")
 
-	klog.V(1).Infof("Tool call: prometheus_metric_info - metric=%s, include_statistics=%s", metric, includeStatsArg)
+	klog.V(1).Infof("Tool: prometheus_metric_info - metric=%s, include_statistics=%s - got called", metric, includeStatsArg)
 
 	if metric == "" {
 		duration := time.Since(start)
@@ -405,7 +405,7 @@ func (s *Server) prometheusGenerateQuery(ctx context.Context, ctr mcp.CallToolRe
 	start := time.Now()
 	description := ctr.GetString("description", "")
 
-	klog.V(1).Infof("Tool call: prometheus_generate_query - description=%s", description)
+	klog.V(1).Infof("Tool: prometheus_generate_query - description=%s - got called", description)
 
 	if description == "" {
 		duration := time.Since(start)
@@ -536,7 +536,7 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 		endStr = endTime.Format(time.RFC3339)
 	}
 
-	klog.V(1).Infof("Tool call: prometheus_series_query - match_count=%d, start=%s, end=%s, limit=%d",
+	klog.V(1).Infof("Tool: prometheus_series_query - match_count=%d, start=%s, end=%s, limit=%d - got called",
 		len(match), startStr, endStr, limit)
 
 	// Call the Kubernetes function
@@ -576,7 +576,7 @@ func (s *Server) prometheusTargets(ctx context.Context, ctr mcp.CallToolRequest)
 	state := ctr.GetString("state", "")
 	scrapePool := ctr.GetString("scrape_pool", "")
 
-	klog.V(1).Infof("Tool call: prometheus_targets - state=%s, scrape_pool=%s", state, scrapePool)
+	klog.V(1).Infof("Tool: prometheus_targets - state=%s, scrape_pool=%s - got called", state, scrapePool)
 
 	// Call the Kubernetes function
 	ret, err := s.k.GetPrometheusTargets(state, scrapePool)
@@ -608,7 +608,7 @@ func (s *Server) prometheusTargetMetadata(ctx context.Context, ctr mcp.CallToolR
 		}
 	}
 
-	klog.V(1).Infof("Tool call: prometheus_targets_metadata - match_target=%s, metric=%s, limit=%d",
+	klog.V(1).Infof("Tool: prometheus_targets_metadata - match_target=%s, metric=%s, limit=%d - got called",
 		matchTarget, metric, limit)
 
 	// Call the Kubernetes function
@@ -649,7 +649,7 @@ func (s *Server) prometheusCreateAlert(ctx context.Context, ctr mcp.CallToolRequ
 		}
 	}
 
-	klog.V(1).Infof("Tool call: prometheus_create_alert - alertname=%s, applabel=%s, namespace=%s, interval=%s, for=%s, annotations_count=%d, alertlabels_count=%d",
+	klog.V(1).Infof("Tool: prometheus_create_alert - alertname=%s, applabel=%s, namespace=%s, interval=%s, for=%s, annotations_count=%d, alertlabels_count=%d - got called",
 		alertName, appLabel, namespace, interval, forDuration, annotationsCount, alertLabelsCount)
 
 	// Extract and validate required parameters
@@ -756,7 +756,7 @@ func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequ
 		}
 	}
 
-	klog.V(1).Infof("Tool call: prometheus_update_alert - alertname=%s, applabel=%s, namespace=%s, expression=%s, interval=%s, for=%s, annotations_count=%d, alertlabels_count=%d",
+	klog.V(1).Infof("Tool: prometheus_update_alert - alertname=%s, applabel=%s, namespace=%s, expression=%s, interval=%s, for=%s, annotations_count=%d, alertlabels_count=%d - got called",
 		alertName, appLabel, namespace, expression, interval, forDuration, annotationsCount, alertLabelsCount)
 
 	// Extract and validate required parameters
@@ -828,7 +828,7 @@ func (s *Server) prometheusDeleteAlert(ctx context.Context, ctr mcp.CallToolRequ
 	namespace := ctr.GetString("namespace", "")
 	alertName := ctr.GetString("alertname", "")
 
-	klog.V(1).Infof("Tool call: prometheus_delete_alert - applabel=%s, namespace=%s, alertname=%s",
+	klog.V(1).Infof("Tool: prometheus_delete_alert - applabel=%s, namespace=%s, alertname=%s - got called",
 		appLabel, namespace, alertName)
 
 	// Extract and validate required parameters
@@ -860,7 +860,7 @@ func (s *Server) prometheusDeleteAlert(ctx context.Context, ctr mcp.CallToolRequ
 // prometheusGetAlerts handles the prometheus_get_alerts tool request
 func (s *Server) prometheusGetAlerts(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool call: prometheus_get_alerts")
+	klog.V(1).Infof("Tool: prometheus_get_alerts - got called")
 
 	// Call the Kubernetes function
 	ret, err := s.k.GetPrometheusAlerts()
@@ -945,7 +945,7 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 		groupLimit = fmt.Sprintf("%d", int(limitVal))
 	}
 
-	klog.V(1).Infof("Tool call: prometheus_get_rules - rule_names_count=%d, rule_groups_count=%d, files_count=%d, exclude_alerts=%t, match_labels_count=%d, group_limit=%s",
+	klog.V(1).Infof("Tool: prometheus_get_rules - rule_names_count=%d, rule_groups_count=%d, files_count=%d, exclude_alerts=%t, match_labels_count=%d, group_limit=%s - got called",
 		len(ruleNames), len(ruleGroups), len(files), excludeAlerts, len(matchLabels), groupLimit)
 
 	// Call the Kubernetes function
@@ -964,7 +964,7 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 // prometheusRuntimeInfo handles the prometheus_runtimeinfo tool request
 func (s *Server) prometheusRuntimeInfo(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool call: prometheus_runtimeinfo")
+	klog.V(1).Infof("Tool: prometheus_runtimeinfo - got called")
 
 	// Call the Kubernetes function
 	ret, err := s.k.GetPrometheusRuntimeInfo()
@@ -984,7 +984,7 @@ func (s *Server) prometheusTSDBStatus(ctx context.Context, ctr mcp.CallToolReque
 	start := time.Now()
 	limit := int(ctr.GetFloat("limit", 0)) // Default is no limit
 
-	klog.V(1).Infof("Tool call: prometheus_TSDB_status - limit=%d", limit)
+	klog.V(1).Infof("Tool: prometheus_TSDB_status - limit=%d - got called", limit)
 
 	// Call the Kubernetes function
 	ret, err := s.k.GetPrometheusTSDBStatus(limit)
@@ -1021,7 +1021,7 @@ func (s *Server) prometheusListLabelNames(ctx context.Context, ctr mcp.CallToolR
 		}
 	}
 
-	klog.V(1).Infof("Tool call: prometheus_list_label_names - startRfc3339=%s, endRfc3339=%s, limit=%d, matches_count=%d",
+	klog.V(1).Infof("Tool: prometheus_list_label_names - startRfc3339=%s, endRfc3339=%s, limit=%d, matches_count=%d - got called",
 		startRfc3339, endRfc3339, limit, len(matches))
 
 	// Call the Kubernetes function
@@ -1060,7 +1060,7 @@ func (s *Server) prometheusListLabelValues(ctx context.Context, ctr mcp.CallTool
 		}
 	}
 
-	klog.V(1).Infof("Tool call: prometheus_list_label_values - labelName=%s, startRfc3339=%s, endRfc3339=%s, limit=%d, matches_count=%d",
+	klog.V(1).Infof("Tool: prometheus_list_label_values - labelName=%s, startRfc3339=%s, endRfc3339=%s, limit=%d, matches_count=%d - got called",
 		labelName, startRfc3339, endRfc3339, limit, len(matches))
 
 	// Extract required parameters

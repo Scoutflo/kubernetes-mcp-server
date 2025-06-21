@@ -129,7 +129,7 @@ func (s *Server) labelResource(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		}
 	}
 
-	klog.V(1).Infof("Tool call: label_resource - apiVersion=%s, kind=%s, name=%s, namespace=%s, labels_count=%d",
+	klog.V(1).Infof("Tool: label_resource - apiVersion=%s, kind=%s, name=%s, namespace=%s, labels_count=%d - got called",
 		apiVersion, kind, name, namespace, labelsCount)
 
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
@@ -184,7 +184,7 @@ func (s *Server) removeLabel(ctx context.Context, ctr mcp.CallToolRequest) (*mcp
 	name := ctr.GetString("name", "")
 	labelKey := ctr.GetString("label_key", "")
 
-	klog.V(1).Infof("Tool call: remove_label - apiVersion=%s, kind=%s, name=%s, namespace=%s, label_key=%s",
+	klog.V(1).Infof("Tool: remove_label - apiVersion=%s, kind=%s, name=%s, namespace=%s, label_key=%s - got called",
 		apiVersion, kind, name, namespace, labelKey)
 
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
@@ -234,7 +234,7 @@ func (s *Server) annotateResource(ctx context.Context, ctr mcp.CallToolRequest) 
 		}
 	}
 
-	klog.V(1).Infof("Tool call: annotate_resource - apiVersion=%s, kind=%s, name=%s, namespace=%s, annotations_count=%d",
+	klog.V(1).Infof("Tool: annotate_resource - apiVersion=%s, kind=%s, name=%s, namespace=%s, annotations_count=%d - got called",
 		apiVersion, kind, name, namespace, annotationsCount)
 
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
@@ -289,7 +289,7 @@ func (s *Server) removeAnnotation(ctx context.Context, ctr mcp.CallToolRequest) 
 	name := ctr.GetString("name", "")
 	annotationKey := ctr.GetString("annotation_key", "")
 
-	klog.V(1).Infof("Tool call: remove_annotation - apiVersion=%s, kind=%s, name=%s, namespace=%s, annotation_key=%s",
+	klog.V(1).Infof("Tool: remove_annotation - apiVersion=%s, kind=%s, name=%s, namespace=%s, annotation_key=%s - got called",
 		apiVersion, kind, name, namespace, annotationKey)
 
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))

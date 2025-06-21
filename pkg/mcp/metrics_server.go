@@ -29,7 +29,7 @@ func (s *Server) nodesMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mc
 	start := time.Now()
 	nodeName := ctr.GetString("name", "")
 
-	klog.V(1).Infof("Tool call: nodes_metrics - name=%s", nodeName)
+	klog.V(1).Infof("Tool: nodes_metrics - name=%s - got called", nodeName)
 
 	ret, err := s.k.GetNodeMetrics(ctx, nodeName)
 	if err != nil {
@@ -53,7 +53,7 @@ func (s *Server) podsMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mcp
 	namespace := ctr.GetString("namespace", "")
 	podName := ctr.GetString("name", "")
 
-	klog.V(1).Infof("Tool call: pods_metrics - namespace=%s, name=%s", namespace, podName)
+	klog.V(1).Infof("Tool: pods_metrics - namespace=%s, name=%s - got called", namespace, podName)
 
 	ret, err := s.k.GetPodMetrics(ctx, namespace, podName)
 	if err != nil {

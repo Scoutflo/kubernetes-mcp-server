@@ -64,7 +64,7 @@ func (s *Server) initGrafana() []server.ServerTool {
 // grafanaHealthCheck handles the grafana_health_check tool request
 func (s *Server) grafanaHealthCheck(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool call: grafana_health_check")
+	klog.V(1).Infof("Tool: grafana_health_check - got called")
 
 	result, err := s.k.HealthCheck()
 	duration := time.Since(start)
@@ -88,7 +88,7 @@ func (s *Server) grafanaGetDashboardByUID(ctx context.Context, ctr mcp.CallToolR
 		return NewTextResult("", errors.New("missing required parameter: uid")), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_get_dashboard_by_uid - uid: %s", uid)
+	klog.V(1).Infof("Tool: grafana_get_dashboard_by_uid - uid: %s - got called", uid)
 
 	// Call the Kubernetes client to get the dashboard
 	result, err := s.k.GetDashboardByUID(uid)
@@ -109,7 +109,7 @@ func (s *Server) grafanaSearchDashboards(ctx context.Context, ctr mcp.CallToolRe
 	// Extract optional query parameter
 	query := ctr.GetString("query", "")
 
-	klog.V(1).Infof("Tool call: grafana_search_dashboards - query: %s", query)
+	klog.V(1).Infof("Tool: grafana_search_dashboards - query: %s - got called", query)
 
 	// Call the Kubernetes client to search dashboards
 	result, err := s.k.SearchDashboards(query)
@@ -156,7 +156,7 @@ func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolReq
 		}
 	}
 
-	klog.V(1).Infof("Tool call: grafana_update_dashboard - folderUID: %s, message: %s, overwrite: %t, userID: %d, dashboard_fields: %d",
+	klog.V(1).Infof("Tool: grafana_update_dashboard - folderUID: %s, message: %s, overwrite: %t, userID: %d, dashboard_fields: %d - got called",
 		folderUID, message, overwrite, userID, len(dashboard))
 
 	// Call the Kubernetes client to update the dashboard
@@ -182,7 +182,7 @@ func (s *Server) grafanaGetDashboardPanelQueries(ctx context.Context, ctr mcp.Ca
 		return NewTextResult("", errors.New("missing required parameter: uid")), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_get_dashboard_panel_queries - uid: %s", uid)
+	klog.V(1).Infof("Tool: grafana_get_dashboard_panel_queries - uid: %s - got called", uid)
 
 	// Call the Kubernetes client to get the dashboard panel queries
 	result, err := s.k.GetDashboardPanelQueries(uid)
@@ -203,7 +203,7 @@ func (s *Server) grafanaListDatasources(ctx context.Context, ctr mcp.CallToolReq
 	// Extract optional type parameter
 	dsType := ctr.GetString("type", "")
 
-	klog.V(1).Infof("Tool call: grafana_list_datasources - type: %s", dsType)
+	klog.V(1).Infof("Tool: grafana_list_datasources - type: %s - got called", dsType)
 
 	// Call the Kubernetes client to list datasources
 	result, err := s.k.ListDatasources(dsType)
@@ -228,7 +228,7 @@ func (s *Server) grafanaGetDatasourceByUID(ctx context.Context, ctr mcp.CallTool
 		return NewTextResult("", errors.New("missing required parameter: uid")), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_get_datasource_by_uid - uid: %s", uid)
+	klog.V(1).Infof("Tool: grafana_get_datasource_by_uid - uid: %s - got called", uid)
 
 	// Call the Kubernetes client to get the datasource by UID
 	result, err := s.k.GetDatasourceByUID(uid)
@@ -253,7 +253,7 @@ func (s *Server) grafanaGetDatasourceByName(ctx context.Context, ctr mcp.CallToo
 		return NewTextResult("", errors.New("missing required parameter: name")), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_get_datasource_by_name - name: %s", name)
+	klog.V(1).Infof("Tool: grafana_get_datasource_by_name - name: %s - got called", name)
 
 	// Call the Kubernetes client to get the datasource by name
 	result, err := s.k.GetDatasourceByName(name)
@@ -299,7 +299,7 @@ func (s *Server) grafanaListAlertRules(ctx context.Context, ctr mcp.CallToolRequ
 		}
 	}
 
-	klog.V(1).Infof("Tool call: grafana_list_alert_rules - limit: %d, page: %d, label_selectors_count: %d", limit, page, len(labelSelectors))
+	klog.V(1).Infof("Tool: grafana_list_alert_rules - limit: %d, page: %d, label_selectors_count: %d - got called", limit, page, len(labelSelectors))
 
 	// Call the Kubernetes client to list alert rules
 	result, err := s.k.ListAlertRules(limit, page, labelSelectors)
@@ -324,7 +324,7 @@ func (s *Server) grafanaGetAlertRuleByUID(ctx context.Context, ctr mcp.CallToolR
 		return NewTextResult("", errors.New("missing required parameter: uid")), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_get_alert_rule_by_uid - uid: %s", uid)
+	klog.V(1).Infof("Tool: grafana_get_alert_rule_by_uid - uid: %s - got called", uid)
 
 	// Call the Kubernetes client to get the alert rule by UID
 	result, err := s.k.GetAlertRuleByUID(uid)
