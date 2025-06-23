@@ -47,11 +47,11 @@ Note:
 
   # TODO: add more examples`,
 	Run: func(cmd *cobra.Command, args []string) {
-		initLogging()
 		if viper.GetBool("version") {
 			fmt.Println(version.Version)
 			return
 		}
+		initLogging()
 		mcpServer, err := mcp.NewSever()
 		if err != nil {
 			panic(err)
@@ -151,9 +151,17 @@ func initLogging() {
 		logLevel = 2 // Default to level 2 to show all tool calls and details
 	}
 
+	// Determine output destination based on SSE mode
+	// In STDIO mode, use stderr to avoid corrupting JSON-RPC communication on stdout
+	// In SSE mode, stdout is fine since JSON-RPC goes over HTTP
+	logOutput := os.Stderr
+	if ssePort := viper.GetInt("sse-port"); ssePort > 0 {
+		logOutput = os.Stdout
+	}
+
 	// Configure klog with proper verbosity
 	config := textlogger.NewConfig(
-		textlogger.Output(os.Stdout),
+		textlogger.Output(logOutput),
 		textlogger.Verbosity(logLevel),
 	)
 	logger := textlogger.NewLogger(config)
@@ -163,7 +171,7 @@ func initLogging() {
 	flagSet := flag.NewFlagSet("kubernetes-mcp-server", flag.ContinueOnError)
 	klog.InitFlags(flagSet)
 	if err := flagSet.Parse([]string{"--v", strconv.Itoa(logLevel)}); err != nil {
-		fmt.Printf("Error parsing log level: %v\n", err)
+		fmt.Fprintf(logOutput, "Error parsing log level: %v\n", err)
 	}
 
 	klog.V(0).Infof("Logging initialized with level %d", logLevel)

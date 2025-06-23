@@ -95,6 +95,7 @@ func (s *Server) initializeKubernetesClient() error {
 		s.initConverters(),
 		s.initPromptGenerator(),
 		s.initGrafana(),
+		s.initIstio(),
 	)
 
 	s.server.SetTools(tools...)
@@ -223,8 +224,8 @@ func (s *Server) startHealthServer() {
 
 	// Start server
 	if err := s.healthServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		// Log error but don't crash (could use a proper logger here)
-		println("Health server error:", err.Error())
+		// Log error but don't crash - use klog to respect output configuration
+		klog.Errorf("Health server error: %v", err)
 	}
 }
 
@@ -242,8 +243,8 @@ func (s *Server) Close() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := s.healthServer.Shutdown(ctx); err != nil {
-			// Log error but don't crash (could use a proper logger here)
-			println("Health server shutdown error:", err.Error())
+			// Log error but don't crash - use klog to respect output configuration
+			klog.Errorf("Health server shutdown error: %v", err)
 		}
 	}
 }
