@@ -206,11 +206,12 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 	timeArg := ctr.GetString("time", "")
 	timeout := ctr.GetString("timeout", "")
 
-	klog.V(1).Infof("Tool call: prometheus_metrics_query - query=%s, time=%s, timeout=%s", queryArg, timeArg, timeout)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool call: prometheus_metrics_query - query=%s, time=%s, timeout=%s - got called by session id: %s", queryArg, timeArg, timeout, sessionID)
 
 	if queryArg == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query failed after %v: missing required parameter: query", duration)
+		klog.Errorf("Tool call: prometheus_metrics_query failed after %v: missing required parameter: query by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: query")), nil
 	}
 	query := queryArg
@@ -231,16 +232,16 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 		errMsg := err.Error()
 		// Check for common error patterns and provide more helpful messages
 		if strings.Contains(errMsg, "unknown by name") || strings.Contains(errMsg, "metrics not found") {
-			klog.Errorf("Tool call: prometheus_metrics_query failed after %v: metric not found: %s", duration, query)
+			klog.Errorf("Tool call: prometheus_metrics_query failed after %v: metric not found: %s by session id: %s", duration, query, sessionID)
 			return NewTextResult("", fmt.Errorf("ERROR: Metric not found. The specified metric '%s' does not exist in Prometheus. Please check the metric name and ensure it's correctly spelled.", query)), nil
 		} else if strings.Contains(errMsg, "parse error") {
-			klog.Errorf("Tool call: prometheus_metrics_query failed after %v: invalid PromQL syntax: %s", duration, query)
+			klog.Errorf("Tool call: prometheus_metrics_query failed after %v: invalid PromQL syntax: %s by session id: %s", duration, query, sessionID)
 			return NewTextResult("", fmt.Errorf("ERROR: Invalid PromQL query syntax in '%s'. Please check your query format.", query)), nil
 		} else if strings.Contains(errMsg, "failed to discover Prometheus") {
-			klog.Errorf("Tool call: prometheus_metrics_query failed after %v: cannot connect to Prometheus server", duration)
+			klog.Errorf("Tool call: prometheus_metrics_query failed after %v: cannot connect to Prometheus server by session id: %s", duration, sessionID)
 			return NewTextResult("", fmt.Errorf("ERROR: Cannot connect to Prometheus server. The server may be unavailable or misconfigured.")), nil
 		}
-		klog.Errorf("Tool call: prometheus_metrics_query failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_metrics_query failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("ERROR: Failed to execute Prometheus query: %v", err)), nil
 	}
 
@@ -251,7 +252,7 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_metrics_query completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_metrics_query completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -264,28 +265,29 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 	stepArg := ctr.GetString("step", "")
 	timeout := ctr.GetString("timeout", "")
 
-	klog.V(1).Infof("Tool call: prometheus_metrics_query_range - query=%s, start=%s, end=%s, step=%s, timeout=%s",
-		queryArg, startArg, endArg, stepArg, timeout)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool call: prometheus_metrics_query_range - query=%s, start=%s, end=%s, step=%s, timeout=%s - got called by session id: %s",
+		queryArg, startArg, endArg, stepArg, timeout, sessionID)
 
 	// Validate required parameters
 	if queryArg == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: query", duration)
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: query by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: query")), nil
 	}
 	if startArg == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: start", duration)
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: start by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: start")), nil
 	}
 	if endArg == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: end", duration)
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: end by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: end")), nil
 	}
 	if stepArg == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: step", duration)
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: step by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: step")), nil
 	}
 
@@ -296,7 +298,7 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 	startTime := parseTime(startArg, time.Now().Add(-1*time.Hour))
 	if startTime.IsZero() {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid start time format: %s", duration, startArg)
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid start time format: %s by session id: %s", duration, startArg, sessionID)
 		return NewTextResult("", errors.New("invalid start time format")), nil
 	}
 
@@ -304,7 +306,7 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 	endTime := parseTime(endArg, time.Now())
 	if endTime.IsZero() {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid end time format: %s", duration, endArg)
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid end time format: %s by session id: %s", duration, endArg, sessionID)
 		return NewTextResult("", errors.New("invalid end time format")), nil
 	}
 
@@ -318,22 +320,22 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 		errMsg := err.Error()
 		// Check for common error patterns and provide more helpful messages
 		if strings.Contains(errMsg, "unknown by name") || strings.Contains(errMsg, "metrics not found") {
-			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: metric not found: %s", duration, query)
+			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: metric not found: %s by session id: %s", duration, query, sessionID)
 			return NewTextResult("", fmt.Errorf("ERROR: Metric not found. The specified metric '%s' does not exist in Prometheus. Please check the metric name and ensure it's correctly spelled.", query)), nil
 		} else if strings.Contains(errMsg, "parse error") {
-			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid PromQL syntax: %s", duration, query)
+			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid PromQL syntax: %s by session id: %s", duration, query, sessionID)
 			return NewTextResult("", fmt.Errorf("ERROR: Invalid PromQL query syntax in '%s'. Please check your query format.", query)), nil
 		} else if strings.Contains(errMsg, "failed to discover Prometheus") {
-			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: cannot connect to Prometheus server", duration)
+			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: cannot connect to Prometheus server by session id: %s", duration, sessionID)
 			return NewTextResult("", fmt.Errorf("ERROR: Cannot connect to Prometheus server. The server may be unavailable or misconfigured.")), nil
 		} else if strings.Contains(errMsg, "invalid step") {
-			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid step parameter: %s", duration, step)
+			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid step parameter: %s by session id: %s", duration, step, sessionID)
 			return NewTextResult("", fmt.Errorf("ERROR: Invalid step parameter '%s'. Step must be a valid duration (e.g., '15s', '1m', '1h').", step)), nil
 		} else if strings.Contains(errMsg, "resolution") || strings.Contains(errMsg, "step") {
-			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: step parameter issue: %v", duration, err)
+			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: step parameter issue: %v by session id: %s", duration, err, sessionID)
 			return NewTextResult("", fmt.Errorf("ERROR: Step parameter issue: %v. Adjust the step size or time range.", err)), nil
 		}
-		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("ERROR: Failed to execute Prometheus range query: %v", err)), nil
 	}
 
@@ -344,24 +346,25 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_metrics_query_range completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_metrics_query_range completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
 // prometheusListMetrics handles the prometheus_list_metrics tool request
 func (s *Server) prometheusListMetrics(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool: prometheus_list_metrics - got called")
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_list_metrics - got called by session id: %s", sessionID)
 
 	ret, err := s.k.ListPrometheusMetrics()
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_list_metrics failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_list_metrics failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to list Prometheus metrics: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_list_metrics completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_list_metrics completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -371,11 +374,12 @@ func (s *Server) prometheusMetricInfo(ctx context.Context, ctr mcp.CallToolReque
 	metric := ctr.GetString("metric", "")
 	includeStatsArg := ctr.GetString("include_statistics", "")
 
-	klog.V(1).Infof("Tool: prometheus_metric_info - metric=%s, include_statistics=%s - got called", metric, includeStatsArg)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_metric_info - metric=%s, include_statistics=%s - got called by session id: %s", metric, includeStatsArg, sessionID)
 
 	if metric == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metric_info failed after %v: missing required parameter: metric", duration)
+		klog.Errorf("Tool call: prometheus_metric_info failed after %v: missing required parameter: metric by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: metric")), nil
 	}
 
@@ -385,7 +389,7 @@ func (s *Server) prometheusMetricInfo(ctx context.Context, ctr mcp.CallToolReque
 	ret, err := s.k.GetPrometheusMetricInfo(metric, includeStats)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metric_info failed after %v: failed to get info for metric '%s': %v", duration, metric, err)
+		klog.Errorf("Tool call: prometheus_metric_info failed after %v: failed to get info for metric '%s': %v by session id: %s", duration, metric, err, sessionID)
 		return NewTextResult("", fmt.Errorf("ERROR: Failed to get information for metric '%s': %v", metric, err)), nil
 	}
 
@@ -396,7 +400,7 @@ func (s *Server) prometheusMetricInfo(ctx context.Context, ctr mcp.CallToolReque
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_metric_info completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_metric_info completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -405,11 +409,12 @@ func (s *Server) prometheusGenerateQuery(ctx context.Context, ctr mcp.CallToolRe
 	start := time.Now()
 	description := ctr.GetString("description", "")
 
-	klog.V(1).Infof("Tool: prometheus_generate_query - description=%s - got called", description)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_generate_query - description=%s - got called by session id: %s", description, sessionID)
 
 	if description == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_generate_query failed after %v: missing required parameter: description", duration)
+		klog.Errorf("Tool call: prometheus_generate_query failed after %v: missing required parameter: description by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: description")), nil
 	}
 
@@ -419,25 +424,25 @@ func (s *Server) prometheusGenerateQuery(ctx context.Context, ctr mcp.CallToolRe
 		duration := time.Since(start)
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "failed to create LLM client") {
-			klog.Errorf("Tool call: prometheus_generate_query failed after %v: could not connect to LLM service", duration)
+			klog.Errorf("Tool call: prometheus_generate_query failed after %v: could not connect to LLM service by session id: %s", duration, sessionID)
 			return NewTextResult("", fmt.Errorf("ERROR: Could not connect to LLM service to generate PromQL query. The service may be unavailable.")), nil
 		} else if strings.Contains(errMsg, "context deadline exceeded") || strings.Contains(errMsg, "timeout") {
-			klog.Errorf("Tool call: prometheus_generate_query failed after %v: timeout occurred", duration)
+			klog.Errorf("Tool call: prometheus_generate_query failed after %v: timeout occurred by session id: %s", duration, sessionID)
 			return NewTextResult("", fmt.Errorf("ERROR: Timeout occurred while generating the PromQL query. Please try again with a simpler description or try later.")), nil
 		}
-		klog.Errorf("Tool call: prometheus_generate_query failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_generate_query failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("ERROR: Failed to generate PromQL query from description: %v", err)), nil
 	}
 
 	// Check if the response is empty or too short to be a valid query
 	if len(query) < 5 {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_generate_query failed after %v: generated query too short: %s", duration, query)
+		klog.Errorf("Tool call: prometheus_generate_query failed after %v: generated query too short: %s by session id: %s", duration, query, sessionID)
 		return NewTextResult("", fmt.Errorf("ERROR: The generated query is too short or empty. Please provide a more specific description of the metric you're looking for.")), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_generate_query completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_generate_query completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(query, nil), nil
 }
 
@@ -462,20 +467,21 @@ func parseTime(timeStr string, defaultTime time.Time) time.Time {
 // prometheusSeries handles the prometheus_series_query tool request
 func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 
 	// Extract the match parameter (required) using new API
 	args := ctr.GetRawArguments()
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_series_query failed after %v: failed to get arguments", duration)
+		klog.Errorf("Tool call: prometheus_series_query failed after %v: failed to get arguments by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("failed to get arguments")), nil
 	}
 
 	matchArg, ok := argsMap["match"]
 	if !ok {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_series_query failed after %v: missing required parameter: match", duration)
+		klog.Errorf("Tool call: prometheus_series_query failed after %v: missing required parameter: match by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: match")), nil
 	}
 
@@ -483,7 +489,7 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 	matchSlice, ok := matchArg.([]interface{})
 	if !ok {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_series_query failed after %v: match parameter must be a string array", duration)
+		klog.Errorf("Tool call: prometheus_series_query failed after %v: match parameter must be a string array by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("match parameter must be a string array")), nil
 	}
 
@@ -493,7 +499,7 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 		match[i], ok = m.(string)
 		if !ok {
 			duration := time.Since(start)
-			klog.Errorf("Tool call: prometheus_series_query failed after %v: match parameter must contain only strings", duration)
+			klog.Errorf("Tool call: prometheus_series_query failed after %v: match parameter must contain only strings by session id: %s", duration, sessionID)
 			return NewTextResult("", errors.New("match parameter must contain only strings")), nil
 		}
 	}
@@ -536,8 +542,8 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 		endStr = endTime.Format(time.RFC3339)
 	}
 
-	klog.V(1).Infof("Tool: prometheus_series_query - match_count=%d, start=%s, end=%s, limit=%d - got called",
-		len(match), startStr, endStr, limit)
+	klog.V(1).Infof("Tool: prometheus_series_query - match_count=%d, start=%s, end=%s, limit=%d - got called by session id: %s",
+		len(match), startStr, endStr, limit, sessionID)
 
 	// Call the Kubernetes function
 	ret, err := s.k.QueryPrometheusSeries(match, startTime, endTime, limit)
@@ -546,16 +552,16 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 		errMsg := err.Error()
 		// Check for common error patterns and provide more helpful messages
 		if strings.Contains(errMsg, "unknown by name") || strings.Contains(errMsg, "metrics not found") {
-			klog.Errorf("Tool call: prometheus_series_query failed after %v: no series found matching selectors", duration)
+			klog.Errorf("Tool call: prometheus_series_query failed after %v: no series found matching selectors by session id: %s", duration, sessionID)
 			return NewTextResult("", fmt.Errorf("ERROR: No series found matching the provided selectors. The metrics may not exist in Prometheus or may have different labels than specified.")), nil
 		} else if strings.Contains(errMsg, "parse error") || strings.Contains(errMsg, "bad_data") {
-			klog.Errorf("Tool call: prometheus_series_query failed after %v: invalid series selector syntax", duration)
+			klog.Errorf("Tool call: prometheus_series_query failed after %v: invalid series selector syntax by session id: %s", duration, sessionID)
 			return NewTextResult("", fmt.Errorf("ERROR: Invalid series selector syntax in one of the match patterns: %v. Please check your selector format.", match)), nil
 		} else if strings.Contains(errMsg, "failed to discover Prometheus") {
-			klog.Errorf("Tool call: prometheus_series_query failed after %v: cannot connect to Prometheus server", duration)
+			klog.Errorf("Tool call: prometheus_series_query failed after %v: cannot connect to Prometheus server by session id: %s", duration, sessionID)
 			return NewTextResult("", fmt.Errorf("ERROR: Cannot connect to Prometheus server. The server may be unavailable or misconfigured.")), nil
 		}
-		klog.Errorf("Tool call: prometheus_series_query failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_series_query failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("ERROR: Failed to query Prometheus series: %v", err)), nil
 	}
 
@@ -566,7 +572,7 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_series_query completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_series_query completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -576,18 +582,19 @@ func (s *Server) prometheusTargets(ctx context.Context, ctr mcp.CallToolRequest)
 	state := ctr.GetString("state", "")
 	scrapePool := ctr.GetString("scrape_pool", "")
 
-	klog.V(1).Infof("Tool: prometheus_targets - state=%s, scrape_pool=%s - got called", state, scrapePool)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_targets - state=%s, scrape_pool=%s - got called by session id: %s", state, scrapePool, sessionID)
 
 	// Call the Kubernetes function
 	ret, err := s.k.GetPrometheusTargets(state, scrapePool)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_targets failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_targets failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to get Prometheus targets: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_targets completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_targets completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -608,19 +615,20 @@ func (s *Server) prometheusTargetMetadata(ctx context.Context, ctr mcp.CallToolR
 		}
 	}
 
-	klog.V(1).Infof("Tool: prometheus_targets_metadata - match_target=%s, metric=%s, limit=%d - got called",
-		matchTarget, metric, limit)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_targets_metadata - match_target=%s, metric=%s, limit=%d - got called by session id: %s",
+		matchTarget, metric, limit, sessionID)
 
 	// Call the Kubernetes function
 	ret, err := s.k.GetPrometheusTargetMetadata(matchTarget, metric, limit)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_targets_metadata failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_targets_metadata failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to get Prometheus target metadata: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_targets_metadata completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_targets_metadata completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -649,31 +657,32 @@ func (s *Server) prometheusCreateAlert(ctx context.Context, ctr mcp.CallToolRequ
 		}
 	}
 
-	klog.V(1).Infof("Tool: prometheus_create_alert - alertname=%s, applabel=%s, namespace=%s, interval=%s, for=%s, annotations_count=%d, alertlabels_count=%d - got called",
-		alertName, appLabel, namespace, interval, forDuration, annotationsCount, alertLabelsCount)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_create_alert - alertname=%s, applabel=%s, namespace=%s, interval=%s, for=%s, annotations_count=%d, alertlabels_count=%d - got called by session id: %s",
+		alertName, appLabel, namespace, interval, forDuration, annotationsCount, alertLabelsCount, sessionID)
 
 	// Extract and validate required parameters
 	if alertName == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_create_alert failed after %v: missing required parameter: alertname", duration)
+		klog.Errorf("Tool call: prometheus_create_alert failed after %v: missing required parameter: alertname by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: alertname")), nil
 	}
 
 	if expression == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_create_alert failed after %v: missing required parameter: expression", duration)
+		klog.Errorf("Tool call: prometheus_create_alert failed after %v: missing required parameter: expression by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: expression")), nil
 	}
 
 	if appLabel == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_create_alert failed after %v: missing required parameter: applabel", duration)
+		klog.Errorf("Tool call: prometheus_create_alert failed after %v: missing required parameter: applabel by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: applabel")), nil
 	}
 
 	if namespace == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_create_alert failed after %v: missing required parameter: namespace", duration)
+		klog.Errorf("Tool call: prometheus_create_alert failed after %v: missing required parameter: namespace by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: namespace")), nil
 	}
 
@@ -717,17 +726,17 @@ func (s *Server) prometheusCreateAlert(ctx context.Context, ctr mcp.CallToolRequ
 		result, err := s.k.CreatePrometheusAlert(alertName, expression, appLabel, namespace, interval, forDuration, annotations, alertLabels)
 		if err != nil {
 			duration := time.Since(start)
-			klog.Errorf("Tool call: prometheus_create_alert failed after %v: %v", duration, err)
+			klog.Errorf("Tool call: prometheus_create_alert failed after %v: %v by session id: %s", duration, err, sessionID)
 			return NewTextResult("", fmt.Errorf("failed to create Prometheus alert: %v", err)), nil
 		}
 
 		duration := time.Since(start)
-		klog.V(1).Infof("Tool call: prometheus_create_alert completed successfully in %v", duration)
+		klog.V(1).Infof("Tool call: prometheus_create_alert completed successfully in %v by session id: %s", duration, sessionID)
 		return NewTextResult(result, nil), nil
 	}
 
 	duration := time.Since(start)
-	klog.Errorf("Tool call: prometheus_create_alert failed after %v: failed to get arguments", duration)
+	klog.Errorf("Tool call: prometheus_create_alert failed after %v: failed to get arguments by session id: %s", duration, sessionID)
 	return NewTextResult("", errors.New("failed to get arguments")), nil
 }
 
@@ -756,25 +765,26 @@ func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequ
 		}
 	}
 
-	klog.V(1).Infof("Tool: prometheus_update_alert - alertname=%s, applabel=%s, namespace=%s, expression=%s, interval=%s, for=%s, annotations_count=%d, alertlabels_count=%d - got called",
-		alertName, appLabel, namespace, expression, interval, forDuration, annotationsCount, alertLabelsCount)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_update_alert - alertname=%s, applabel=%s, namespace=%s, expression=%s, interval=%s, for=%s, annotations_count=%d, alertlabels_count=%d - got called by session id: %s",
+		alertName, appLabel, namespace, expression, interval, forDuration, annotationsCount, alertLabelsCount, sessionID)
 
 	// Extract and validate required parameters
 	if alertName == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_update_alert failed after %v: missing required parameter: alertname", duration)
+		klog.Errorf("Tool call: prometheus_update_alert failed after %v: missing required parameter: alertname by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: alertname")), nil
 	}
 
 	if appLabel == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_update_alert failed after %v: missing required parameter: applabel", duration)
+		klog.Errorf("Tool call: prometheus_update_alert failed after %v: missing required parameter: applabel by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: applabel")), nil
 	}
 
 	if namespace == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_update_alert failed after %v: missing required parameter: namespace", duration)
+		klog.Errorf("Tool call: prometheus_update_alert failed after %v: missing required parameter: namespace by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: namespace")), nil
 	}
 
@@ -812,12 +822,12 @@ func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequ
 	result, err := s.k.UpdatePrometheusAlert(alertName, expression, appLabel, namespace, interval, forDuration, annotations, alertLabels)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_update_alert failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_update_alert failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to update Prometheus alert: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_update_alert completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_update_alert completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(result, nil), nil
 }
 
@@ -828,19 +838,20 @@ func (s *Server) prometheusDeleteAlert(ctx context.Context, ctr mcp.CallToolRequ
 	namespace := ctr.GetString("namespace", "")
 	alertName := ctr.GetString("alertname", "")
 
-	klog.V(1).Infof("Tool: prometheus_delete_alert - applabel=%s, namespace=%s, alertname=%s - got called",
-		appLabel, namespace, alertName)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_delete_alert - applabel=%s, namespace=%s, alertname=%s - got called by session id: %s",
+		appLabel, namespace, alertName, sessionID)
 
 	// Extract and validate required parameters
 	if appLabel == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_delete_alert failed after %v: missing required parameter: applabel", duration)
+		klog.Errorf("Tool call: prometheus_delete_alert failed after %v: missing required parameter: applabel by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: applabel")), nil
 	}
 
 	if namespace == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_delete_alert failed after %v: missing required parameter: namespace", duration)
+		klog.Errorf("Tool call: prometheus_delete_alert failed after %v: missing required parameter: namespace by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: namespace")), nil
 	}
 
@@ -848,30 +859,31 @@ func (s *Server) prometheusDeleteAlert(ctx context.Context, ctr mcp.CallToolRequ
 	result, err := s.k.DeletePrometheusAlert(appLabel, namespace, alertName)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_delete_alert failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_delete_alert failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to delete Prometheus alert: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_delete_alert completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_delete_alert completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // prometheusGetAlerts handles the prometheus_get_alerts tool request
 func (s *Server) prometheusGetAlerts(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool: prometheus_get_alerts - got called")
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_get_alerts - got called by session id: %s", sessionID)
 
 	// Call the Kubernetes function
 	ret, err := s.k.GetPrometheusAlerts()
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_get_alerts failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_get_alerts failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to get Prometheus alerts: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_get_alerts completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_get_alerts completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -945,37 +957,39 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 		groupLimit = fmt.Sprintf("%d", int(limitVal))
 	}
 
-	klog.V(1).Infof("Tool: prometheus_get_rules - rule_names_count=%d, rule_groups_count=%d, files_count=%d, exclude_alerts=%t, match_labels_count=%d, group_limit=%s - got called",
-		len(ruleNames), len(ruleGroups), len(files), excludeAlerts, len(matchLabels), groupLimit)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_get_rules - rule_names_count=%d, rule_groups_count=%d, files_count=%d, exclude_alerts=%t, match_labels_count=%d, group_limit=%s - got called by session id: %s",
+		len(ruleNames), len(ruleGroups), len(files), excludeAlerts, len(matchLabels), groupLimit, sessionID)
 
 	// Call the Kubernetes function
 	ret, err := s.k.GetPrometheusRules(groupLimit, ruleNames, ruleGroups, files, excludeAlerts, matchLabels)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_get_rules failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_get_rules failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to get Prometheus rules: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_get_rules completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_get_rules completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
 // prometheusRuntimeInfo handles the prometheus_runtimeinfo tool request
 func (s *Server) prometheusRuntimeInfo(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool: prometheus_runtimeinfo - got called")
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_runtimeinfo - got called by session id: %s", sessionID)
 
 	// Call the Kubernetes function
 	ret, err := s.k.GetPrometheusRuntimeInfo()
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_runtimeinfo failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_runtimeinfo failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to get Prometheus runtime info: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_runtimeinfo completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_runtimeinfo completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -984,18 +998,19 @@ func (s *Server) prometheusTSDBStatus(ctx context.Context, ctr mcp.CallToolReque
 	start := time.Now()
 	limit := int(ctr.GetFloat("limit", 0)) // Default is no limit
 
-	klog.V(1).Infof("Tool: prometheus_TSDB_status - limit=%d - got called", limit)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_TSDB_status - limit=%d - got called by session id: %s", limit, sessionID)
 
 	// Call the Kubernetes function
 	ret, err := s.k.GetPrometheusTSDBStatus(limit)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_TSDB_status failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_TSDB_status failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to get Prometheus TSDB status: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_TSDB_status completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_TSDB_status completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -1021,19 +1036,20 @@ func (s *Server) prometheusListLabelNames(ctx context.Context, ctr mcp.CallToolR
 		}
 	}
 
-	klog.V(1).Infof("Tool: prometheus_list_label_names - startRfc3339=%s, endRfc3339=%s, limit=%d, matches_count=%d - got called",
-		startRfc3339, endRfc3339, limit, len(matches))
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_list_label_names - startRfc3339=%s, endRfc3339=%s, limit=%d, matches_count=%d - got called by session id: %s",
+		startRfc3339, endRfc3339, limit, len(matches), sessionID)
 
 	// Call the Kubernetes function
 	ret, err := s.k.ListPrometheusLabelNames(startRfc3339, endRfc3339, limit, matches)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_list_label_names failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_list_label_names failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to list Prometheus label names: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_list_label_names completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_list_label_names completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -1060,13 +1076,14 @@ func (s *Server) prometheusListLabelValues(ctx context.Context, ctr mcp.CallTool
 		}
 	}
 
-	klog.V(1).Infof("Tool: prometheus_list_label_values - labelName=%s, startRfc3339=%s, endRfc3339=%s, limit=%d, matches_count=%d - got called",
-		labelName, startRfc3339, endRfc3339, limit, len(matches))
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prometheus_list_label_values - labelName=%s, startRfc3339=%s, endRfc3339=%s, limit=%d, matches_count=%d - got called by session id: %s",
+		labelName, startRfc3339, endRfc3339, limit, len(matches), sessionID)
 
 	// Extract required parameters
 	if labelName == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_list_label_values failed after %v: missing required parameter: labelName", duration)
+		klog.Errorf("Tool call: prometheus_list_label_values failed after %v: missing required parameter: labelName by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: labelName")), nil
 	}
 
@@ -1074,11 +1091,11 @@ func (s *Server) prometheusListLabelValues(ctx context.Context, ctr mcp.CallTool
 	ret, err := s.k.ListPrometheusLabelValues(labelName, startRfc3339, endRfc3339, limit, matches)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_list_label_values failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: prometheus_list_label_values failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to list Prometheus label values: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: prometheus_list_label_values completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: prometheus_list_label_values completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }

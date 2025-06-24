@@ -26,17 +26,18 @@ func (s *Server) initNodes() []server.ServerTool {
 // nodesList handles the nodes_list tool request
 func (s *Server) nodesList(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool: nodes_list - listing all nodes - got called")
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: nodes_list - listing all nodes - got called by session id: %s", sessionID)
 
 	ret, err := s.k.NodesList(ctx)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: nodes_list failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: nodes_list failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to list nodes: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: nodes_list completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: nodes_list completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -44,10 +45,11 @@ func (s *Server) nodesList(ctx context.Context, _ mcp.CallToolRequest) (*mcp.Cal
 func (s *Server) nodesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	name := ctr.GetString("name", "")
-	klog.V(1).Infof("Tool: nodes_get - name: %s - got called", name)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: nodes_get - name: %s - got called by session id: %s", name, sessionID)
 
 	if name == "" {
-		klog.Errorf("Tool call: nodes_get failed after %v: missing name parameter", time.Since(start))
+		klog.Errorf("Tool call: nodes_get failed after %v: missing name parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("missing required parameter: name")), nil
 	}
 
@@ -55,10 +57,10 @@ func (s *Server) nodesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Ca
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: nodes_get failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: nodes_get failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to get node '%s': %v", name, err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: nodes_get completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: nodes_get completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }

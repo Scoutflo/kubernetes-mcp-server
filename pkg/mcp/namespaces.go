@@ -22,16 +22,17 @@ func (s *Server) initNamespaces() []server.ServerTool {
 
 func (s *Server) namespacesList(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool: namespaces_list - listing all namespaces - got called")
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: namespaces_list - listing all namespaces - got called by session id: %s", sessionID)
 
 	ret, err := s.k.NamespacesList(ctx)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: namespaces_list failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: namespaces_list failed after %v: %v by session id: %s", duration, err, sessionID)
 		err = fmt.Errorf("failed to list namespaces: %v", err)
 	} else {
-		klog.V(1).Infof("Tool call: namespaces_list completed successfully in %v", duration)
+		klog.V(1).Infof("Tool call: namespaces_list completed successfully in %v by session id: %s", duration, sessionID)
 	}
 
 	return NewTextResult(ret, err), nil

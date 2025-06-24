@@ -29,21 +29,22 @@ func (s *Server) nodesMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mc
 	start := time.Now()
 	nodeName := ctr.GetString("name", "")
 
-	klog.V(1).Infof("Tool: nodes_metrics - name=%s - got called", nodeName)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: nodes_metrics - name=%s - got called by session id: %s", nodeName, sessionID)
 
 	ret, err := s.k.GetNodeMetrics(ctx, nodeName)
 	if err != nil {
 		duration := time.Since(start)
 		if nodeName != "" {
-			klog.Errorf("Tool call: nodes_metrics failed after %v: failed to get metrics for node '%s': %v", duration, nodeName, err)
+			klog.Errorf("Tool call: nodes_metrics failed after %v: failed to get metrics for node '%s': %v by session id: %s", duration, nodeName, err, sessionID)
 			return NewTextResult("", fmt.Errorf("failed to get metrics for node '%s': %v", nodeName, err)), nil
 		}
-		klog.Errorf("Tool call: nodes_metrics failed after %v: failed to list node metrics: %v", duration, err)
+		klog.Errorf("Tool call: nodes_metrics failed after %v: failed to list node metrics: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to list node metrics: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: nodes_metrics completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: nodes_metrics completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -53,20 +54,21 @@ func (s *Server) podsMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mcp
 	namespace := ctr.GetString("namespace", "")
 	podName := ctr.GetString("name", "")
 
-	klog.V(1).Infof("Tool: pods_metrics - namespace=%s, name=%s - got called", namespace, podName)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: pods_metrics - namespace=%s, name=%s - got called by session id: %s", namespace, podName, sessionID)
 
 	ret, err := s.k.GetPodMetrics(ctx, namespace, podName)
 	if err != nil {
 		duration := time.Since(start)
 		if podName != "" {
-			klog.Errorf("Tool call: pods_metrics failed after %v: failed to get metrics for pod '%s' in namespace '%s': %v", duration, podName, namespace, err)
+			klog.Errorf("Tool call: pods_metrics failed after %v: failed to get metrics for pod '%s' in namespace '%s': %v by session id: %s", duration, podName, namespace, err, sessionID)
 			return NewTextResult("", fmt.Errorf("failed to get metrics for pod '%s' in namespace '%s': %v", podName, namespace, err)), nil
 		}
-		klog.Errorf("Tool call: pods_metrics failed after %v: failed to get pod metrics in namespace '%s': %v", duration, namespace, err)
+		klog.Errorf("Tool call: pods_metrics failed after %v: failed to get pod metrics in namespace '%s': %v by session id: %s", duration, namespace, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to get pod metrics in namespace '%s': %v", namespace, err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: pods_metrics completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: pods_metrics completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }

@@ -139,7 +139,8 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		return NewTextResult("", fmt.Errorf("failed to list resources, %s", err)), nil
 	}
 
-	klog.V(1).Infof("Tool: resources_list - apiVersion: %s, kind: %s, namespace: %s - got called", gvk.Version, gvk.Kind, namespace)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: resources_list - apiVersion: %s, kind: %s, namespace: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, sessionID)
 
 	ret, err := s.k.ResourcesList(ctx, gvk, namespace)
 	duration := time.Since(start)
@@ -149,7 +150,7 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		return NewTextResult("", fmt.Errorf("failed to list resources: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: resources_list completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: resources_list completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, err), nil
 }
 
@@ -170,7 +171,8 @@ func (s *Server) resourcesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mc
 		return NewTextResult("", errors.New("failed to get resource, missing argument name")), nil
 	}
 
-	klog.V(1).Infof("Tool: resources_get - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called", gvk.Version, gvk.Kind, namespace, name)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: resources_get - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, name, sessionID)
 
 	ret, err := s.k.ResourcesGet(ctx, gvk, namespace, name)
 	duration := time.Since(start)
@@ -180,7 +182,7 @@ func (s *Server) resourcesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mc
 		return NewTextResult("", fmt.Errorf("failed to get resource: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: resources_get completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: resources_get completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, err), nil
 }
 
@@ -192,7 +194,8 @@ func (s *Server) resourcesCreateOrUpdate(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", errors.New("failed to create or update resources, missing argument resource")), nil
 	}
 
-	klog.V(1).Infof("Tool: resources_create_or_update - resource YAML/JSON provided (length: %d) - got called", len(resource))
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: resources_create_or_update - resource YAML/JSON provided (length: %d) - got called by session id: %s", len(resource), sessionID)
 
 	ret, err := s.k.ResourcesCreateOrUpdate(ctx, resource)
 	duration := time.Since(start)
@@ -202,7 +205,7 @@ func (s *Server) resourcesCreateOrUpdate(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("failed to create or update resources: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: resources_create_or_update completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: resources_create_or_update completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, err), nil
 }
 
@@ -223,7 +226,8 @@ func (s *Server) resourcesDelete(ctx context.Context, ctr mcp.CallToolRequest) (
 		return NewTextResult("", errors.New("failed to delete resource, missing argument name")), nil
 	}
 
-	klog.V(1).Infof("Tool: resources_delete - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called", gvk.Version, gvk.Kind, namespace, name)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: resources_delete - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, name, sessionID)
 
 	err = s.k.ResourcesDelete(ctx, gvk, namespace, name)
 	duration := time.Since(start)
@@ -233,7 +237,7 @@ func (s *Server) resourcesDelete(ctx context.Context, ctr mcp.CallToolRequest) (
 		return NewTextResult("", fmt.Errorf("failed to delete resource: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: resources_delete completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: resources_delete completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult("Resource deleted successfully", err), nil
 }
 
@@ -267,7 +271,8 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 
 	name := ctr.GetString("name", "")
 
-	klog.V(1).Infof("Tool: get_resources_yaml - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called", gvk.Version, gvk.Kind, namespace, name)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: get_resources_yaml - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, name, sessionID)
 
 	if name != "" {
 		// Get a specific resource
@@ -277,7 +282,7 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
 			return NewTextResult("", fmt.Errorf("failed to get resource YAML: %v", err)), nil
 		}
-		klog.V(1).Infof("Tool call: get_resources_yaml completed successfully in %v", duration)
+		klog.V(1).Infof("Tool call: get_resources_yaml completed successfully in %v by session id: %s", duration, sessionID)
 		return NewTextResult(ret, err), nil
 	} else {
 		// Get all resources of this type in the namespace
@@ -287,7 +292,7 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
 			return NewTextResult("", fmt.Errorf("failed to list resources YAML: %v", err)), nil
 		}
-		klog.V(1).Infof("Tool call: get_resources_yaml completed successfully in %v", duration)
+		klog.V(1).Infof("Tool call: get_resources_yaml completed successfully in %v by session id: %s", duration, sessionID)
 		return NewTextResult(ret, err), nil
 	}
 }
@@ -297,7 +302,8 @@ func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	manifestPath := ctr.GetString("manifest_path", "")
 	yamlContent := ctr.GetString("yaml_content", "")
 
-	klog.V(1).Infof("Tool: apply_manifest - manifest_path: %s, yaml_content_length: %d - got called", manifestPath, len(yamlContent))
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: apply_manifest - manifest_path: %s, yaml_content_length: %d - got called by session id: %s", manifestPath, len(yamlContent), sessionID)
 
 	// Ensure at least one of manifest_path or yaml_content is provided
 	if manifestPath == "" && yamlContent == "" {
@@ -330,7 +336,7 @@ func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		return NewTextResult("", fmt.Errorf("failed to apply manifest: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: apply_manifest completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: apply_manifest completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -364,7 +370,8 @@ func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*
 		patchType = pt
 	}
 
-	klog.V(1).Infof("Tool: resources_patch - apiVersion: %s, kind: %s, namespace: %s, name: %s, patch_type: %s - got called", gvk.Version, gvk.Kind, namespace, resourceName, patchType)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: resources_patch - apiVersion: %s, kind: %s, namespace: %s, name: %s, patch_type: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, resourceName, patchType, sessionID)
 
 	// Validate patch type
 	if patchType != "json" && patchType != "merge" && patchType != "strategic" {
@@ -388,6 +395,6 @@ func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*
 		return NewTextResult("", fmt.Errorf("failed to patch resource: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: resources_patch completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: resources_patch completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }

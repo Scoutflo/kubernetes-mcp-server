@@ -46,7 +46,8 @@ func (s *Server) promptGenerator(ctx context.Context, ctr mcp.CallToolRequest) (
 	}
 	description := descriptionArg.(string)
 
-	klog.V(1).Infof("Tool: prompt_generator - description=%s - got called", description)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: prompt_generator - description=%s - got called by session id: %s", description, sessionID)
 
 	// Call the Kubernetes GeneratePrompt function
 	prompt, err := s.k.GeneratePrompt(description)

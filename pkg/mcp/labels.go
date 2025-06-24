@@ -129,32 +129,33 @@ func (s *Server) labelResource(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		}
 	}
 
-	klog.V(1).Infof("Tool: label_resource - apiVersion=%s, kind=%s, name=%s, namespace=%s, labels_count=%d - got called",
-		apiVersion, kind, name, namespace, labelsCount)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: label_resource - apiVersion=%s, kind=%s, name=%s, namespace=%s, labels_count=%d - got called by session id: %s",
+		apiVersion, kind, name, namespace, labelsCount, sessionID)
 
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: label_resource failed after %v: failed to parse GVK: %v", duration, err)
+		klog.Errorf("Tool call: label_resource failed after %v: failed to parse GVK: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to label resource, %s", err)), nil
 	}
 
 	if name == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: label_resource failed after %v: missing argument name", duration)
+		klog.Errorf("Tool call: label_resource failed after %v: missing argument name by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("failed to label resource, missing argument name")), nil
 	}
 
 	if !ok {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: label_resource failed after %v: failed to get arguments", duration)
+		klog.Errorf("Tool call: label_resource failed after %v: failed to get arguments by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("failed to get arguments")), nil
 	}
 
 	labels, ok := argsMap["labels"].(map[string]interface{})
 	if !ok || len(labels) == 0 {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: label_resource failed after %v: missing or invalid labels", duration)
+		klog.Errorf("Tool call: label_resource failed after %v: missing or invalid labels by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("failed to label resource, missing or invalid labels")), nil
 	}
 
@@ -167,12 +168,12 @@ func (s *Server) labelResource(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	ret, err := s.k.LabelResource(ctx, gvk, namespace, name, labelMap)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: label_resource failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: label_resource failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to label resource: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: label_resource completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: label_resource completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -184,37 +185,38 @@ func (s *Server) removeLabel(ctx context.Context, ctr mcp.CallToolRequest) (*mcp
 	name := ctr.GetString("name", "")
 	labelKey := ctr.GetString("label_key", "")
 
-	klog.V(1).Infof("Tool: remove_label - apiVersion=%s, kind=%s, name=%s, namespace=%s, label_key=%s - got called",
-		apiVersion, kind, name, namespace, labelKey)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: remove_label - apiVersion=%s, kind=%s, name=%s, namespace=%s, label_key=%s - got called by session id: %s",
+		apiVersion, kind, name, namespace, labelKey, sessionID)
 
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: remove_label failed after %v: failed to parse GVK: %v", duration, err)
+		klog.Errorf("Tool call: remove_label failed after %v: failed to parse GVK: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to remove label, %s", err)), nil
 	}
 
 	if name == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: remove_label failed after %v: missing argument name", duration)
+		klog.Errorf("Tool call: remove_label failed after %v: missing argument name by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("failed to remove label, missing argument name")), nil
 	}
 
 	if labelKey == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: remove_label failed after %v: missing or invalid label_key", duration)
+		klog.Errorf("Tool call: remove_label failed after %v: missing or invalid label_key by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("failed to remove label, missing or invalid label_key")), nil
 	}
 
 	ret, err := s.k.RemoveLabel(ctx, gvk, namespace, name, labelKey)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: remove_label failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: remove_label failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to remove label: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: remove_label completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: remove_label completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -234,32 +236,33 @@ func (s *Server) annotateResource(ctx context.Context, ctr mcp.CallToolRequest) 
 		}
 	}
 
-	klog.V(1).Infof("Tool: annotate_resource - apiVersion=%s, kind=%s, name=%s, namespace=%s, annotations_count=%d - got called",
-		apiVersion, kind, name, namespace, annotationsCount)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: annotate_resource - apiVersion=%s, kind=%s, name=%s, namespace=%s, annotations_count=%d - got called by session id: %s",
+		apiVersion, kind, name, namespace, annotationsCount, sessionID)
 
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: annotate_resource failed after %v: failed to parse GVK: %v", duration, err)
+		klog.Errorf("Tool call: annotate_resource failed after %v: failed to parse GVK: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to annotate resource, %s", err)), nil
 	}
 
 	if name == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: annotate_resource failed after %v: missing argument name", duration)
+		klog.Errorf("Tool call: annotate_resource failed after %v: missing argument name by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("failed to annotate resource, missing argument name")), nil
 	}
 
 	if !ok {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: annotate_resource failed after %v: failed to get arguments", duration)
+		klog.Errorf("Tool call: annotate_resource failed after %v: failed to get arguments by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("failed to get arguments")), nil
 	}
 
 	annotations, ok := argsMap["annotations"].(map[string]interface{})
 	if !ok || len(annotations) == 0 {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: annotate_resource failed after %v: missing or invalid annotations", duration)
+		klog.Errorf("Tool call: annotate_resource failed after %v: missing or invalid annotations by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("failed to annotate resource, missing or invalid annotations")), nil
 	}
 
@@ -272,12 +275,12 @@ func (s *Server) annotateResource(ctx context.Context, ctr mcp.CallToolRequest) 
 	ret, err := s.k.AnnotateResource(ctx, gvk, namespace, name, annotationMap)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: annotate_resource failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: annotate_resource failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to annotate resource: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: annotate_resource completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: annotate_resource completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
 
@@ -289,36 +292,37 @@ func (s *Server) removeAnnotation(ctx context.Context, ctr mcp.CallToolRequest) 
 	name := ctr.GetString("name", "")
 	annotationKey := ctr.GetString("annotation_key", "")
 
-	klog.V(1).Infof("Tool: remove_annotation - apiVersion=%s, kind=%s, name=%s, namespace=%s, annotation_key=%s - got called",
-		apiVersion, kind, name, namespace, annotationKey)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: remove_annotation - apiVersion=%s, kind=%s, name=%s, namespace=%s, annotation_key=%s - got called by session id: %s",
+		apiVersion, kind, name, namespace, annotationKey, sessionID)
 
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: remove_annotation failed after %v: failed to parse GVK: %v", duration, err)
+		klog.Errorf("Tool call: remove_annotation failed after %v: failed to parse GVK: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to remove annotation, %s", err)), nil
 	}
 
 	if name == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: remove_annotation failed after %v: missing argument name", duration)
+		klog.Errorf("Tool call: remove_annotation failed after %v: missing argument name by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("failed to remove annotation, missing argument name")), nil
 	}
 
 	if annotationKey == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: remove_annotation failed after %v: missing or invalid annotation_key", duration)
+		klog.Errorf("Tool call: remove_annotation failed after %v: missing or invalid annotation_key by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("failed to remove annotation, missing or invalid annotation_key")), nil
 	}
 
 	ret, err := s.k.RemoveAnnotation(ctx, gvk, namespace, name, annotationKey)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: remove_annotation failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: remove_annotation failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to remove annotation: %v", err)), nil
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: remove_annotation completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: remove_annotation completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }

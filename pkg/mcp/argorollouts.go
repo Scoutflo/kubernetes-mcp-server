@@ -203,34 +203,35 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 // createArgoRolloutsConfig generates an Argo Rollout YAML configuration based on provided parameters
 func (s *Server) createArgoRolloutsConfig(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
-		klog.Errorf("Tool call: create_argo_rollout_config failed after %v: missing name parameter", time.Since(start))
+		klog.Errorf("Tool call: create_argo_rollout_config failed after %v: missing name parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
-		klog.Errorf("Tool call: create_argo_rollout_config failed after %v: missing namespace parameter", time.Since(start))
+		klog.Errorf("Tool call: create_argo_rollout_config failed after %v: missing namespace parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
 	image, err := ctr.RequireString("image")
 	if err != nil {
-		klog.Errorf("Tool call: create_argo_rollout_config failed after %v: missing image parameter", time.Since(start))
+		klog.Errorf("Tool call: create_argo_rollout_config failed after %v: missing image parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("container image is required")), nil
 	}
 
 	strategy, err := ctr.RequireString("strategy")
 	if err != nil {
-		klog.Errorf("Tool call: create_argo_rollout_config failed after %v: missing strategy parameter", time.Since(start))
+		klog.Errorf("Tool call: create_argo_rollout_config failed after %v: missing strategy parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("rollout strategy is required")), nil
 	}
 
 	selectorLabels := ctr.GetString("selector_labels", "")
 	if selectorLabels == "" {
-		klog.Errorf("Tool call: create_argo_rollout_config failed after %v: missing selector_labels parameter", time.Since(start))
+		klog.Errorf("Tool call: create_argo_rollout_config failed after %v: missing selector_labels parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("selector labels are required")), nil
 	}
 
@@ -261,8 +262,8 @@ func (s *Server) createArgoRolloutsConfig(ctx context.Context, ctr mcp.CallToolR
 		"analysis_templates":       ctr.GetString("analysis_templates", ""),
 	}
 
-	klog.V(1).Infof("Tool: create_argo_rollout_config - name: %s, namespace: %s, image: %s, strategy: %s, selector_labels: %s, replicas: %s - got called",
-		name, namespace, image, strategy, selectorLabels, replicas)
+	klog.V(1).Infof("Tool: create_argo_rollout_config - name: %s, namespace: %s, image: %s, strategy: %s, selector_labels: %s, replicas: %s - got called by session id: %s",
+		name, namespace, image, strategy, selectorLabels, replicas, sessionID)
 
 	// Generate YAML using the Kubernetes client
 	yamlConfig, err := s.k.GenerateRolloutYAML(
@@ -273,104 +274,107 @@ func (s *Server) createArgoRolloutsConfig(ctx context.Context, ctr mcp.CallToolR
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: create_argo_rollout_config failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: create_argo_rollout_config failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: create_argo_rollout_config completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: create_argo_rollout_config completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(yamlConfig, nil), nil
 }
 
 // promoteArgoRollout promotes an Argo Rollout to advance it to the next step
 func (s *Server) promoteArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
-		klog.Errorf("Tool call: promote_argo_rollout failed after %v: missing name parameter", time.Since(start))
+		klog.Errorf("Tool call: promote_argo_rollout failed after %v: missing name parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
-		klog.Errorf("Tool call: promote_argo_rollout failed after %v: missing namespace parameter", time.Since(start))
+		klog.Errorf("Tool call: promote_argo_rollout failed after %v: missing namespace parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
 	// Extract optional parameters
 	fullPromote := ctr.GetBool("full", false)
 
-	klog.V(1).Infof("Tool: promote_argo_rollout - name: %s, namespace: %s, full: %t - got called", name, namespace, fullPromote)
+	klog.V(1).Infof("Tool: promote_argo_rollout - name: %s, namespace: %s, full: %t - got called by session id: %s", name, namespace, fullPromote, sessionID)
 
 	// Promote the rollout using the Kubernetes client
 	result, err := s.k.PromoteRollout(ctx, name, namespace, fullPromote)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: promote_argo_rollout failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: promote_argo_rollout failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: promote_argo_rollout completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: promote_argo_rollout completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // abortArgoRollout aborts an in-progress Argo Rollout and reverts to the stable version
 func (s *Server) abortArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
-		klog.Errorf("Tool call: abort_argo_rollout failed after %v: missing name parameter", time.Since(start))
+		klog.Errorf("Tool call: abort_argo_rollout failed after %v: missing name parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
-		klog.Errorf("Tool call: abort_argo_rollout failed after %v: missing namespace parameter", time.Since(start))
+		klog.Errorf("Tool call: abort_argo_rollout failed after %v: missing namespace parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
-	klog.V(1).Infof("Tool: abort_argo_rollout - name: %s, namespace: %s - got called", name, namespace)
+	klog.V(1).Infof("Tool: abort_argo_rollout - name: %s, namespace: %s - got called by session id: %s", name, namespace, sessionID)
 
 	// Abort the rollout using the Kubernetes client
 	result, err := s.k.AbortRollout(ctx, name, namespace)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: abort_argo_rollout failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: abort_argo_rollout failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: abort_argo_rollout completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: abort_argo_rollout completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // getArgoRollout gets the status of an Argo Rollout
 func (s *Server) getArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
-		klog.Errorf("Tool call: get_argo_rollout failed after %v: missing name parameter", time.Since(start))
+		klog.Errorf("Tool call: get_argo_rollout failed after %v: missing name parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
-		klog.Errorf("Tool call: get_argo_rollout failed after %v: missing namespace parameter", time.Since(start))
+		klog.Errorf("Tool call: get_argo_rollout failed after %v: missing namespace parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
 	output := ctr.GetString("output", "")
 
-	klog.V(1).Infof("Tool: get_argo_rollout - name: %s, namespace: %s, output: %s - got called", name, namespace, output)
+	klog.V(1).Infof("Tool: get_argo_rollout - name: %s, namespace: %s, output: %s - got called by session id: %s", name, namespace, output, sessionID)
 
 	// Get the rollout using the Kubernetes client
 	rollout, err := s.k.GetRollout(ctx, name, namespace)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: get_argo_rollout failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: get_argo_rollout failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
@@ -379,125 +383,128 @@ func (s *Server) getArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: get_argo_rollout failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: get_argo_rollout failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: get_argo_rollout completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: get_argo_rollout completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // setArgoRolloutWeight sets the weight for a canary rollout
 func (s *Server) setArgoRolloutWeight(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
-		klog.Errorf("Tool call: set_argo_rollout_weight failed after %v: missing name parameter", time.Since(start))
+		klog.Errorf("Tool call: set_argo_rollout_weight failed after %v: missing name parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
-		klog.Errorf("Tool call: set_argo_rollout_weight failed after %v: missing namespace parameter", time.Since(start))
+		klog.Errorf("Tool call: set_argo_rollout_weight failed after %v: missing namespace parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
 	weightStr, err := ctr.RequireString("weight")
 	if err != nil {
-		klog.Errorf("Tool call: set_argo_rollout_weight failed after %v: missing weight parameter", time.Since(start))
+		klog.Errorf("Tool call: set_argo_rollout_weight failed after %v: missing weight parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("weight is required")), nil
 	}
 
 	weight, err := strconv.Atoi(weightStr)
 	if err != nil {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: set_argo_rollout_weight failed after %v: invalid weight value '%s': %v", duration, weightStr, err)
+		klog.Errorf("Tool call: set_argo_rollout_weight failed after %v: invalid weight value '%s': %v by session id: %s", duration, weightStr, err, sessionID)
 		return NewTextResult("", fmt.Errorf("invalid weight value '%s': %w", weightStr, err)), nil
 	}
 
-	klog.V(1).Infof("Tool: set_argo_rollout_weight - name: %s, namespace: %s, weight: %d - got called", name, namespace, weight)
+	klog.V(1).Infof("Tool: set_argo_rollout_weight - name: %s, namespace: %s, weight: %d - got called by session id: %s", name, namespace, weight, sessionID)
 
 	// Set the rollout weight using the Kubernetes client
 	result, err := s.k.SetRolloutWeight(ctx, name, namespace, weight)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: set_argo_rollout_weight failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: set_argo_rollout_weight failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: set_argo_rollout_weight completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: set_argo_rollout_weight completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // pauseArgoRollout pauses an Argo Rollout to temporarily halt progression
 func (s *Server) pauseArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
-		klog.Errorf("Tool call: pause_argo_rollout failed after %v: missing name parameter", time.Since(start))
+		klog.Errorf("Tool call: pause_argo_rollout failed after %v: missing name parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
-		klog.Errorf("Tool call: pause_argo_rollout failed after %v: missing namespace parameter", time.Since(start))
+		klog.Errorf("Tool call: pause_argo_rollout failed after %v: missing namespace parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
-	klog.V(1).Infof("Tool: pause_argo_rollout - name: %s, namespace: %s - got called", name, namespace)
+	klog.V(1).Infof("Tool: pause_argo_rollout - name: %s, namespace: %s - got called by session id: %s", name, namespace, sessionID)
 
 	// Pause the rollout using the Kubernetes client
 	result, err := s.k.PauseRollout(ctx, name, namespace)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: pause_argo_rollout failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: pause_argo_rollout failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: pause_argo_rollout completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: pause_argo_rollout completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // setArgoRolloutImage sets the image for a container in an Argo Rollouts deployment
 func (s *Server) setArgoRolloutImage(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
-		klog.Errorf("Tool call: set_argo_rollout_image failed after %v: missing name parameter", time.Since(start))
+		klog.Errorf("Tool call: set_argo_rollout_image failed after %v: missing name parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("rollout name is required")), nil
 	}
 
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
-		klog.Errorf("Tool call: set_argo_rollout_image failed after %v: missing namespace parameter", time.Since(start))
+		klog.Errorf("Tool call: set_argo_rollout_image failed after %v: missing namespace parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("namespace is required")), nil
 	}
 
 	image, err := ctr.RequireString("image")
 	if err != nil {
-		klog.Errorf("Tool call: set_argo_rollout_image failed after %v: missing image parameter", time.Since(start))
+		klog.Errorf("Tool call: set_argo_rollout_image failed after %v: missing image parameter by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", fmt.Errorf("new image is required")), nil
 	}
 
 	// Extract optional parameters
 	containerName := ctr.GetString("container", "")
 
-	klog.V(1).Infof("Tool: set_argo_rollout_image - name: %s, namespace: %s, image: %s, container: %s - got called", name, namespace, image, containerName)
+	klog.V(1).Infof("Tool: set_argo_rollout_image - name: %s, namespace: %s, image: %s, container: %s - got called by session id: %s", name, namespace, image, containerName, sessionID)
 
 	// Set the rollout image using the Kubernetes client
 	result, err := s.k.SetRolloutImage(ctx, name, namespace, containerName, image)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: set_argo_rollout_image failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: set_argo_rollout_image failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: set_argo_rollout_image completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: set_argo_rollout_image completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(result, nil), nil
 }

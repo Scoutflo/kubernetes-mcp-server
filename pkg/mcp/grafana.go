@@ -64,82 +64,86 @@ func (s *Server) initGrafana() []server.ServerTool {
 // grafanaHealthCheck handles the grafana_health_check tool request
 func (s *Server) grafanaHealthCheck(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool: grafana_health_check - got called")
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: grafana_health_check - got called by session id: %s", sessionID)
 
 	result, err := s.k.HealthCheck()
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: grafana_health_check failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: grafana_health_check failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("Grafana health check failed: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_health_check completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: grafana_health_check completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // grafanaGetDashboardByUID handles the grafana_get_dashboard_by_uid tool request
 func (s *Server) grafanaGetDashboardByUID(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required uid parameter
 	uid := ctr.GetString("uid", "")
 	if uid == "" {
-		klog.Errorf("Tool call: grafana_get_dashboard_by_uid failed after %v: missing required parameter: uid", time.Since(start))
+		klog.Errorf("Tool call: grafana_get_dashboard_by_uid failed after %v: missing required parameter: uid by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("missing required parameter: uid")), nil
 	}
 
-	klog.V(1).Infof("Tool: grafana_get_dashboard_by_uid - uid: %s - got called", uid)
+	klog.V(1).Infof("Tool: grafana_get_dashboard_by_uid - uid: %s - got called by session id: %s", uid, sessionID)
 
 	// Call the Kubernetes client to get the dashboard
 	result, err := s.k.GetDashboardByUID(uid)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: grafana_get_dashboard_by_uid failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: grafana_get_dashboard_by_uid failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_get_dashboard_by_uid completed successfully in %v, result_length: %d", duration, len(result))
+	klog.V(1).Infof("Tool call: grafana_get_dashboard_by_uid completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // grafanaSearchDashboards handles the grafana_search_dashboards tool request
 func (s *Server) grafanaSearchDashboards(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract optional query parameter
 	query := ctr.GetString("query", "")
 
-	klog.V(1).Infof("Tool: grafana_search_dashboards - query: %s - got called", query)
+	klog.V(1).Infof("Tool: grafana_search_dashboards - query: %s - got called by session id: %s", query, sessionID)
 
 	// Call the Kubernetes client to search dashboards
 	result, err := s.k.SearchDashboards(query)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: grafana_search_dashboards failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: grafana_search_dashboards failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_search_dashboards completed successfully in %v, result_length: %d", duration, len(result))
+	klog.V(1).Infof("Tool call: grafana_search_dashboards completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // grafanaUpdateDashboard handles the grafana_update_dashboard tool request
 func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract parameters using GetRawArguments
 	args := ctr.GetRawArguments().(map[string]interface{})
 
 	// Extract required dashboard parameter
 	dashboardArg, exists := args["dashboard"]
 	if !exists {
-		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: missing required parameter: dashboard", time.Since(start))
+		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: missing required parameter: dashboard by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("missing required parameter: dashboard")), nil
 	}
 
 	dashboard, ok := dashboardArg.(map[string]interface{})
 	if !ok {
-		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard parameter must be a JSON object", time.Since(start))
+		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard parameter must be a JSON object by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("dashboard parameter must be a JSON object")), nil
 	}
 
@@ -156,121 +160,126 @@ func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolReq
 		}
 	}
 
-	klog.V(1).Infof("Tool: grafana_update_dashboard - folderUID: %s, message: %s, overwrite: %t, userID: %d, dashboard_fields: %d - got called",
-		folderUID, message, overwrite, userID, len(dashboard))
+	klog.V(1).Infof("Tool: grafana_update_dashboard - folderUID: %s, message: %s, overwrite: %t, userID: %d, dashboard_fields: %d - got called by session id: %s",
+		folderUID, message, overwrite, userID, len(dashboard), sessionID)
 
 	// Call the Kubernetes client to update the dashboard
 	result, err := s.k.UpdateDashboard(dashboard, folderUID, message, overwrite, userID)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_update_dashboard completed successfully in %v, result_length: %d", duration, len(result))
+	klog.V(1).Infof("Tool call: grafana_update_dashboard completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // grafanaGetDashboardPanelQueries handles the grafana_get_dashboard_panel_queries tool request
 func (s *Server) grafanaGetDashboardPanelQueries(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required uid parameter
 	uid := ctr.GetString("uid", "")
 	if uid == "" {
-		klog.Errorf("Tool call: grafana_get_dashboard_panel_queries failed after %v: missing required parameter: uid", time.Since(start))
+		klog.Errorf("Tool call: grafana_get_dashboard_panel_queries failed after %v: missing required parameter: uid by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("missing required parameter: uid")), nil
 	}
 
-	klog.V(1).Infof("Tool: grafana_get_dashboard_panel_queries - uid: %s - got called", uid)
+	klog.V(1).Infof("Tool: grafana_get_dashboard_panel_queries - uid: %s - got called by session id: %s", uid, sessionID)
 
 	// Call the Kubernetes client to get the dashboard panel queries
 	result, err := s.k.GetDashboardPanelQueries(uid)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: grafana_get_dashboard_panel_queries failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: grafana_get_dashboard_panel_queries failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_get_dashboard_panel_queries completed successfully in %v, result_length: %d", duration, len(result))
+	klog.V(1).Infof("Tool call: grafana_get_dashboard_panel_queries completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // grafanaListDatasources handles the grafana_list_datasources tool request
 func (s *Server) grafanaListDatasources(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract optional type parameter
 	dsType := ctr.GetString("type", "")
 
-	klog.V(1).Infof("Tool: grafana_list_datasources - type: %s - got called", dsType)
+	klog.V(1).Infof("Tool: grafana_list_datasources - type: %s - got called by session id: %s", dsType, sessionID)
 
 	// Call the Kubernetes client to list datasources
 	result, err := s.k.ListDatasources(dsType)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: grafana_list_datasources failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: grafana_list_datasources failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_list_datasources completed successfully in %v, result_length: %d", duration, len(result))
+	klog.V(1).Infof("Tool call: grafana_list_datasources completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // grafanaGetDatasourceByUID handles the grafana_get_datasource_by_uid tool request
 func (s *Server) grafanaGetDatasourceByUID(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required uid parameter
 	uid := ctr.GetString("uid", "")
 	if uid == "" {
-		klog.Errorf("Tool call: grafana_get_datasource_by_uid failed after %v: missing required parameter: uid", time.Since(start))
+		klog.Errorf("Tool call: grafana_get_datasource_by_uid failed after %v: missing required parameter: uid by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("missing required parameter: uid")), nil
 	}
 
-	klog.V(1).Infof("Tool: grafana_get_datasource_by_uid - uid: %s - got called", uid)
+	klog.V(1).Infof("Tool: grafana_get_datasource_by_uid - uid: %s - got called by session id: %s", uid, sessionID)
 
 	// Call the Kubernetes client to get the datasource by UID
 	result, err := s.k.GetDatasourceByUID(uid)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: grafana_get_datasource_by_uid failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: grafana_get_datasource_by_uid failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_get_datasource_by_uid completed successfully in %v, result_length: %d", duration, len(result))
+	klog.V(1).Infof("Tool call: grafana_get_datasource_by_uid completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // grafanaGetDatasourceByName handles the grafana_get_datasource_by_name tool request
 func (s *Server) grafanaGetDatasourceByName(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required name parameter
 	name := ctr.GetString("name", "")
 	if name == "" {
-		klog.Errorf("Tool call: grafana_get_datasource_by_name failed after %v: missing required parameter: name", time.Since(start))
+		klog.Errorf("Tool call: grafana_get_datasource_by_name failed after %v: missing required parameter: name by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("missing required parameter: name")), nil
 	}
 
-	klog.V(1).Infof("Tool: grafana_get_datasource_by_name - name: %s - got called", name)
+	klog.V(1).Infof("Tool: grafana_get_datasource_by_name - name: %s - got called by session id: %s", name, sessionID)
 
 	// Call the Kubernetes client to get the datasource by name
 	result, err := s.k.GetDatasourceByName(name)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: grafana_get_datasource_by_name failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: grafana_get_datasource_by_name failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_get_datasource_by_name completed successfully in %v, result_length: %d", duration, len(result))
+	klog.V(1).Infof("Tool call: grafana_get_datasource_by_name completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // grafanaListAlertRules handles the list_alert_rules tool request
 func (s *Server) grafanaListAlertRules(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract optional parameters
 	args := ctr.GetRawArguments().(map[string]interface{})
 
@@ -299,42 +308,43 @@ func (s *Server) grafanaListAlertRules(ctx context.Context, ctr mcp.CallToolRequ
 		}
 	}
 
-	klog.V(1).Infof("Tool: grafana_list_alert_rules - limit: %d, page: %d, label_selectors_count: %d - got called", limit, page, len(labelSelectors))
+	klog.V(1).Infof("Tool: grafana_list_alert_rules - limit: %d, page: %d, label_selectors_count: %d - got called by session id: %s", limit, page, len(labelSelectors), sessionID)
 
 	// Call the Kubernetes client to list alert rules
 	result, err := s.k.ListAlertRules(limit, page, labelSelectors)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: grafana_list_alert_rules failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: grafana_list_alert_rules failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_list_alert_rules completed successfully in %v, result_length: %d", duration, len(result))
+	klog.V(1).Infof("Tool call: grafana_list_alert_rules completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 // grafanaGetAlertRuleByUID handles the get_alert_rule_by_uid tool request
 func (s *Server) grafanaGetAlertRuleByUID(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required uid parameter
 	uid := ctr.GetString("uid", "")
 	if uid == "" {
-		klog.Errorf("Tool call: grafana_get_alert_rule_by_uid failed after %v: missing required parameter: uid", time.Since(start))
+		klog.Errorf("Tool call: grafana_get_alert_rule_by_uid failed after %v: missing required parameter: uid by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("missing required parameter: uid")), nil
 	}
 
-	klog.V(1).Infof("Tool: grafana_get_alert_rule_by_uid - uid: %s - got called", uid)
+	klog.V(1).Infof("Tool: grafana_get_alert_rule_by_uid - uid: %s - got called by session id: %s", uid, sessionID)
 
 	// Call the Kubernetes client to get the alert rule by UID
 	result, err := s.k.GetAlertRuleByUID(uid)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: grafana_get_alert_rule_by_uid failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: grafana_get_alert_rule_by_uid failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", err), nil
 	}
 
-	klog.V(1).Infof("Tool call: grafana_get_alert_rule_by_uid completed successfully in %v, result_length: %d", duration, len(result))
+	klog.V(1).Infof("Tool call: grafana_get_alert_rule_by_uid completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }

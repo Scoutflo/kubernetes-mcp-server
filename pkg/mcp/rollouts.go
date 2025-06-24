@@ -69,8 +69,9 @@ func (s *Server) rollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 		}
 	}
 
-	klog.V(1).Infof("Tool: rollout - action=%s, resource_type=%s, resource_name=%s, namespace=%s, revision=%d -- got called",
-		action, resourceType, resourceName, namespace, revision)
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: rollout - action=%s, resource_type=%s, resource_name=%s, namespace=%s, revision=%d -- got called by session id: %s",
+		action, resourceType, resourceName, namespace, revision, sessionID)
 
 	// Call the Kubernetes rollout function
 	result, err := s.k.ResourceRollout(ctx, namespace, resourceType, resourceName, action, revision)
@@ -81,6 +82,6 @@ func (s *Server) rollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 	}
 
 	duration := time.Since(start)
-	klog.V(1).Infof("Tool call: rollout completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: rollout completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(result, nil), nil
 }

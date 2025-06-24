@@ -32,10 +32,11 @@ func (s *Server) initConnectivity() []server.ServerTool {
 
 func (s *Server) checkServiceConnectivity(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool: check_service_connectivity - got called")
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: check_service_connectivity - got called by session id: %s", sessionID)
 	serviceName, err := ctr.RequireString("service_name")
 	if err != nil {
-		klog.Errorf("Tool call: check_service_connectivity failed after %v: missing or invalid service_name", time.Since(start))
+		klog.Errorf("Tool call: check_service_connectivity failed after %v: missing or invalid service_name by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("failed to check service connectivity, missing or invalid service_name")), nil
 	}
 
@@ -44,16 +45,17 @@ func (s *Server) checkServiceConnectivity(ctx context.Context, ctr mcp.CallToolR
 		return NewTextResult("", fmt.Errorf("connectivity check failed: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: check_service_connectivity completed successfully in %v", time.Since(start))
+	klog.V(1).Infof("Tool call: check_service_connectivity completed successfully in %v by session id: %s", time.Since(start), sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 func (s *Server) checkIngressConnectivity(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool: check_ingress_connectivity - got called")
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: check_ingress_connectivity - got called by session id: %s", sessionID)
 	ingressHost, err := ctr.RequireString("ingress_host")
 	if err != nil {
-		klog.Errorf("Tool call: check_ingress_connectivity failed after %v: missing or invalid ingress_host", time.Since(start))
+		klog.Errorf("Tool call: check_ingress_connectivity failed after %v: missing or invalid ingress_host by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("failed to check ingress connectivity, missing or invalid ingress_host")), nil
 	}
 
@@ -62,6 +64,6 @@ func (s *Server) checkIngressConnectivity(ctx context.Context, ctr mcp.CallToolR
 		return NewTextResult("", fmt.Errorf("ingress connectivity check failed: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: check_ingress_connectivity completed successfully in %v", time.Since(start))
+	klog.V(1).Infof("Tool call: check_ingress_connectivity completed successfully in %v by session id: %s", time.Since(start), sessionID)
 	return NewTextResult(result, nil), nil
 }

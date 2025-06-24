@@ -48,17 +48,18 @@ func (s *Server) eventsList(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.
 		fieldSelectors = append(fieldSelectors, fmt.Sprintf("involvedObject.apiVersion=%s", involvedObjectAPIVersion))
 	}
 
-	klog.V(1).Infof("Tool: events_list - namespace: %s, involved_object_name: %s, involved_object_kind: %s, involved_object_api_version: %s, field_selectors_count: %d -- got called",
-		namespace, involvedObjectName, involvedObjectKind, involvedObjectAPIVersion, len(fieldSelectors))
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: events_list - namespace: %s, involved_object_name: %s, involved_object_kind: %s, involved_object_api_version: %s, field_selectors_count: %d -- got called by session id: %s",
+		namespace, involvedObjectName, involvedObjectKind, involvedObjectAPIVersion, len(fieldSelectors), sessionID)
 
 	ret, err := s.k.EventsList(ctx, namespace, fieldSelectors)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: events_list failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: events_list failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to list events: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: events_list completed successfully in %v, result_length: %d", duration, len(ret))
+	klog.V(1).Infof("Tool call: events_list completed successfully in %v, result_length: %d by session id: %s", duration, len(ret), sessionID)
 	return NewTextResult(ret, err), nil
 }

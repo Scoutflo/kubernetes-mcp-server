@@ -220,49 +220,51 @@ func (s *Server) initHelm() []server.ServerTool {
 
 func (s *Server) helmAddRepository(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
-		klog.Errorf("Tool call: helm_add_repository failed after %v: missing or invalid repository name", time.Since(start))
+		klog.Errorf("Tool call: helm_add_repository failed after %v: missing or invalid repository name by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("failed to add repository: missing or invalid repository name")), nil
 	}
 
 	url, err := ctr.RequireString("url")
 	if err != nil {
-		klog.Errorf("Tool call: helm_add_repository failed after %v: missing or invalid repository URL", time.Since(start))
+		klog.Errorf("Tool call: helm_add_repository failed after %v: missing or invalid repository URL by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("failed to add repository: missing or invalid repository URL")), nil
 	}
 
-	klog.V(1).Infof("Tool: helm_add_repository - name: %s, url: %s - got called", name, url)
+	klog.V(1).Infof("Tool: helm_add_repository - name: %s, url: %s - got called by session id: %s", name, url, sessionID)
 
 	// Add repository using kubernetes client
 	result, err := s.k.AddRepository(ctx, name, url)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: helm_add_repository failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: helm_add_repository failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to add repository: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: helm_add_repository completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: helm_add_repository completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 func (s *Server) helmListRepositories(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	klog.V(1).Infof("Tool: helm_list_repositories - got called")
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: helm_list_repositories - got called by session id: %s", sessionID)
 
 	// List repositories using kubernetes client
 	repos, err := s.k.ListRepositories(ctx)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: helm_list_repositories failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: helm_list_repositories failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to list repositories: %v", err)), nil
 	}
 
 	if len(repos) == 0 {
-		klog.V(1).Infof("Tool call: helm_list_repositories completed successfully in %v, repositories_count: 0", duration)
+		klog.V(1).Infof("Tool call: helm_list_repositories completed successfully in %v, repositories_count: 0 by session id: %s", duration, sessionID)
 		return NewTextResult("No Helm repositories configured", nil), nil
 	}
 
@@ -277,12 +279,13 @@ func (s *Server) helmListRepositories(ctx context.Context, ctr mcp.CallToolReque
 		sb.WriteString(fmt.Sprintf("%-23s %s\n", repo.Name, repo.URL))
 	}
 
-	klog.V(1).Infof("Tool call: helm_list_repositories completed successfully in %v, repositories_count: %d", duration, len(repos))
+	klog.V(1).Infof("Tool call: helm_list_repositories completed successfully in %v, repositories_count: %d by session id: %s", duration, len(repos), sessionID)
 	return NewTextResult(sb.String(), nil), nil
 }
 
 func (s *Server) helmUpdateRepositories(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Check if specific repo was specified
 	var repoNames []string
 	repoName := ctr.GetString("repo_name", "")
@@ -290,49 +293,51 @@ func (s *Server) helmUpdateRepositories(ctx context.Context, ctr mcp.CallToolReq
 		repoNames = []string{repoName}
 	}
 
-	klog.V(1).Infof("Tool: helm_update_repositories - repo_name: %s, repos_to_update: %d - got called", repoName, len(repoNames))
+	klog.V(1).Infof("Tool: helm_update_repositories - repo_name: %s, repos_to_update: %d - got called by session id: %s", repoName, len(repoNames), sessionID)
 
 	// Update repositories using kubernetes client
 	result, err := s.k.UpdateRepositories(ctx, repoNames...)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: helm_update_repositories failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: helm_update_repositories failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to update repositories: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: helm_update_repositories completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: helm_update_repositories completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 func (s *Server) helmGetRelease(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
-		klog.Errorf("Tool call: helm_get_release failed after %v: missing or invalid release name", time.Since(start))
+		klog.Errorf("Tool call: helm_get_release failed after %v: missing or invalid release name by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("failed to get release: missing or invalid release name")), nil
 	}
 
 	namespace := ctr.GetString("namespace", "")
 
-	klog.V(1).Infof("Tool: helm_get_release - name: %s, namespace: %s - got called", name, namespace)
+	klog.V(1).Infof("Tool: helm_get_release - name: %s, namespace: %s - got called by session id: %s", name, namespace, sessionID)
 
 	// Get release information using kubernetes client
 	result, err := s.k.GetRelease(ctx, name, namespace)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: helm_get_release failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: helm_get_release failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to get release: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: helm_get_release completed successfully in %v, result_length: %d", duration, len(result))
+	klog.V(1).Infof("Tool call: helm_get_release completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 func (s *Server) helmListReleases(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Build the list options
 	opts := kubernetes.ListOptions{}
 
@@ -356,34 +361,35 @@ func (s *Server) helmListReleases(ctx context.Context, ctr mcp.CallToolRequest) 
 
 	opts.Output = ctr.GetString("output", "")
 
-	klog.V(1).Infof("Tool: helm_list_releases - all_namespaces: %t, all: %t, filter: %s, output: %s - got called",
-		opts.AllNamespaces, opts.All, opts.Filter, opts.Output)
+	klog.V(1).Infof("Tool: helm_list_releases - all_namespaces: %t, all: %t, filter: %s, output: %s - got called by session id: %s",
+		opts.AllNamespaces, opts.All, opts.Filter, opts.Output, sessionID)
 
 	// List releases using kubernetes client
 	result, err := s.k.ListReleases(ctx, opts)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: helm_list_releases failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: helm_list_releases failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to list releases: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: helm_list_releases completed successfully in %v, result_length: %d", duration, len(result))
+	klog.V(1).Infof("Tool call: helm_list_releases completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 func (s *Server) helmUninstallRelease(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
-		klog.Errorf("Tool call: helm_uninstall_release failed after %v: missing or invalid release name", time.Since(start))
+		klog.Errorf("Tool call: helm_uninstall_release failed after %v: missing or invalid release name by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("failed to uninstall release: missing or invalid release name")), nil
 	}
 
 	namespace := ctr.GetString("namespace", "")
 	if namespace == "" {
-		klog.Errorf("Tool call: helm_uninstall_release failed after %v: missing or invalid namespace", time.Since(start))
+		klog.Errorf("Tool call: helm_uninstall_release failed after %v: missing or invalid namespace by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("failed to uninstall release: missing or invalid namespace")), nil
 	}
 
@@ -395,34 +401,35 @@ func (s *Server) helmUninstallRelease(ctx context.Context, ctr mcp.CallToolReque
 
 	opts.Wait = strings.ToLower(ctr.GetString("wait", "false")) == "true"
 
-	klog.V(1).Infof("Tool: helm_uninstall_release - name: %s, namespace: %s, dry_run: %t, wait: %t - got called",
-		name, namespace, opts.DryRun, opts.Wait)
+	klog.V(1).Infof("Tool: helm_uninstall_release - name: %s, namespace: %s, dry_run: %t, wait: %t - got called by session id: %s",
+		name, namespace, opts.DryRun, opts.Wait, sessionID)
 
 	// Uninstall the release using kubernetes client
 	result, err := s.k.UninstallRelease(ctx, name, namespace, opts)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: helm_uninstall_release failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: helm_uninstall_release failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to uninstall release: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: helm_uninstall_release completed successfully in %v", duration)
+	klog.V(1).Infof("Tool call: helm_uninstall_release completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 func (s *Server) helmInstallRelease(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
-		klog.Errorf("Tool call: helm_install_release failed after %v: missing or invalid release name", time.Since(start))
+		klog.Errorf("Tool call: helm_install_release failed after %v: missing or invalid release name by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("failed to install release: missing or invalid release name")), nil
 	}
 
 	chart, err := ctr.RequireString("chart")
 	if err != nil {
-		klog.Errorf("Tool call: helm_install_release failed after %v: missing or invalid chart", time.Since(start))
+		klog.Errorf("Tool call: helm_install_release failed after %v: missing or invalid chart by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("failed to install release: missing or invalid chart")), nil
 	}
 
@@ -460,34 +467,35 @@ func (s *Server) helmInstallRelease(ctx context.Context, ctr mcp.CallToolRequest
 		}
 	}
 
-	klog.V(1).Infof("Tool: helm_install_release - name: %s, chart: %s, namespace: %s, repo_url: %s, version: %s, set_count: %d, values_count: %d - got called",
-		name, chart, namespace, opts.RepoURL, opts.Version, len(opts.Set), len(opts.Values))
+	klog.V(1).Infof("Tool: helm_install_release - name: %s, chart: %s, namespace: %s, repo_url: %s, version: %s, set_count: %d, values_count: %d - got called by session id: %s",
+		name, chart, namespace, opts.RepoURL, opts.Version, len(opts.Set), len(opts.Values), sessionID)
 
 	// Install the release using kubernetes client
 	result, err := s.k.InstallRelease(ctx, name, chart, opts)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: helm_install_release failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: helm_install_release failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to install release: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: helm_install_release completed successfully in %v, result_length: %d", duration, len(result))
+	klog.V(1).Infof("Tool call: helm_install_release completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }
 
 func (s *Server) helmUpgradeRelease(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	sessionID := getSessionID(ctx)
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
-		klog.Errorf("Tool call: helm_upgrade_release failed after %v: missing or invalid release name", time.Since(start))
+		klog.Errorf("Tool call: helm_upgrade_release failed after %v: missing or invalid release name by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("failed to upgrade release: missing or invalid release name")), nil
 	}
 
 	chart, err := ctr.RequireString("chart")
 	if err != nil {
-		klog.Errorf("Tool call: helm_upgrade_release failed after %v: missing or invalid chart", time.Since(start))
+		klog.Errorf("Tool call: helm_upgrade_release failed after %v: missing or invalid chart by session id: %s", time.Since(start), sessionID)
 		return NewTextResult("", errors.New("failed to upgrade release: missing or invalid chart")), nil
 	}
 
@@ -522,18 +530,18 @@ func (s *Server) helmUpgradeRelease(ctx context.Context, ctr mcp.CallToolRequest
 		}
 	}
 
-	klog.V(1).Infof("Tool: helm_upgrade_release - name: %s, chart: %s, namespace: %s, version: %s, set_count: %d, values_count: %d - got called",
-		name, chart, namespace, opts.Version, len(opts.Set), len(opts.Values))
+	klog.V(1).Infof("Tool: helm_upgrade_release - name: %s, chart: %s, namespace: %s, version: %s, set_count: %d, values_count: %d - got called by session id: %s",
+		name, chart, namespace, opts.Version, len(opts.Set), len(opts.Values), sessionID)
 
 	// Upgrade the release using kubernetes client
 	result, err := s.k.UpgradeRelease(ctx, name, chart, opts)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: helm_upgrade_release failed after %v: %v", duration, err)
+		klog.Errorf("Tool call: helm_upgrade_release failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to upgrade release: %v", err)), nil
 	}
 
-	klog.V(1).Infof("Tool call: helm_upgrade_release completed successfully in %v, result_length: %d", duration, len(result))
+	klog.V(1).Infof("Tool call: helm_upgrade_release completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }
