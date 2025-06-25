@@ -185,6 +185,7 @@ jobs:
               --restart unless-stopped \
               --network k8s-mcp-network \
               -p 8081:8081 \
+              -p 8082:8082 \
               -e AZURE_OPENAI_API_KEY="$OPENAI_API_KEY" \
               -e AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT" \
               -e AZURE_OPENAI_DEPLOYMENT_NAME="$OPENAI_DEPLOYMENT_NAME" \
@@ -235,6 +236,7 @@ jobs:
               --restart unless-stopped \
               --network k8s-mcp-network \
               -p 8081:8081 \
+              -p 8082:8082 \
               -e AZURE_OPENAI_API_KEY="$OPENAI_API_KEY" \
               -e AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT" \
               -e AZURE_OPENAI_DEPLOYMENT_NAME="$OPENAI_DEPLOYMENT_NAME" \
