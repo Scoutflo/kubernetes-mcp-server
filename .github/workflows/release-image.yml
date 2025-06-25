@@ -186,7 +186,7 @@ jobs:
               -e AZURE_OPENAI_MAX_TOKENS=${{ secrets.OPENAI_MAX_TOKENS }} \
               -e AZURE_OPENAI_TEMPERATURE=${{ secrets.OPENAI_TEMPERATURE }} \
               -e AZURE_OPENAI_TOP_P=${{ secrets.OPENAI_TOP_P }} \
-              $IMAGE
+              $ECR_IMAGE
             echo "Container status:"
             docker ps | grep kubernetes-mcp-server
             echo "Port check:"
@@ -230,7 +230,7 @@ jobs:
               -e AZURE_OPENAI_MAX_TOKENS=${{ secrets.OPENAI_MAX_TOKENS }} \
               -e AZURE_OPENAI_TEMPERATURE=${{ secrets.OPENAI_TEMPERATURE }} \
               -e AZURE_OPENAI_TOP_P=${{ secrets.OPENAI_TOP_P }} \
-              $IMAGE
+              $ECR_IMAGE
             echo "Container status:"
             docker ps | grep kubernetes-mcp-server
             echo "Port check:"
