@@ -119,10 +119,10 @@ func (s *Server) initIstio() []server.ServerTool {
 		{Tool: mcp.NewTool("istio_get_ztunnel_config",
 			mcp.WithDescription("Get ztunnel configuration"),
 			mcp.WithString("ns",
-				mcp.Description("The namespace of the pod to get proxy configuration for (optional, defaults to istio-system)"),
+				mcp.Description("The namespace of the pod to get ztunnel configuration for (optional, defaults to istio-system)"),
 			),
 			mcp.WithString("config_type",
-				mcp.Description("The type of configuration to get, the allowed values are: all, bootstrap, cluster, ecds, listener, log, route, secret (optional, defaults to all)"),
+				mcp.Description("The type of configuration to get, the allowed values are: all, workload, service, policy, certificate, connections, log (optional, defaults to all)"),
 			),
 			mcp.WithString("pod",
 				mcp.Description("Pod name (optional, if not provided gets config from all pods)"),
@@ -141,7 +141,7 @@ func (s *Server) initIstio() []server.ServerTool {
 				mcp.Required(),
 			),
 			mcp.WithString("action",
-				mcp.Description("Waypoint action: status, list, generate, delete, apply (optional, defaults to status)"),
+				mcp.Description("Waypoint action: list, status, generate, apply, delete (optional, defaults to status)"),
 			),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
@@ -156,7 +156,7 @@ func (s *Server) initIstio() []server.ServerTool {
 				mcp.Description("The namespace of the pod to get proxy configuration for (optional, defaults to default)"),
 			),
 			mcp.WithString("config_type",
-				mcp.Description("The type of configuration to get, the allowed values are: all, bootstrap, cluster, ecds, listener, log, route, secret (optional, defaults to all)"),
+				mcp.Description("The type of configuration to get, the allowed values are: all, bootstrap, cluster, listener, route, endpoint, secret, log (optional, defaults to all)"),
 			),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
@@ -625,7 +625,7 @@ func (s *Server) waypoint(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Ca
 		klog.Errorf("Tool call: waypoint failed to get Kubernetes client after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
-	sessionID := getSessionID
+	sessionID := getSessionID(ctx)
 	name := ctr.GetString("name", "")
 	namespace := ctr.GetString("ns", "")
 	action := ctr.GetString("action", "status")
