@@ -93,16 +93,13 @@ type Kubernetes struct {
 	GrafanaToken       string
 }
 
-func NewKubernetes() (*Kubernetes, error) {
-	k8s := &Kubernetes{}
-
-	// Check if K8S_URL and K8S_TOKEN are set for HTTP mode
-	k8sURL := os.Getenv("K8S_URL")
-	k8sToken := os.Getenv("K8S_TOKEN")
-
+// NewKubernetesWithCredentials creates a new Kubernetes client with the provided URL and token
+func NewKubernetesWithCredentials(k8sURL, k8sToken string) (*Kubernetes, error) {
 	if k8sURL == "" || k8sToken == "" {
-		return nil, fmt.Errorf("K8S_URL and K8S_TOKEN environment variables must be set")
+		return nil, fmt.Errorf("k8sURL and k8sToken must be provided")
 	}
+
+	k8s := &Kubernetes{}
 
 	// Initialize HTTP client mode
 	k8s.HTTPClient = NewHTTPClient(k8sURL, k8sToken)

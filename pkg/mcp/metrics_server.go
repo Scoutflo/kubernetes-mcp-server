@@ -15,11 +15,15 @@ func (s *Server) initMetricsServer() []server.ServerTool {
 		{Tool: mcp.NewTool("nodes_metrics",
 			mcp.WithDescription("Get CPU and memory metrics for all nodes or a specific node"),
 			mcp.WithString("name", mcp.Description("Name of the node (optional, if not provided will return metrics for all nodes)")),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.nodesMetrics},
 		{Tool: mcp.NewTool("pods_metrics",
 			mcp.WithDescription("Get CPU and memory metrics for pods in a namespace"),
 			mcp.WithString("namespace", mcp.Description("Namespace to get pod metrics from (optional, if not provided will use default namespace)")),
 			mcp.WithString("name", mcp.Description("Name of the pod (optional, if not provided will return metrics for all pods in the namespace)")),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.podsMetrics},
 	}
 }
@@ -27,12 +31,17 @@ func (s *Server) initMetricsServer() []server.ServerTool {
 // nodesMetrics handles the nodes_metrics tool request
 func (s *Server) nodesMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: nodes_metrics failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	nodeName := ctr.GetString("name", "")
 
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: nodes_metrics - name=%s - got called by session id: %s", nodeName, sessionID)
 
-	ret, err := s.k.GetNodeMetrics(ctx, nodeName)
+	ret, err := k.GetNodeMetrics(ctx, nodeName)
 	if err != nil {
 		duration := time.Since(start)
 		if nodeName != "" {
@@ -51,13 +60,18 @@ func (s *Server) nodesMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mc
 // podsMetrics handles the pods_metrics tool request
 func (s *Server) podsMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: pods_metrics failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	namespace := ctr.GetString("namespace", "")
 	podName := ctr.GetString("name", "")
 
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: pods_metrics - namespace=%s, name=%s - got called by session id: %s", namespace, podName, sessionID)
 
-	ret, err := s.k.GetPodMetrics(ctx, namespace, podName)
+	ret, err := k.GetPodMetrics(ctx, namespace, podName)
 	if err != nil {
 		duration := time.Since(start)
 		if podName != "" {

@@ -19,6 +19,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_list_applications",
 				mcp.WithDescription("List applications in ArgoCD with filtering options"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("project",
 					mcp.Description("Filter applications by project name (optional)"),
 				),
@@ -41,6 +43,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_application",
 				mcp.WithDescription("Get detailed information about a specific ArgoCD application"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the application"),
 					mcp.Required(),
@@ -61,6 +65,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_application_events",
 				mcp.WithDescription("Returns events for an application"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -74,6 +80,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_sync_application",
 				mcp.WithDescription("Sync an ArgoCD application to its desired state"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the application"),
 					mcp.Required(),
@@ -106,6 +114,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_create_application",
 				mcp.WithDescription("Create a new application in ArgoCD"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -157,6 +167,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_update_application",
 				mcp.WithDescription("Update an existing application in ArgoCD"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The application name to update"),
 					mcp.Required(),
@@ -197,6 +209,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_delete_application",
 				mcp.WithDescription("Delete an application from ArgoCD"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application to delete"),
 					mcp.Required(),
@@ -217,6 +231,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_application_resource_tree",
 				mcp.WithDescription("Returns resource tree for application by application name"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -231,6 +247,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_application_managed_resources",
 				mcp.WithDescription("Returns managed resources for application by application name"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -245,6 +263,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_application_workload_logs",
 				mcp.WithDescription("Returns logs for application workload (Deployment, StatefulSet, Pod, etc.) by application name and resource details"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -269,6 +289,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_resource_events",
 				mcp.WithDescription("Returns events for a resource that is managed by an application"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -287,6 +309,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_resource_actions",
 				mcp.WithDescription("Returns actions for a resource that is managed by an application"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -305,6 +329,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_run_resource_action",
 				mcp.WithDescription("Runs an action on a resource"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -339,6 +365,11 @@ func formatJSON(data interface{}) (string, error) {
 // argocdListApplications lists ArgoCD applications with filtering
 func (s *Server) argocdListApplications(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: argocd_list_applications failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract parameters from the tool request
 	project := ctr.GetString("project", "")
 	name := ctr.GetString("name", "")
@@ -350,7 +381,7 @@ func (s *Server) argocdListApplications(ctx context.Context, ctr mcp.CallToolReq
 		project, name, repo, namespace, refresh)
 
 	// Create ArgoCD client
-	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
+	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
 	if err != nil {
 		klog.Errorf("Tool call: argocd_list_applications failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
@@ -464,6 +495,11 @@ func (s *Server) argocdListApplications(ctx context.Context, ctr mcp.CallToolReq
 // argocdGetApplication gets detailed information about a specific application
 func (s *Server) argocdGetApplication(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: argocd_sync_application failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -477,7 +513,7 @@ func (s *Server) argocdGetApplication(ctx context.Context, ctr mcp.CallToolReque
 	klog.V(1).Infof("Tool: argocd_get_application - name: %s, namespace: %s, refresh: %s - got called", name, namespace, refresh)
 
 	// Create ArgoCD client
-	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
+	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
 	if err != nil {
 		klog.Errorf("Tool call: argocd_get_application failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
@@ -533,6 +569,11 @@ func (s *Server) argocdGetApplication(ctx context.Context, ctr mcp.CallToolReque
 // argocdSyncApplication syncs an ArgoCD application
 func (s *Server) argocdSyncApplication(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: argocd_sync_application failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -552,7 +593,7 @@ func (s *Server) argocdSyncApplication(ctx context.Context, ctr mcp.CallToolRequ
 		name, namespace, revision, prune, dryRun, resources)
 
 	// Create ArgoCD client
-	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
+	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
 	if err != nil {
 		klog.Errorf("Tool call: argocd_sync_application failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
@@ -630,6 +671,11 @@ func (s *Server) argocdSyncApplication(ctx context.Context, ctr mcp.CallToolRequ
 // argocdCreateApplication creates a new ArgoCD application
 func (s *Server) argocdCreateApplication(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: argocd_create_application failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -686,7 +732,7 @@ func (s *Server) argocdCreateApplication(ctx context.Context, ctr mcp.CallToolRe
 	// Parse boolean flags with defaults
 
 	// Create ArgoCD client
-	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
+	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
 	if err != nil {
 		klog.Errorf("Tool call: argocd_create_application failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
@@ -727,6 +773,11 @@ func (s *Server) argocdCreateApplication(ctx context.Context, ctr mcp.CallToolRe
 // argocdUpdateApplication updates an existing ArgoCD application
 func (s *Server) argocdUpdateApplication(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: argocd_update_application failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -768,7 +819,7 @@ func (s *Server) argocdUpdateApplication(ctx context.Context, ctr mcp.CallToolRe
 		name, project, repoURL, path, destServer, destNamespace, revision, validate)
 
 	// Create ArgoCD client
-	argoClient, closer, err := s.k.NewArgoClient(ctx, "")
+	argoClient, closer, err := k.NewArgoClient(ctx, "")
 	if err != nil {
 		klog.Errorf("Tool call: argocd_update_application failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
@@ -837,6 +888,11 @@ func (s *Server) argocdUpdateApplication(ctx context.Context, ctr mcp.CallToolRe
 // argocdDeleteApplication deletes an ArgoCD application
 func (s *Server) argocdDeleteApplication(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: argocd_delete_application failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -867,7 +923,7 @@ func (s *Server) argocdDeleteApplication(ctx context.Context, ctr mcp.CallToolRe
 		name, cascade, propagationPolicy, namespace)
 
 	// Create ArgoCD client
-	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
+	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
 	if err != nil {
 		klog.Errorf("Tool call: argocd_delete_application failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
@@ -938,6 +994,11 @@ func (s *Server) argocdDeleteApplication(ctx context.Context, ctr mcp.CallToolRe
 // argocdGetApplicationResourceTree returns the resource tree for an application
 func (s *Server) argocdGetApplicationResourceTree(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: argocd_get_application_resource_tree failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -950,7 +1011,7 @@ func (s *Server) argocdGetApplicationResourceTree(ctx context.Context, ctr mcp.C
 	klog.V(1).Infof("Tool: argocd_get_application_resource_tree - name: %s, namespace: %s - got called", name, namespace)
 
 	// Create ArgoCD client
-	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
+	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
 	if err != nil {
 		klog.Errorf("Tool call: argocd_get_application_resource_tree failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
@@ -1004,6 +1065,11 @@ func (s *Server) argocdGetApplicationResourceTree(ctx context.Context, ctr mcp.C
 // argocdGetApplicationManagedResources returns the managed resources for an application
 func (s *Server) argocdGetApplicationManagedResources(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: argocd_get_application_managed_resources failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -1016,7 +1082,7 @@ func (s *Server) argocdGetApplicationManagedResources(ctx context.Context, ctr m
 	klog.V(1).Infof("Tool: argocd_get_application_managed_resources - name: %s, namespace: %s - got called", name, namespace)
 
 	// Create ArgoCD client
-	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
+	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
 	if err != nil {
 		klog.Errorf("Tool call: argocd_get_application_managed_resources failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
@@ -1079,6 +1145,11 @@ func (s *Server) argocdGetApplicationManagedResources(ctx context.Context, ctr m
 // argocdGetApplicationWorkloadLogs returns logs for application workload
 func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: argocd_get_application_workload_logs failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract parameters
 	name, err := ctr.RequireString("application_name")
 	if err != nil {
@@ -1173,7 +1244,7 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 		name, appNamespace, resourceRef.Kind, resourceRef.Namespace, resourceRef.Name, tailStr, follow)
 
 	// Create ArgoCD client
-	argoClient, closer, err := s.k.NewArgoClient(ctx, appNamespace)
+	argoClient, closer, err := k.NewArgoClient(ctx, appNamespace)
 	if err != nil {
 		klog.Errorf("Tool call: argocd_get_application_workload_logs failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
@@ -1219,6 +1290,11 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 // argocdGetResourceEvents returns events for a resource managed by an application
 func (s *Server) argocdGetResourceEvents(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: argocd_get_resource_events failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract parameters
 	name, err := ctr.RequireString("application_name")
 	if err != nil {
@@ -1256,7 +1332,7 @@ func (s *Server) argocdGetResourceEvents(ctx context.Context, ctr mcp.CallToolRe
 		name, appNamespace, resourceNamespace, resourceName)
 
 	// Create ArgoCD client
-	argoClient, closer, err := s.k.NewArgoClient(ctx, appNamespace)
+	argoClient, closer, err := k.NewArgoClient(ctx, appNamespace)
 	if err != nil {
 		klog.Errorf("Tool call: argocd_get_resource_events failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
@@ -1344,6 +1420,11 @@ func formatTimeAgo(d time.Duration) string {
 // argocdGetResourceActions returns available actions for a resource managed by an application
 func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: argocd_get_resource_actions failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -1399,7 +1480,7 @@ func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolR
 		name, appNamespace, resourceGroup, resourceVersion, resourceKind, resourceNamespace, resourceName)
 
 	// Create ArgoCD client
-	argoClient, closer, err := s.k.NewArgoClient(ctx, appNamespace)
+	argoClient, closer, err := k.NewArgoClient(ctx, appNamespace)
 	if err != nil {
 		klog.Errorf("Tool call: argocd_get_resource_actions failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
@@ -1460,6 +1541,11 @@ func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolR
 // argocdRunResourceAction runs an action on a resource managed by an application
 func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: argocd_run_resource_action failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -1517,7 +1603,7 @@ func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRe
 		name, appNamespace, resourceGroup, resourceVersion, resourceKind, resourceNamespace, resourceName, action)
 
 	// Create ArgoCD client
-	argoClient, closer, err := s.k.NewArgoClient(ctx, appNamespace)
+	argoClient, closer, err := k.NewArgoClient(ctx, appNamespace)
 	if err != nil {
 		klog.Errorf("Tool call: argocd_run_resource_action failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
@@ -1560,6 +1646,11 @@ func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRe
 // argocdGetApplicationEvents returns events for an application
 func (s *Server) argocdGetApplicationEvents(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: argocd_get_application_events failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract parameters
 	name, err := ctr.RequireString("application_name")
 	if err != nil {
@@ -1576,7 +1667,7 @@ func (s *Server) argocdGetApplicationEvents(ctx context.Context, ctr mcp.CallToo
 	klog.V(1).Infof("Tool: argocd_get_application_events - application: %s, namespace: %s - got called", name, namespace)
 
 	// Create ArgoCD client
-	argoClient, closer, err := s.k.NewArgoClient(ctx, namespace)
+	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
 	if err != nil {
 		klog.Errorf("Tool call: argocd_get_application_events failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil

@@ -22,13 +22,19 @@ func (s *Server) initPromptGenerator() []server.ServerTool {
 				mcp.Description("Natural language description of the prompt to generate"),
 				mcp.Required(),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.promptGenerator},
 	}
 }
 
 func (s *Server) promptGenerator(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prompt_generator failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract the description parameter
 	args := ctr.GetRawArguments()
 	argsMap, ok := args.(map[string]interface{})
@@ -50,7 +56,7 @@ func (s *Server) promptGenerator(ctx context.Context, ctr mcp.CallToolRequest) (
 	klog.V(1).Infof("Tool: prompt_generator - description=%s - got called by session id: %s", description, sessionID)
 
 	// Call the Kubernetes GeneratePrompt function
-	prompt, err := s.k.GeneratePrompt(description)
+	prompt, err := k.GeneratePrompt(description)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prompt_generator failed after %v: %v", duration, err)

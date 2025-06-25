@@ -17,16 +17,22 @@ func (s *Server) initPrometheus() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("prometheus_generate_query",
 			mcp.WithDescription("Tool for generating a PromQL query from a natural language description. Use this tool when you need to create a PromQL expression based on a natural language description of the metric you want to query."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("description", mcp.Description("Natural language description of the metric you want to query"), mcp.Required()),
 		), Handler: s.prometheusGenerateQuery},
 		{Tool: mcp.NewTool("prometheus_metrics_query",
 			mcp.WithDescription("Tool for executing instant Prometheus queries. Executes instant queries against Prometheus to retrieve current metric values. Use this tool when you need to get the latest values of metrics or perform calculations on current data. The query must be a valid PromQL expression."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
 			mcp.WithString("time", mcp.Description("Evaluation timestamp in RFC3339 or unix timestamp format (optional)")),
 			mcp.WithString("timeout", mcp.Description("Evaluation timeout (optional)")),
 		), Handler: s.prometheusMetrics},
 		{Tool: mcp.NewTool("prometheus_metrics_query_range",
 			mcp.WithDescription("Tool for executing range queries in Prometheus. Executes time series queries over a specified time range in Prometheus. Use this tool for analyzing metric patterns, trends, and historical data. You can specify the time range, resolution (step), and timeout for the query."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
 			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format"), mcp.Required()),
 			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format"), mcp.Required()),
@@ -35,14 +41,20 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusMetricsRange},
 		{Tool: mcp.NewTool("prometheus_list_metrics",
 			mcp.WithDescription("Tool for listing all available Prometheus metrics with their metadata. Use this tool to discover all metrics available in Prometheus and their associated information."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.prometheusListMetrics},
 		{Tool: mcp.NewTool("prometheus_metric_info",
 			mcp.WithDescription("Tool for getting detailed information about a specific Prometheus metric. Use this tool to discover more about a particular metric and its associated statistics. You can include count, min, max, and avg statistics for the metric if needed."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("metric", mcp.Description("Name of the metric to get information about"), mcp.Required()),
 			mcp.WithBoolean("include_statistics", mcp.Description("Include count, min, max, and avg statistics for this metric. May be slower for metrics with many time series.")),
 		), Handler: s.prometheusMetricInfo},
 		{Tool: mcp.NewTool("prometheus_series_query",
 			mcp.WithDescription("Tool for querying Prometheus series. Finds time series that match certain label selectors in Prometheus. Use this tool to discover which metrics exist and their label combinations. You can specify time ranges to limit the search scope and set a maximum number of results."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithArray("match", mcp.Description("Series selector arguments"),
 				func(schema map[string]interface{}) {
 					schema["type"] = "array"
@@ -57,17 +69,23 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusSeries},
 		{Tool: mcp.NewTool("prometheus_targets",
 			mcp.WithDescription("Tool for getting Prometheus target discovery state. Provides information about all Prometheus scrape targets and their current state. Use this tool to monitor which targets are being scraped successfully and which are failing. You can filter targets by state (active/dropped) and scrape pool."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("state", mcp.Description("Target state filter, must be one of: active, dropped, any (optional)")),
 			mcp.WithString("scrape_pool", mcp.Description("Scrape pool name (optional)")),
 		), Handler: s.prometheusTargets},
 		{Tool: mcp.NewTool("prometheus_targets_metadata",
 			mcp.WithDescription("Tool for getting Prometheus target metadata. Retrieves metadata about metrics exposed by specific Prometheus targets. Use this tool to understand metric types, help texts, and units. You can filter by target labels and specific metric names."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("match_target", mcp.Description("Target label selectors (optional)")),
 			mcp.WithString("metric", mcp.Description("Metric name (optional)")),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of targets (optional)")),
 		), Handler: s.prometheusTargetMetadata},
 		{Tool: mcp.NewTool("prometheus_list_label_names",
 			mcp.WithDescription("List label names in a Prometheus datasource. Allows filtering by series selectors and time range."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the time range to filter the results by")),
 			mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the time range to filter the results by")),
 			mcp.WithNumber("limit", mcp.Description("Optionally, the maximum number of results to return")),
@@ -82,6 +100,8 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusListLabelNames},
 		{Tool: mcp.NewTool("prometheus_list_label_values",
 			mcp.WithDescription("Get the values for a specific label name in Prometheus. Allows filtering by series selectors and time range."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("labelName", mcp.Description("The name of the label to query"), mcp.Required()),
 			mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the query")),
 			mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the query")),
@@ -97,9 +117,13 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusListLabelValues},
 		{Tool: mcp.NewTool("prometheus_get_alerts",
 			mcp.WithDescription("Tool for getting active Prometheus alerts. Retrieves all currently firing alerts in the Prometheus server. Use this tool to monitor the current alert state and identify ongoing issues. Returns details about alert names, labels, and when they started firing."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.prometheusGetAlerts},
 		{Tool: mcp.NewTool("prometheus_get_rules",
 			mcp.WithDescription("Tool for getting Prometheus alerting and recording rules. Retrieves information about configured alerting and recording rules in Prometheus. Use this tool to understand what alerts are defined and what metrics are being pre-computed. You can filter rules by type, name, group, and other criteria."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithArray("rule_name", mcp.Description("Rule names filter"),
 				func(schema map[string]interface{}) {
 					schema["type"] = "array"
@@ -137,6 +161,8 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusGetRules},
 		{Tool: mcp.NewTool("prometheus_create_alert",
 			mcp.WithDescription("Tool for creating a new Prometheus alert rule. This tool allows you to define alerting rules that will trigger notifications when specific conditions are met. You can customize the alert with annotations, labels, and evaluation intervals."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("alertname", mcp.Description("Name of the alert to create"), mcp.Required()),
 			mcp.WithString("expression", mcp.Description("PromQL expression that defines the alert condition, If not provided, please generate a query using prometheus_generate_query tool"), mcp.Required()),
 			mcp.WithString("applabel", mcp.Description("Application label used to identify the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
@@ -148,6 +174,8 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusCreateAlert},
 		{Tool: mcp.NewTool("prometheus_update_alert",
 			mcp.WithDescription("Tool for updating an existing Prometheus alert rule. This tool allows you to modify the properties of an existing alert without having to delete and recreate it. You can update the condition, annotations, labels, and other attributes."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("alertname", mcp.Description("Name of the alert to update"), mcp.Required()),
 			mcp.WithString("applabel", mcp.Description("Application label that identifies the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
 			mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert"), mcp.Required()),
@@ -159,6 +187,8 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusUpdateAlert},
 		{Tool: mcp.NewTool("prometheus_delete_alert",
 			mcp.WithDescription("Tool for deleting a Prometheus alert rule. This tool removes an existing alert rule from the system. You can either delete a specific alert within a rule group or the entire PrometheusRule resource."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("applabel", mcp.Description("Application label that identifies the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
 			mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert"), mcp.Required()),
 			mcp.WithString("alertname", mcp.Description("Name of the specific alert to delete within the rule group (optional)")),
@@ -188,9 +218,13 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		// ), Handler: s.prometheusAlertManagers},
 		{Tool: mcp.NewTool("prometheus_runtimeinfo",
 			mcp.WithDescription("Tool for getting Prometheus runtime information. Provides detailed information about the Prometheus server's runtime state. Use this tool to monitor server health and performance through details about garbage collection, memory usage, and other runtime metrics."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.prometheusRuntimeInfo},
 		{Tool: mcp.NewTool("prometheus_TSDB_status",
 			mcp.WithDescription("Tool for getting Prometheus TSDB status. Provides information about the time series database (TSDB) status in Prometheus. Use this tool to monitor database health through details about data storage, head blocks, WAL status, and other TSDB metrics."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithNumber("limit", mcp.Description("Number of items limit")),
 		), Handler: s.prometheusTSDBStatus},
 		// {Tool: mcp.NewTool("prometheus_WALReplay",
@@ -202,6 +236,12 @@ func (s *Server) initPrometheus() []server.ServerTool {
 // prometheusMetrics handles the prometheus_metrics_query tool request
 func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_metrics failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	queryArg := ctr.GetString("query", "")
 	timeArg := ctr.GetString("time", "")
 	timeout := ctr.GetString("timeout", "")
@@ -226,7 +266,7 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 	}
 
 	// Execute the instant query with the provided parameters
-	ret, err := s.k.QueryPrometheus(query, queryTime, timeout)
+	ret, err := k.QueryPrometheus(query, queryTime, timeout)
 	if err != nil {
 		duration := time.Since(start)
 		errMsg := err.Error()
@@ -259,6 +299,11 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 // prometheusMetricsRange handles the prometheus_metrics_query_range tool request
 func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	queryArg := ctr.GetString("query", "")
 	startArg := ctr.GetString("start", "")
 	endArg := ctr.GetString("end", "")
@@ -314,7 +359,7 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 	step := stepArg
 
 	// Execute the range query with the provided parameters
-	ret, err := s.k.QueryPrometheusRange(query, startTime, endTime, step, timeout)
+	ret, err := k.QueryPrometheusRange(query, startTime, endTime, step, timeout)
 	if err != nil {
 		duration := time.Since(start)
 		errMsg := err.Error()
@@ -351,12 +396,17 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 }
 
 // prometheusListMetrics handles the prometheus_list_metrics tool request
-func (s *Server) prometheusListMetrics(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (s *Server) prometheusListMetrics(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_list_metrics failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: prometheus_list_metrics - got called by session id: %s", sessionID)
 
-	ret, err := s.k.ListPrometheusMetrics()
+	ret, err := k.ListPrometheusMetrics()
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_list_metrics failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -371,6 +421,11 @@ func (s *Server) prometheusListMetrics(ctx context.Context, _ mcp.CallToolReques
 // prometheusMetricInfo handles the prometheus_metric_info tool request
 func (s *Server) prometheusMetricInfo(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_metric_info failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	metric := ctr.GetString("metric", "")
 	includeStatsArg := ctr.GetString("include_statistics", "")
 
@@ -386,7 +441,7 @@ func (s *Server) prometheusMetricInfo(ctx context.Context, ctr mcp.CallToolReque
 	// Check if statistics are requested
 	includeStats := includeStatsArg == "true"
 
-	ret, err := s.k.GetPrometheusMetricInfo(metric, includeStats)
+	ret, err := k.GetPrometheusMetricInfo(metric, includeStats)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_metric_info failed after %v: failed to get info for metric '%s': %v by session id: %s", duration, metric, err, sessionID)
@@ -407,6 +462,11 @@ func (s *Server) prometheusMetricInfo(ctx context.Context, ctr mcp.CallToolReque
 // prometheusGenerateQuery handles the prometheus_generate_query tool request
 func (s *Server) prometheusGenerateQuery(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_generate_query failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	description := ctr.GetString("description", "")
 
 	sessionID := getSessionID(ctx)
@@ -419,7 +479,7 @@ func (s *Server) prometheusGenerateQuery(ctx context.Context, ctr mcp.CallToolRe
 	}
 
 	// Generate the PromQL query
-	query, err := s.k.GeneratePromQLQuery(description)
+	query, err := k.GeneratePromQLQuery(description)
 	if err != nil {
 		duration := time.Since(start)
 		errMsg := err.Error()
@@ -467,6 +527,11 @@ func parseTime(timeStr string, defaultTime time.Time) time.Time {
 // prometheusSeries handles the prometheus_series_query tool request
 func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_series_query failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 
 	// Extract the match parameter (required) using new API
@@ -546,7 +611,7 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 		len(match), startStr, endStr, limit, sessionID)
 
 	// Call the Kubernetes function
-	ret, err := s.k.QueryPrometheusSeries(match, startTime, endTime, limit)
+	ret, err := k.QueryPrometheusSeries(match, startTime, endTime, limit)
 	if err != nil {
 		duration := time.Since(start)
 		errMsg := err.Error()
@@ -579,6 +644,11 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 // prometheusTargets handles the prometheus_targets tool request
 func (s *Server) prometheusTargets(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_targets failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	state := ctr.GetString("state", "")
 	scrapePool := ctr.GetString("scrape_pool", "")
 
@@ -586,7 +656,7 @@ func (s *Server) prometheusTargets(ctx context.Context, ctr mcp.CallToolRequest)
 	klog.V(1).Infof("Tool: prometheus_targets - state=%s, scrape_pool=%s - got called by session id: %s", state, scrapePool, sessionID)
 
 	// Call the Kubernetes function
-	ret, err := s.k.GetPrometheusTargets(state, scrapePool)
+	ret, err := k.GetPrometheusTargets(state, scrapePool)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_targets failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -601,6 +671,11 @@ func (s *Server) prometheusTargets(ctx context.Context, ctr mcp.CallToolRequest)
 // prometheusTargetMetadata handles the prometheus_targets_metadata tool request
 func (s *Server) prometheusTargetMetadata(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_targets_metadata failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	matchTarget := ctr.GetString("match_target", "")
 	metric := ctr.GetString("metric", "")
 
@@ -620,7 +695,7 @@ func (s *Server) prometheusTargetMetadata(ctx context.Context, ctr mcp.CallToolR
 		matchTarget, metric, limit, sessionID)
 
 	// Call the Kubernetes function
-	ret, err := s.k.GetPrometheusTargetMetadata(matchTarget, metric, limit)
+	ret, err := k.GetPrometheusTargetMetadata(matchTarget, metric, limit)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_targets_metadata failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -635,6 +710,11 @@ func (s *Server) prometheusTargetMetadata(ctx context.Context, ctr mcp.CallToolR
 // Handler for creating Prometheus alerts
 func (s *Server) prometheusCreateAlert(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_create_alert failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	alertName := ctr.GetString("alertname", "")
 	expression := ctr.GetString("expression", "")
 	appLabel := ctr.GetString("applabel", "")
@@ -723,7 +803,7 @@ func (s *Server) prometheusCreateAlert(ctx context.Context, ctr mcp.CallToolRequ
 		}
 
 		// Call the Kubernetes function
-		result, err := s.k.CreatePrometheusAlert(alertName, expression, appLabel, namespace, interval, forDuration, annotations, alertLabels)
+		result, err := k.CreatePrometheusAlert(alertName, expression, appLabel, namespace, interval, forDuration, annotations, alertLabels)
 		if err != nil {
 			duration := time.Since(start)
 			klog.Errorf("Tool call: prometheus_create_alert failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -743,6 +823,11 @@ func (s *Server) prometheusCreateAlert(ctx context.Context, ctr mcp.CallToolRequ
 // Handler for updating Prometheus alerts
 func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_update_alert failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	alertName := ctr.GetString("alertname", "")
 	appLabel := ctr.GetString("applabel", "")
 	namespace := ctr.GetString("namespace", "")
@@ -819,7 +904,7 @@ func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequ
 	}
 
 	// Call the Kubernetes function (remove type casting since these are already strings)
-	result, err := s.k.UpdatePrometheusAlert(alertName, expression, appLabel, namespace, interval, forDuration, annotations, alertLabels)
+	result, err := k.UpdatePrometheusAlert(alertName, expression, appLabel, namespace, interval, forDuration, annotations, alertLabels)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_update_alert failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -834,6 +919,11 @@ func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequ
 // Handler for deleting Prometheus alerts
 func (s *Server) prometheusDeleteAlert(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_delete_alert failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	appLabel := ctr.GetString("applabel", "")
 	namespace := ctr.GetString("namespace", "")
 	alertName := ctr.GetString("alertname", "")
@@ -856,7 +946,7 @@ func (s *Server) prometheusDeleteAlert(ctx context.Context, ctr mcp.CallToolRequ
 	}
 
 	// Call the Kubernetes function
-	result, err := s.k.DeletePrometheusAlert(appLabel, namespace, alertName)
+	result, err := k.DeletePrometheusAlert(appLabel, namespace, alertName)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_delete_alert failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -869,13 +959,18 @@ func (s *Server) prometheusDeleteAlert(ctx context.Context, ctr mcp.CallToolRequ
 }
 
 // prometheusGetAlerts handles the prometheus_get_alerts tool request
-func (s *Server) prometheusGetAlerts(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (s *Server) prometheusGetAlerts(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_get_alerts failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: prometheus_get_alerts - got called by session id: %s", sessionID)
 
 	// Call the Kubernetes function
-	ret, err := s.k.GetPrometheusAlerts()
+	ret, err := k.GetPrometheusAlerts()
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_get_alerts failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -890,7 +985,11 @@ func (s *Server) prometheusGetAlerts(ctx context.Context, _ mcp.CallToolRequest)
 // prometheusGetRules handles the prometheus_get_rules tool request
 func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_get_rules failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract optional parameters using new API
 	args := ctr.GetRawArguments()
 	argsMap, ok := args.(map[string]interface{})
@@ -962,7 +1061,7 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 		len(ruleNames), len(ruleGroups), len(files), excludeAlerts, len(matchLabels), groupLimit, sessionID)
 
 	// Call the Kubernetes function
-	ret, err := s.k.GetPrometheusRules(groupLimit, ruleNames, ruleGroups, files, excludeAlerts, matchLabels)
+	ret, err := k.GetPrometheusRules(groupLimit, ruleNames, ruleGroups, files, excludeAlerts, matchLabels)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_get_rules failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -975,13 +1074,18 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 }
 
 // prometheusRuntimeInfo handles the prometheus_runtimeinfo tool request
-func (s *Server) prometheusRuntimeInfo(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (s *Server) prometheusRuntimeInfo(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_runtimeinfo failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: prometheus_runtimeinfo - got called by session id: %s", sessionID)
 
 	// Call the Kubernetes function
-	ret, err := s.k.GetPrometheusRuntimeInfo()
+	ret, err := k.GetPrometheusRuntimeInfo()
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_runtimeinfo failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -996,13 +1100,18 @@ func (s *Server) prometheusRuntimeInfo(ctx context.Context, _ mcp.CallToolReques
 // prometheusTSDBStatus handles the prometheus_TSDB_status tool request
 func (s *Server) prometheusTSDBStatus(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_TSDB_status failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	limit := int(ctr.GetFloat("limit", 0)) // Default is no limit
 
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: prometheus_TSDB_status - limit=%d - got called by session id: %s", limit, sessionID)
 
 	// Call the Kubernetes function
-	ret, err := s.k.GetPrometheusTSDBStatus(limit)
+	ret, err := k.GetPrometheusTSDBStatus(limit)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_TSDB_status failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -1017,6 +1126,11 @@ func (s *Server) prometheusTSDBStatus(ctx context.Context, ctr mcp.CallToolReque
 // prometheusListLabelNames handles the prometheus_list_label_names tool request
 func (s *Server) prometheusListLabelNames(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_list_label_names failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	startRfc3339 := ctr.GetString("startRfc3339", "")
 	endRfc3339 := ctr.GetString("endRfc3339", "")
 	limit := int(ctr.GetFloat("limit", 0))
@@ -1041,7 +1155,7 @@ func (s *Server) prometheusListLabelNames(ctx context.Context, ctr mcp.CallToolR
 		startRfc3339, endRfc3339, limit, len(matches), sessionID)
 
 	// Call the Kubernetes function
-	ret, err := s.k.ListPrometheusLabelNames(startRfc3339, endRfc3339, limit, matches)
+	ret, err := k.ListPrometheusLabelNames(startRfc3339, endRfc3339, limit, matches)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_list_label_names failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -1056,6 +1170,11 @@ func (s *Server) prometheusListLabelNames(ctx context.Context, ctr mcp.CallToolR
 // prometheusListLabelValues handles the prometheus_list_label_values tool request
 func (s *Server) prometheusListLabelValues(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: prometheus_list_label_values failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	labelName := ctr.GetString("labelName", "")
 	startRfc3339 := ctr.GetString("startRfc3339", "")
 	endRfc3339 := ctr.GetString("endRfc3339", "")
@@ -1088,7 +1207,7 @@ func (s *Server) prometheusListLabelValues(ctx context.Context, ctr mcp.CallTool
 	}
 
 	// Call the Kubernetes function
-	ret, err := s.k.ListPrometheusLabelValues(labelName, startRfc3339, endRfc3339, limit, matches)
+	ret, err := k.ListPrometheusLabelValues(labelName, startRfc3339, endRfc3339, limit, matches)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_list_label_values failed after %v: %v by session id: %s", duration, err, sessionID)

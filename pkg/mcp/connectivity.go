@@ -15,6 +15,8 @@ func (s *Server) initConnectivity() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("check_service_connectivity",
 			mcp.WithDescription("Check connectivity to a Kubernetes service"),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("service_name",
 				mcp.Description("Fully qualified service name with port number (e.g. my-service.my-namespace.svc.cluster.local:80)"),
 				mcp.Required(),
@@ -22,6 +24,8 @@ func (s *Server) initConnectivity() []server.ServerTool {
 		), Handler: s.checkServiceConnectivity},
 		{Tool: mcp.NewTool("check_ingress_connectivity",
 			mcp.WithDescription("Check connectivity to a Kubernetes ingress host"),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("ingress_host",
 				mcp.Description("Ingress host to check connectivity to (e.g. example.com or https://example.com)"),
 				mcp.Required(),
@@ -33,6 +37,11 @@ func (s *Server) initConnectivity() []server.ServerTool {
 func (s *Server) checkServiceConnectivity(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: check_service_connectivity failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	klog.V(1).Infof("Tool: check_service_connectivity - got called by session id: %s", sessionID)
 	serviceName, err := ctr.RequireString("service_name")
 	if err != nil {
@@ -40,7 +49,7 @@ func (s *Server) checkServiceConnectivity(ctx context.Context, ctr mcp.CallToolR
 		return NewTextResult("", errors.New("failed to check service connectivity, missing or invalid service_name")), nil
 	}
 
-	result, err := s.k.CheckServiceConnectivity(ctx, serviceName)
+	result, err := k.CheckServiceConnectivity(ctx, serviceName)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("connectivity check failed: %v", err)), nil
 	}
@@ -52,6 +61,11 @@ func (s *Server) checkServiceConnectivity(ctx context.Context, ctr mcp.CallToolR
 func (s *Server) checkIngressConnectivity(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: check_ingress_connectivity failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	klog.V(1).Infof("Tool: check_ingress_connectivity - got called by session id: %s", sessionID)
 	ingressHost, err := ctr.RequireString("ingress_host")
 	if err != nil {
@@ -59,7 +73,7 @@ func (s *Server) checkIngressConnectivity(ctx context.Context, ctr mcp.CallToolR
 		return NewTextResult("", errors.New("failed to check ingress connectivity, missing or invalid ingress_host")), nil
 	}
 
-	result, err := s.k.CheckIngressConnectivity(ctx, ingressHost)
+	result, err := k.CheckIngressConnectivity(ctx, ingressHost)
 	if err != nil {
 		return NewTextResult("", fmt.Errorf("ingress connectivity check failed: %v", err)), nil
 	}

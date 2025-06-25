@@ -17,6 +17,8 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("create_argo_rollout_config",
 				mcp.WithDescription("Generate a YAML configuration for Argo Rollouts with specified deployment strategy"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				// Required parameters
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout"),
@@ -99,6 +101,8 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("promote_argo_rollout",
 				mcp.WithDescription("Promote an Argo Rollout to advance it to the next step"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout to promote"),
 					mcp.Required(),
@@ -116,6 +120,8 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("abort_argo_rollout",
 				mcp.WithDescription("Abort an in-progress Argo Rollout and revert to the stable version"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout to abort"),
 					mcp.Required(),
@@ -130,6 +136,8 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("get_argo_rollout",
 				mcp.WithDescription("Get the status of an Argo Rollout"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout"),
 					mcp.Required(),
@@ -147,6 +155,8 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("set_argo_rollout_weight",
 				mcp.WithDescription("Set the canary weight for an Argo Rollout"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout"),
 					mcp.Required(),
@@ -165,6 +175,8 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("pause_argo_rollout",
 				mcp.WithDescription("Pause an Argo Rollout to temporarily halt progression"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout to pause"),
 					mcp.Required(),
@@ -179,6 +191,8 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("set_argo_rollout_image",
 				mcp.WithDescription("Set the image for a container in an Argo Rollouts deployment"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout"),
 					mcp.Required(),
@@ -204,6 +218,11 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 func (s *Server) createArgoRolloutsConfig(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: create_argo_rollout_config failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -266,7 +285,7 @@ func (s *Server) createArgoRolloutsConfig(ctx context.Context, ctr mcp.CallToolR
 		name, namespace, image, strategy, selectorLabels, replicas, sessionID)
 
 	// Generate YAML using the Kubernetes client
-	yamlConfig, err := s.k.GenerateRolloutYAML(
+	yamlConfig, err := k.GenerateRolloutYAML(
 		name, namespace, image, strategy, selectorLabels,
 		replicas, minReadySeconds, progressDeadlineSeconds, cpuRequest, memoryRequest, scaleDownDelaySeconds,
 		blueGreenOptions, canaryOptions,
@@ -286,6 +305,11 @@ func (s *Server) createArgoRolloutsConfig(ctx context.Context, ctr mcp.CallToolR
 func (s *Server) promoteArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: promote_argo_rollout failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -305,7 +329,7 @@ func (s *Server) promoteArgoRollout(ctx context.Context, ctr mcp.CallToolRequest
 	klog.V(1).Infof("Tool: promote_argo_rollout - name: %s, namespace: %s, full: %t - got called by session id: %s", name, namespace, fullPromote, sessionID)
 
 	// Promote the rollout using the Kubernetes client
-	result, err := s.k.PromoteRollout(ctx, name, namespace, fullPromote)
+	result, err := k.PromoteRollout(ctx, name, namespace, fullPromote)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -321,6 +345,11 @@ func (s *Server) promoteArgoRollout(ctx context.Context, ctr mcp.CallToolRequest
 func (s *Server) abortArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: abort_argo_rollout failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -337,7 +366,7 @@ func (s *Server) abortArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) 
 	klog.V(1).Infof("Tool: abort_argo_rollout - name: %s, namespace: %s - got called by session id: %s", name, namespace, sessionID)
 
 	// Abort the rollout using the Kubernetes client
-	result, err := s.k.AbortRollout(ctx, name, namespace)
+	result, err := k.AbortRollout(ctx, name, namespace)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -353,6 +382,11 @@ func (s *Server) abortArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) 
 func (s *Server) getArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: get_argo_rollout failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -371,7 +405,7 @@ func (s *Server) getArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*
 	klog.V(1).Infof("Tool: get_argo_rollout - name: %s, namespace: %s, output: %s - got called by session id: %s", name, namespace, output, sessionID)
 
 	// Get the rollout using the Kubernetes client
-	rollout, err := s.k.GetRollout(ctx, name, namespace)
+	rollout, err := k.GetRollout(ctx, name, namespace)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: get_argo_rollout failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -379,7 +413,7 @@ func (s *Server) getArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*
 	}
 
 	// Format the output using the Kubernetes client
-	result, err := s.k.FormatRolloutOutput(rollout, output)
+	result, err := k.FormatRolloutOutput(rollout, output)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -395,6 +429,11 @@ func (s *Server) getArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*
 func (s *Server) setArgoRolloutWeight(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: set_argo_rollout_weight failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -424,7 +463,7 @@ func (s *Server) setArgoRolloutWeight(ctx context.Context, ctr mcp.CallToolReque
 	klog.V(1).Infof("Tool: set_argo_rollout_weight - name: %s, namespace: %s, weight: %d - got called by session id: %s", name, namespace, weight, sessionID)
 
 	// Set the rollout weight using the Kubernetes client
-	result, err := s.k.SetRolloutWeight(ctx, name, namespace, weight)
+	result, err := k.SetRolloutWeight(ctx, name, namespace, weight)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -440,6 +479,11 @@ func (s *Server) setArgoRolloutWeight(ctx context.Context, ctr mcp.CallToolReque
 func (s *Server) pauseArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: pause_argo_rollout failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -456,7 +500,7 @@ func (s *Server) pauseArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) 
 	klog.V(1).Infof("Tool: pause_argo_rollout - name: %s, namespace: %s - got called by session id: %s", name, namespace, sessionID)
 
 	// Pause the rollout using the Kubernetes client
-	result, err := s.k.PauseRollout(ctx, name, namespace)
+	result, err := k.PauseRollout(ctx, name, namespace)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -472,6 +516,11 @@ func (s *Server) pauseArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) 
 func (s *Server) setArgoRolloutImage(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: set_argo_rollout_image failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -497,7 +546,7 @@ func (s *Server) setArgoRolloutImage(ctx context.Context, ctr mcp.CallToolReques
 	klog.V(1).Infof("Tool: set_argo_rollout_image - name: %s, namespace: %s, image: %s, container: %s - got called by session id: %s", name, namespace, image, containerName, sessionID)
 
 	// Set the rollout image using the Kubernetes client
-	result, err := s.k.SetRolloutImage(ctx, name, namespace, containerName, image)
+	result, err := k.SetRolloutImage(ctx, name, namespace, containerName, image)
 	duration := time.Since(start)
 
 	if err != nil {

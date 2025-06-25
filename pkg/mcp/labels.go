@@ -18,6 +18,8 @@ func (s *Server) initLabels() []server.ServerTool {
 		{Tool: mcp.NewTool("label_resource",
 			mcp.WithDescription("Apply labels to a Kubernetes resource\n"+
 				commonApiVersion),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -42,6 +44,8 @@ func (s *Server) initLabels() []server.ServerTool {
 		{Tool: mcp.NewTool("remove_label",
 			mcp.WithDescription("Remove a label from a Kubernetes resource\n"+
 				commonApiVersion),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -66,6 +70,8 @@ func (s *Server) initLabels() []server.ServerTool {
 		{Tool: mcp.NewTool("annotate_resource",
 			mcp.WithDescription("Apply annotations to a Kubernetes resource\n"+
 				commonApiVersion),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -90,6 +96,8 @@ func (s *Server) initLabels() []server.ServerTool {
 		{Tool: mcp.NewTool("remove_annotation",
 			mcp.WithDescription("Remove an annotation from a Kubernetes resource\n"+
 				commonApiVersion),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -115,6 +123,11 @@ func (s *Server) initLabels() []server.ServerTool {
 
 func (s *Server) labelResource(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: label_resource failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	namespace := ctr.GetString("namespace", "")
 	apiVersion := ctr.GetString("apiVersion", "")
 	kind := ctr.GetString("kind", "")
@@ -165,7 +178,7 @@ func (s *Server) labelResource(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		labelMap[k] = fmt.Sprintf("%v", v)
 	}
 
-	ret, err := s.k.LabelResource(ctx, gvk, namespace, name, labelMap)
+	ret, err := k.LabelResource(ctx, gvk, namespace, name, labelMap)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: label_resource failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -179,6 +192,11 @@ func (s *Server) labelResource(ctx context.Context, ctr mcp.CallToolRequest) (*m
 
 func (s *Server) removeLabel(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: remove_label failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	namespace := ctr.GetString("namespace", "")
 	apiVersion := ctr.GetString("apiVersion", "")
 	kind := ctr.GetString("kind", "")
@@ -208,7 +226,7 @@ func (s *Server) removeLabel(ctx context.Context, ctr mcp.CallToolRequest) (*mcp
 		return NewTextResult("", errors.New("failed to remove label, missing or invalid label_key")), nil
 	}
 
-	ret, err := s.k.RemoveLabel(ctx, gvk, namespace, name, labelKey)
+	ret, err := k.RemoveLabel(ctx, gvk, namespace, name, labelKey)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: remove_label failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -222,6 +240,11 @@ func (s *Server) removeLabel(ctx context.Context, ctr mcp.CallToolRequest) (*mcp
 
 func (s *Server) annotateResource(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: annotate_resource failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	namespace := ctr.GetString("namespace", "")
 	apiVersion := ctr.GetString("apiVersion", "")
 	kind := ctr.GetString("kind", "")
@@ -272,7 +295,7 @@ func (s *Server) annotateResource(ctx context.Context, ctr mcp.CallToolRequest) 
 		annotationMap[k] = fmt.Sprintf("%v", v)
 	}
 
-	ret, err := s.k.AnnotateResource(ctx, gvk, namespace, name, annotationMap)
+	ret, err := k.AnnotateResource(ctx, gvk, namespace, name, annotationMap)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: annotate_resource failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -286,6 +309,11 @@ func (s *Server) annotateResource(ctx context.Context, ctr mcp.CallToolRequest) 
 
 func (s *Server) removeAnnotation(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: remove_annotation failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	namespace := ctr.GetString("namespace", "")
 	apiVersion := ctr.GetString("apiVersion", "")
 	kind := ctr.GetString("kind", "")
@@ -315,7 +343,7 @@ func (s *Server) removeAnnotation(ctx context.Context, ctr mcp.CallToolRequest) 
 		return NewTextResult("", errors.New("failed to remove annotation, missing or invalid annotation_key")), nil
 	}
 
-	ret, err := s.k.RemoveAnnotation(ctx, gvk, namespace, name, annotationKey)
+	ret, err := k.RemoveAnnotation(ctx, gvk, namespace, name, annotationKey)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: remove_annotation failed after %v: %v by session id: %s", duration, err, sessionID)

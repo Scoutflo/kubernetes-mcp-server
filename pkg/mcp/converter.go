@@ -15,16 +15,22 @@ func (s *Server) initConverters() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("docker_compose_to_k8s_manifest",
 			mcp.WithDescription("Converts a Docker Compose file to a Kubernetes manifest. Transforms services, volumes, networks, and other configurations from Docker Compose format to equivalent Kubernetes resources such as Deployments, StatefulSets, Services, ConfigMaps, and more."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("docker_compose", mcp.Description("Docker Compose YAML content to convert to Kubernetes manifest"), mcp.Required()),
 			mcp.WithString("namespace", mcp.Description("Optional namespace to use for all generated Kubernetes resources")),
 		), Handler: s.dockerComposeToK8sManifest},
 		{Tool: mcp.NewTool("k8s_manifest_to_helm_chart",
 			mcp.WithDescription("Converts a Kubernetes manifest to a Helm chart. Transforms Kubernetes resources into templated Helm chart files with parameterized values, following best practices."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("k8s_manifest", mcp.Description("Kubernetes manifest YAML content to convert to a Helm chart"), mcp.Required()),
 			mcp.WithString("chart_name", mcp.Description("Optional name for the generated Helm chart")),
 		), Handler: s.k8sManifestToHelmChart},
 		{Tool: mcp.NewTool("k8s_manifest_to_argo_rollout",
 			mcp.WithDescription("Converts a Kubernetes Deployment manifest to an Argo Rollout resource with associated Service resources. Transforms a standard Kubernetes Deployment into an Argo Rollout with advanced deployment strategies like Canary or Blue/Green deployments, and creates all necessary Service resources required for the chosen rollout strategy."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("k8s_manifest", mcp.Description("Kubernetes Deployment manifest YAML content to convert to an Argo Rollout"), mcp.Required()),
 			mcp.WithString("strategy", mcp.Description("Rollout strategy to use: 'canary' or 'blueGreen'. For 'blueGreen', both active and preview services will be created. For 'canary', a main service will be created.")),
 			mcp.WithString("canary_config", mcp.Description("Optional JSON configuration for canary deployment strategy please use the following if not provided: '{\"steps\":[{\"setWeight\":20},{\"pause\":{\"duration\":\"10\"}},{\"setWeight\":40},{\"pause\":{\"duration\":\"10\"}},{\"setWeight\":60},{\"pause\":{\"duration\":\"10\"}},{\"setWeight\":80},{\"pause\":{\"duration\":\"10\"}}]}'")),
@@ -35,6 +41,11 @@ func (s *Server) initConverters() []server.ServerTool {
 // dockerComposeToK8sManifest handles the docker_compose_to_k8s_manifest tool request
 func (s *Server) dockerComposeToK8sManifest(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: docker_compose_to_k8s_manifest failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required docker_compose parameter
 	sessionID := getSessionID(ctx)
 	dockerCompose, err := ctr.RequireString("docker_compose")
@@ -49,7 +60,7 @@ func (s *Server) dockerComposeToK8sManifest(ctx context.Context, ctr mcp.CallToo
 	klog.V(1).Infof("Tool: docker_compose_to_k8s_manifest - namespace: %s, docker_compose_length: %d - got called by session id: %s", namespace, len(dockerCompose), sessionID)
 
 	// Generate the Kubernetes manifest
-	k8sManifest, err := s.k.DockerComposeToK8sManifest(dockerCompose, namespace)
+	k8sManifest, err := k.DockerComposeToK8sManifest(dockerCompose, namespace)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -79,6 +90,11 @@ func (s *Server) dockerComposeToK8sManifest(ctx context.Context, ctr mcp.CallToo
 func (s *Server) k8sManifestToHelmChart(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: k8s_manifest_to_helm_chart failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required k8s_manifest parameter
 	k8sManifest, err := ctr.RequireString("k8s_manifest")
 	if err != nil {
@@ -92,7 +108,7 @@ func (s *Server) k8sManifestToHelmChart(ctx context.Context, ctr mcp.CallToolReq
 	klog.V(1).Infof("Tool: k8s_manifest_to_helm_chart - chart_name: %s, k8s_manifest_length: %d - got called by session id: %s", chartName, len(k8sManifest), sessionID)
 
 	// Generate the Helm chart
-	helmChart, err := s.k.K8sManifestToHelmChart(k8sManifest, chartName)
+	helmChart, err := k.K8sManifestToHelmChart(k8sManifest, chartName)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -122,6 +138,11 @@ func (s *Server) k8sManifestToHelmChart(ctx context.Context, ctr mcp.CallToolReq
 func (s *Server) k8sManifestToArgoRollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: k8s_manifest_to_argo_rollout failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required k8s_manifest parameter
 	k8sManifest, err := ctr.RequireString("k8s_manifest")
 	if err != nil {
@@ -138,7 +159,7 @@ func (s *Server) k8sManifestToArgoRollout(ctx context.Context, ctr mcp.CallToolR
 	klog.V(1).Infof("Tool call: k8s_manifest_to_argo_rollout - strategy: %s, canary_config_length: %d, k8s_manifest_length: %d - got called by session id: %s", strategy, len(canaryConfig), len(k8sManifest), sessionID)
 
 	// Generate the Argo Rollout manifest
-	argoRollout, err := s.k.DeploymentToArgoRollout(k8sManifest, strategy, canaryConfig)
+	argoRollout, err := k.DeploymentToArgoRollout(k8sManifest, strategy, canaryConfig)
 	duration := time.Since(start)
 
 	if err != nil {

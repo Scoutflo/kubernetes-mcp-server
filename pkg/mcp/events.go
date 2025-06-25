@@ -14,6 +14,8 @@ func (s *Server) initEvents() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("events_list",
 			mcp.WithDescription("List all the Kubernetes events in the current cluster from all namespaces with optional filtering by namespace, resource name, kind, or API version"),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("namespace",
 				mcp.Description("Optional Namespace to retrieve the events from. If not provided, will list events from all namespaces")),
 			mcp.WithString("involved_object_name",
@@ -29,7 +31,11 @@ func (s *Server) initEvents() []server.ServerTool {
 func (s *Server) eventsList(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	namespace := ctr.GetString("namespace", "")
-
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: events_list failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract field selector parameters
 	var fieldSelectors []string
 
@@ -52,7 +58,7 @@ func (s *Server) eventsList(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.
 	klog.V(1).Infof("Tool: events_list - namespace: %s, involved_object_name: %s, involved_object_kind: %s, involved_object_api_version: %s, field_selectors_count: %d -- got called by session id: %s",
 		namespace, involvedObjectName, involvedObjectKind, involvedObjectAPIVersion, len(fieldSelectors), sessionID)
 
-	ret, err := s.k.EventsList(ctx, namespace, fieldSelectors)
+	ret, err := k.EventsList(ctx, namespace, fieldSelectors)
 	duration := time.Since(start)
 
 	if err != nil {

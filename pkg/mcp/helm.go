@@ -17,6 +17,8 @@ func (s *Server) initHelm() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("helm_add_repository",
 			mcp.WithDescription("Add a Helm chart repository"),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
 				mcp.Description("Repository name"),
 				mcp.Required(),
@@ -32,6 +34,8 @@ func (s *Server) initHelm() []server.ServerTool {
 
 		{Tool: mcp.NewTool("helm_list_repositories",
 			mcp.WithDescription("List all configured Helm repositories"),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("random_string",
 				mcp.Description("Dummy parameter for no-parameter tools"),
 				mcp.Required(),
@@ -40,6 +44,8 @@ func (s *Server) initHelm() []server.ServerTool {
 
 		{Tool: mcp.NewTool("helm_update_repositories",
 			mcp.WithDescription("Update Helm repositories to get the latest charts"),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("repo_name",
 				mcp.Description("Optional name of the repository to update. If not provided, all repositories will be updated"),
 			),
@@ -52,6 +58,8 @@ func (s *Server) initHelm() []server.ServerTool {
 				"manifest (download the manifest for a named release. The manifest is a YAML-formatted file containing the complete state of the release.), "+
 				"notes (download the notes for a named release. The notes are a text document that contains information about the release.), "+
 				"values (download the values for a named release. The values are a YAML-formatted file containing the values for the release.)"),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
 				mcp.Description("The name of the release"),
 				mcp.Required(),
@@ -72,6 +80,8 @@ func (s *Server) initHelm() []server.ServerTool {
 				"Usage: helm list --filter 'ara[a-z]+' "+
 				"NAME                UPDATED                                  CHART "+
 				"maudlin-arachnid    2020-06-18 14:17:46.125134977 +0000 UTC  alpine-0.1.0"),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("namespace",
 				mcp.Description("The namespace to list the helm charts from (optional)"),
 			),
@@ -108,6 +118,8 @@ func (s *Server) initHelm() []server.ServerTool {
 			mcp.WithDescription("Install a Helm chart. The chart argument can be either: a chart reference('example/mariadb'), "+
 				"a path to a chart directory, a packaged chart, or a fully qualified URL. "+
 				"For chart references, the latest version will be specified unless the '--version' flag is set."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
 				mcp.Description("The name of the release"),
 				mcp.Required(),
@@ -155,6 +167,8 @@ func (s *Server) initHelm() []server.ServerTool {
 				"Use the '--dry-run' flag to see which releases will be uninstalled without actually "+
 				"uninstalling them. "+
 				"Usage: helm uninstall RELEASE_NAME [...] [flags]"),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
 				mcp.Description("The name of the release"),
 				mcp.Required(),
@@ -176,6 +190,8 @@ func (s *Server) initHelm() []server.ServerTool {
 				"argument can be either: a chart reference('example/mariadb'), a path to a chart directory, "+
 				"a packaged chart, or a fully qualified URL. For chart references, the latest "+
 				"version will be specified unless the '--version' flag is set."),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
 				mcp.Description("The name of the release"),
 				mcp.Required(),
@@ -221,6 +237,11 @@ func (s *Server) initHelm() []server.ServerTool {
 func (s *Server) helmAddRepository(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: helm_add_repository failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -237,7 +258,7 @@ func (s *Server) helmAddRepository(ctx context.Context, ctr mcp.CallToolRequest)
 	klog.V(1).Infof("Tool: helm_add_repository - name: %s, url: %s - got called by session id: %s", name, url, sessionID)
 
 	// Add repository using kubernetes client
-	result, err := s.k.AddRepository(ctx, name, url)
+	result, err := k.AddRepository(ctx, name, url)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -254,8 +275,14 @@ func (s *Server) helmListRepositories(ctx context.Context, ctr mcp.CallToolReque
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: helm_list_repositories - got called by session id: %s", sessionID)
 
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: helm_list_repositories failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
+
 	// List repositories using kubernetes client
-	repos, err := s.k.ListRepositories(ctx)
+	repos, err := k.ListRepositories(ctx)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -286,6 +313,11 @@ func (s *Server) helmListRepositories(ctx context.Context, ctr mcp.CallToolReque
 func (s *Server) helmUpdateRepositories(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: helm_update_repositories failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Check if specific repo was specified
 	var repoNames []string
 	repoName := ctr.GetString("repo_name", "")
@@ -296,7 +328,7 @@ func (s *Server) helmUpdateRepositories(ctx context.Context, ctr mcp.CallToolReq
 	klog.V(1).Infof("Tool: helm_update_repositories - repo_name: %s, repos_to_update: %d - got called by session id: %s", repoName, len(repoNames), sessionID)
 
 	// Update repositories using kubernetes client
-	result, err := s.k.UpdateRepositories(ctx, repoNames...)
+	result, err := k.UpdateRepositories(ctx, repoNames...)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -311,6 +343,11 @@ func (s *Server) helmUpdateRepositories(ctx context.Context, ctr mcp.CallToolReq
 func (s *Server) helmGetRelease(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: helm_get_release failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -323,7 +360,7 @@ func (s *Server) helmGetRelease(ctx context.Context, ctr mcp.CallToolRequest) (*
 	klog.V(1).Infof("Tool: helm_get_release - name: %s, namespace: %s - got called by session id: %s", name, namespace, sessionID)
 
 	// Get release information using kubernetes client
-	result, err := s.k.GetRelease(ctx, name, namespace)
+	result, err := k.GetRelease(ctx, name, namespace)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -338,6 +375,11 @@ func (s *Server) helmGetRelease(ctx context.Context, ctr mcp.CallToolRequest) (*
 func (s *Server) helmListReleases(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: helm_list_releases failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Build the list options
 	opts := kubernetes.ListOptions{}
 
@@ -365,7 +407,7 @@ func (s *Server) helmListReleases(ctx context.Context, ctr mcp.CallToolRequest) 
 		opts.AllNamespaces, opts.All, opts.Filter, opts.Output, sessionID)
 
 	// List releases using kubernetes client
-	result, err := s.k.ListReleases(ctx, opts)
+	result, err := k.ListReleases(ctx, opts)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -380,6 +422,11 @@ func (s *Server) helmListReleases(ctx context.Context, ctr mcp.CallToolRequest) 
 func (s *Server) helmUninstallRelease(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: helm_uninstall_release failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -405,7 +452,7 @@ func (s *Server) helmUninstallRelease(ctx context.Context, ctr mcp.CallToolReque
 		name, namespace, opts.DryRun, opts.Wait, sessionID)
 
 	// Uninstall the release using kubernetes client
-	result, err := s.k.UninstallRelease(ctx, name, namespace, opts)
+	result, err := k.UninstallRelease(ctx, name, namespace, opts)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -420,6 +467,11 @@ func (s *Server) helmUninstallRelease(ctx context.Context, ctr mcp.CallToolReque
 func (s *Server) helmInstallRelease(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: helm_install_release failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -471,7 +523,7 @@ func (s *Server) helmInstallRelease(ctx context.Context, ctr mcp.CallToolRequest
 		name, chart, namespace, opts.RepoURL, opts.Version, len(opts.Set), len(opts.Values), sessionID)
 
 	// Install the release using kubernetes client
-	result, err := s.k.InstallRelease(ctx, name, chart, opts)
+	result, err := k.InstallRelease(ctx, name, chart, opts)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -486,6 +538,11 @@ func (s *Server) helmInstallRelease(ctx context.Context, ctr mcp.CallToolRequest
 func (s *Server) helmUpgradeRelease(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: helm_upgrade_release failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required parameters
 	name, err := ctr.RequireString("name")
 	if err != nil {
@@ -534,7 +591,7 @@ func (s *Server) helmUpgradeRelease(ctx context.Context, ctr mcp.CallToolRequest
 		name, chart, namespace, opts.Version, len(opts.Set), len(opts.Values), sessionID)
 
 	// Upgrade the release using kubernetes client
-	result, err := s.k.UpgradeRelease(ctx, name, chart, opts)
+	result, err := k.UpgradeRelease(ctx, name, chart, opts)
 	duration := time.Since(start)
 
 	if err != nil {

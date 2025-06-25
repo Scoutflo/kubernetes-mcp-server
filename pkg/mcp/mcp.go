@@ -23,7 +23,6 @@ const (
 
 type Server struct {
 	server      *server.MCPServer
-	k           *kubernetes.Kubernetes
 	healthCheck *health.HealthChecker
 }
 
@@ -56,23 +55,14 @@ func NewSever() (*Server, error) {
 
 	klog.V(0).Infof("Initializing MCP server %s version %s", version.BinaryName, version.Version)
 
-	if err := s.initializeKubernetesClient(); err != nil {
+	if err := s.initializeTools(); err != nil {
 		return nil, err
 	}
 
 	return s, nil
 }
 
-func (s *Server) initializeKubernetesClient() error {
-	klog.V(0).Infof("Initializing Kubernetes client...")
-
-	k, err := kubernetes.NewKubernetes()
-	if err != nil {
-		klog.Errorf("Failed to initialize Kubernetes client: %v", err)
-		return err
-	}
-	s.k = k
-
+func (s *Server) initializeTools() error {
 	klog.V(0).Infof("Registering MCP tools...")
 
 	tools := slices.Concat(
@@ -98,9 +88,6 @@ func (s *Server) initializeKubernetesClient() error {
 
 	s.server.SetTools(tools...)
 	klog.V(0).Infof("Registered %d MCP tools", len(tools))
-
-	s.initDocumentationResources()
-	klog.V(0).Infof("Kubernetes MCP server initialization complete")
 
 	return nil
 }
@@ -172,4 +159,20 @@ func getSessionID(ctx context.Context) string {
 		return session.SessionID()
 	}
 	return "unknown"
+}
+
+// getKubernetesClient creates or returns a Kubernetes client based on the tool request parameters
+// If k8surl and k8stoken are provided in the request, it creates a new client with those credentials
+// Otherwise, it tries to use environment variables as fallback
+func (s *Server) getKubernetesClient(ctr mcp.CallToolRequest) (*kubernetes.Kubernetes, error) {
+	k8sURL := ctr.GetString("k8surl", "")
+	k8sToken := ctr.GetString("k8stoken", "")
+
+	if k8sURL != "" && k8sToken != "" {
+		// Create client with provided credentials
+		return kubernetes.NewKubernetesWithCredentials(k8sURL, k8sToken)
+	}
+
+	// Fallback to environment variables if no credentials provided in request
+	return nil, fmt.Errorf("no credentials provided in request")
 }

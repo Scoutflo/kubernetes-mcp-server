@@ -17,6 +17,8 @@ func (s *Server) initRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("rollout",
 				mcp.WithDescription("The rollout action to perform on the resource (history, pause, restart, resume, status, undo)"),
+				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("action", mcp.Description("The action to perform on the resource"), mcp.Required()),
 				mcp.WithString("resource_type", mcp.Description("The type of resource to rollout (deployment, daemonset, statefulset)"), mcp.Required()),
 				mcp.WithString("resource_name", mcp.Description("The name of the resource to rollout"), mcp.Required()),
@@ -31,7 +33,11 @@ func (s *Server) initRollouts() []server.ServerTool {
 // rollout handler for the rollout MCP tool
 func (s *Server) rollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: pods_list_in_namespace failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	// Extract required parameters
 	action, err := ctr.RequireString("action")
 	if err != nil {
@@ -74,7 +80,7 @@ func (s *Server) rollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 		action, resourceType, resourceName, namespace, revision, sessionID)
 
 	// Call the Kubernetes rollout function
-	result, err := s.k.ResourceRollout(ctx, namespace, resourceType, resourceName, action, revision)
+	result, err := k.ResourceRollout(ctx, namespace, resourceType, resourceName, action, revision)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: rollout failed after %v: %v", duration, err)

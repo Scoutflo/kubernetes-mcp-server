@@ -21,6 +21,8 @@ func (s *Server) initResources() []server.ServerTool {
 		{Tool: mcp.NewTool("resources_list",
 			mcp.WithDescription("List Kubernetes resources and objects in the current cluster by providing their apiVersion and kind and optionally the namespace\n"+
 				commonApiVersion),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resources (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -36,6 +38,8 @@ func (s *Server) initResources() []server.ServerTool {
 		{Tool: mcp.NewTool("resources_get",
 			mcp.WithDescription("Get a Kubernetes resource in the current cluster by providing its apiVersion, kind, optionally the namespace, and its name\n"+
 				commonApiVersion),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -52,6 +56,8 @@ func (s *Server) initResources() []server.ServerTool {
 		{Tool: mcp.NewTool("resources_create_or_update",
 			mcp.WithDescription("Create or update a Kubernetes resource in the current cluster by providing a YAML or JSON representation of the resource\n"+
 				commonApiVersion),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("resource",
 				mcp.Description("A JSON or YAML containing a representation of the Kubernetes resource. Should include top-level fields such as apiVersion,kind,metadata, and spec"),
 				mcp.Required(),
@@ -60,6 +66,8 @@ func (s *Server) initResources() []server.ServerTool {
 		{Tool: mcp.NewTool("resources_delete",
 			mcp.WithDescription("Delete a Kubernetes resource in the current cluster by providing its apiVersion, kind, optionally the namespace, and its name\n"+
 				commonApiVersion),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -76,6 +84,8 @@ func (s *Server) initResources() []server.ServerTool {
 		{Tool: mcp.NewTool("get_resources_yaml",
 			mcp.WithDescription("Get the YAML representation of a resource in Kubernetes\n"+
 				commonApiVersion),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -91,6 +101,8 @@ func (s *Server) initResources() []server.ServerTool {
 		), Handler: s.resourcesYaml},
 		{Tool: mcp.NewTool("apply_manifest",
 			mcp.WithDescription("Apply a YAML resource file to the Kubernetes cluster"),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("manifest_path",
 				mcp.Description("The path to the manifest file to apply (either this or yaml_content must be provided)"),
 			),
@@ -101,6 +113,8 @@ func (s *Server) initResources() []server.ServerTool {
 		{Tool: mcp.NewTool("resources_patch",
 			mcp.WithDescription("Patch a resource in Kubernetes\n"+
 				commonApiVersion),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -129,6 +143,11 @@ func (s *Server) initResources() []server.ServerTool {
 
 func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: resources_list failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
 		namespace = ""
@@ -142,7 +161,7 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: resources_list - apiVersion: %s, kind: %s, namespace: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, sessionID)
 
-	ret, err := s.k.ResourcesList(ctx, gvk, namespace)
+	ret, err := k.ResourcesList(ctx, gvk, namespace)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -156,6 +175,11 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 
 func (s *Server) resourcesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: resources_get failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
 		namespace = ""
@@ -174,7 +198,7 @@ func (s *Server) resourcesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mc
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: resources_get - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, name, sessionID)
 
-	ret, err := s.k.ResourcesGet(ctx, gvk, namespace, name)
+	ret, err := k.ResourcesGet(ctx, gvk, namespace, name)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -188,6 +212,11 @@ func (s *Server) resourcesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mc
 
 func (s *Server) resourcesCreateOrUpdate(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: resources_create_or_update failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	resource, err := ctr.RequireString("resource")
 	if err != nil {
 		klog.Errorf("Tool call: resources_create_or_update failed after %v: missing resource parameter", time.Since(start))
@@ -197,7 +226,7 @@ func (s *Server) resourcesCreateOrUpdate(ctx context.Context, ctr mcp.CallToolRe
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: resources_create_or_update - resource YAML/JSON provided (length: %d) - got called by session id: %s", len(resource), sessionID)
 
-	ret, err := s.k.ResourcesCreateOrUpdate(ctx, resource)
+	ret, err := k.ResourcesCreateOrUpdate(ctx, resource)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -211,6 +240,11 @@ func (s *Server) resourcesCreateOrUpdate(ctx context.Context, ctr mcp.CallToolRe
 
 func (s *Server) resourcesDelete(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: resources_delete failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
 		namespace = ""
@@ -229,7 +263,7 @@ func (s *Server) resourcesDelete(ctx context.Context, ctr mcp.CallToolRequest) (
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: resources_delete - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, name, sessionID)
 
-	err = s.k.ResourcesDelete(ctx, gvk, namespace, name)
+	err = k.ResourcesDelete(ctx, gvk, namespace, name)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -259,6 +293,11 @@ func parseGroupVersionKind(arguments map[string]interface{}) (*schema.GroupVersi
 
 func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: get_resources_yaml failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
 		namespace = ""
@@ -276,7 +315,7 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 
 	if name != "" {
 		// Get a specific resource
-		ret, err := s.k.ResourcesGet(ctx, gvk, namespace, name)
+		ret, err := k.ResourcesGet(ctx, gvk, namespace, name)
 		duration := time.Since(start)
 		if err != nil {
 			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
@@ -286,7 +325,7 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		return NewTextResult(ret, err), nil
 	} else {
 		// Get all resources of this type in the namespace
-		ret, err := s.k.ResourcesList(ctx, gvk, namespace)
+		ret, err := k.ResourcesList(ctx, gvk, namespace)
 		duration := time.Since(start)
 		if err != nil {
 			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
@@ -299,6 +338,11 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 
 func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: apply_manifest failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	manifestPath := ctr.GetString("manifest_path", "")
 	yamlContent := ctr.GetString("yaml_content", "")
 
@@ -312,7 +356,6 @@ func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	}
 
 	var content string
-	var err error
 
 	// If manifest_path is provided, read the file
 	if manifestPath != "" {
@@ -328,7 +371,7 @@ func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	}
 
 	// Apply the manifest content
-	ret, err := s.k.ResourcesCreateOrUpdate(ctx, content)
+	ret, err := k.ResourcesCreateOrUpdate(ctx, content)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -342,6 +385,11 @@ func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*m
 
 func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: resources_patch failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	namespace, err := ctr.RequireString("namespace")
 	if err != nil {
 		namespace = ""
@@ -387,7 +435,7 @@ func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*
 	}
 
 	// Apply the patch
-	ret, err := s.k.ResourcesPatch(ctx, gvk, namespace, resourceName, patchType, patchJSON)
+	ret, err := k.ResourcesPatch(ctx, gvk, namespace, resourceName, patchType, patchJSON)
 	duration := time.Since(start)
 
 	if err != nil {

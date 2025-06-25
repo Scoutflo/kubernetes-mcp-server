@@ -14,6 +14,8 @@ func (s *Server) initIstio() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("istio_status",
 			mcp.WithDescription("Get the status of Istio installation in the Kubernetes cluster"),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.istioStatus},
 		{Tool: mcp.NewTool("istio_get_virtual_services",
 			mcp.WithDescription("Get virtual services in the Kubernetes cluster. If name is provided, gets a specific virtual service. If name is not provided, lists all virtual services in the namespace (or all namespaces if namespace is not provided)"),
@@ -23,6 +25,8 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithString("namespace",
 				mcp.Description("Namespace to get virtual services from (optional, if not provided will get from all namespaces)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.istioGetVirtualServices},
 		{Tool: mcp.NewTool("istio_get_destination_rules",
 			mcp.WithDescription("Get destination rules in the Kubernetes cluster. If name is provided, gets a specific destination rule. If name is not provided, lists all destination rules in the namespace (or all namespaces if namespace is not provided)"),
@@ -32,6 +36,8 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithString("namespace",
 				mcp.Description("Namespace to get destination rules from (optional, if not provided will get from all namespaces)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.istioGetDestinationRules},
 		{Tool: mcp.NewTool("istio_get_gateways",
 			mcp.WithDescription("Get gateways in the Kubernetes cluster. If name is provided, gets a specific gateway. If name is not provided, lists all gateways in the namespace (or all namespaces if namespace is not provided)"),
@@ -41,6 +47,8 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithString("namespace",
 				mcp.Description("Namespace to get gateways from (optional, if not provided will get from all namespaces)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.istioGetGateways},
 		{Tool: mcp.NewTool("istio_get_service_entries",
 			mcp.WithDescription("Get service entries in the Kubernetes cluster. If name is provided, gets a specific service entry. If name is not provided, lists all service entries in the namespace (or all namespaces if namespace is not provided)"),
@@ -50,6 +58,8 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithString("namespace",
 				mcp.Description("Namespace to get service entries from (optional, if not provided will get from all namespaces)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.istioGetServiceEntries},
 		{Tool: mcp.NewTool("istio_get_peer_authentications",
 			mcp.WithDescription("Get peer authentications in the Kubernetes cluster. If name is provided, gets a specific peer authentication. If name is not provided, lists all peer authentications in the namespace (or all namespaces if namespace is not provided)"),
@@ -59,6 +69,8 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithString("namespace",
 				mcp.Description("Namespace to get peer authentications from (optional, if not provided will get from all namespaces)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.istioGetPeerAuthentications},
 		{Tool: mcp.NewTool("istio_get_request_authentications",
 			mcp.WithDescription("Get request authentications in the Kubernetes cluster. If name is provided, gets a specific request authentication. If name is not provided, lists all request authentications in the namespace (or all namespaces if namespace is not provided)"),
@@ -68,6 +80,8 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithString("namespace",
 				mcp.Description("Namespace to get request authentications from (optional, if not provided will get from all namespaces)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.istioGetRequestAuthentications},
 		{Tool: mcp.NewTool("istio_get_wasm_plugins",
 			mcp.WithDescription("Get wasm plugins in the Kubernetes cluster. If name is provided, gets a specific wasm plugin. If name is not provided, lists all wasm plugins in the namespace (or all namespaces if namespace is not provided)"),
@@ -77,6 +91,8 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithString("namespace",
 				mcp.Description("Namespace to get wasm plugins from (optional, if not provided will get from all namespaces)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.istioGetWasmPlugins},
 		{Tool: mcp.NewTool("istio_get_authorization_policies",
 			mcp.WithDescription("Get authorization policies in the Kubernetes cluster. If name is provided, gets a specific authorization policy. If name is not provided, lists all authorization policies in the namespace (or all namespaces if namespace is not provided)"),
@@ -86,6 +102,8 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithString("namespace",
 				mcp.Description("Namespace to get authorization policies from (optional, if not provided will get from all namespaces)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.istioGetAuthorizationPolicies},
 		{Tool: mcp.NewTool("istio_get_telemetries",
 			mcp.WithDescription("Get telemetries in the Kubernetes cluster. If name is provided, gets a specific telemetry. If name is not provided, lists all telemetries in the namespace (or all namespaces if namespace is not provided)"),
@@ -95,6 +113,8 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithString("namespace",
 				mcp.Description("Namespace to get telemetries from (optional, if not provided will get from all namespaces)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.istioGetTelemetries},
 		{Tool: mcp.NewTool("istio_get_ztunnel_config",
 			mcp.WithDescription("Get ztunnel configuration"),
@@ -107,6 +127,8 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithString("pod",
 				mcp.Description("Pod name (optional, if not provided gets config from all pods)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.ztunnelConfig},
 		{Tool: mcp.NewTool("istio_get_waypoint",
 			mcp.WithDescription("Get status, list, generate, delete of a waypoint"),
@@ -121,6 +143,8 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithString("action",
 				mcp.Description("Waypoint action: status, list, generate, delete, apply (optional, defaults to status)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.waypoint},
 		{Tool: mcp.NewTool("istio_get_proxy_config",
 			mcp.WithDescription("Get specific proxy configuration for a single pod"),
@@ -134,6 +158,8 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithString("config_type",
 				mcp.Description("The type of configuration to get, the allowed values are: all, bootstrap, cluster, ecds, listener, log, route, secret (optional, defaults to all)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.proxyConfig},
 		{Tool: mcp.NewTool("istio_get_proxy_status",
 			mcp.WithDescription("Get Envoy proxy status for a pod, retrieves last sent and last acknowledged xDS sync from Istiod to each Envoy in the mesh"),
@@ -143,6 +169,8 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithString("ns",
 				mcp.Description("The namespace of the pod to get Envoy proxy status for (optional, if not provided gets status from all namespaces)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.proxyStatus},
 		{Tool: mcp.NewTool("istio_analyze_cluster_configuration",
 			mcp.WithDescription("Analyzes live cluster configuration"),
@@ -161,23 +189,32 @@ func (s *Server) initIstio() []server.ServerTool {
 			mcp.WithBoolean("all_namespaces",
 				mcp.Description("Analyze all namespaces (optional, defaults to false)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.analyzeClusterConfiguration},
 		{Tool: mcp.NewTool("istio_get_remote_clusters",
 			mcp.WithDescription("Lists the remote clusters each istiod instance is connected to"),
 			mcp.WithString("revision",
 				mcp.Description("Control plane revision to check (optional, defaults to default)"),
 			),
+			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
+			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.remoteClusters},
 	}
 }
 
 // istioStatus handles the istio_status tool request
-func (s *Server) istioStatus(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (s *Server) istioStatus(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: istio_status failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: istio_status - checking Istio installation status - got called by session id: %s", sessionID)
 
-	ret, err := s.k.IstioStatus(ctx)
+	ret, err := k.IstioStatus(ctx)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -192,18 +229,22 @@ func (s *Server) istioStatus(ctx context.Context, _ mcp.CallToolRequest) (*mcp.C
 // istioGetVirtualServices handles the istio_get_virtual_services tool request
 func (s *Server) istioGetVirtualServices(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: istio_get_virtual_services failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	name := ctr.GetString("name", "")
 	namespace := ctr.GetString("namespace", "")
 
 	var ret string
-	var err error
 	var duration time.Duration
 
 	if name != "" {
 		// Get specific virtual service
 		klog.V(1).Infof("Tool: istio_get_virtual_services - getting virtual service: %s in namespace: %s - got called by session id: %s", name, namespace, sessionID)
-		ret, err = s.k.GetVirtualService(ctx, namespace, name)
+		ret, err = k.GetVirtualService(ctx, namespace, name)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -213,7 +254,7 @@ func (s *Server) istioGetVirtualServices(ctx context.Context, ctr mcp.CallToolRe
 	} else {
 		// List all virtual services
 		klog.V(1).Infof("Tool: istio_get_virtual_services - getting virtual services in namespace: %s - got called by session id: %s", namespace, sessionID)
-		ret, err = s.k.GetVirtualServices(ctx, namespace)
+		ret, err = k.GetVirtualServices(ctx, namespace)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -229,18 +270,22 @@ func (s *Server) istioGetVirtualServices(ctx context.Context, ctr mcp.CallToolRe
 // istioGetDestinationRules handles the istio_get_destination_rules tool request
 func (s *Server) istioGetDestinationRules(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: istio_get_destination_rules failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	name := ctr.GetString("name", "")
 	namespace := ctr.GetString("namespace", "")
 
 	var ret string
-	var err error
 	var duration time.Duration
 
 	if name != "" {
 		// Get specific destination rule
 		klog.V(1).Infof("Tool: istio_get_destination_rules - getting destination rule: %s in namespace: %s - got called by session id: %s", name, namespace, sessionID)
-		ret, err = s.k.GetDestinationRule(ctx, namespace, name)
+		ret, err = k.GetDestinationRule(ctx, namespace, name)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -250,7 +295,7 @@ func (s *Server) istioGetDestinationRules(ctx context.Context, ctr mcp.CallToolR
 	} else {
 		// List all destination rules
 		klog.V(1).Infof("Tool: istio_get_destination_rules - getting destination rules in namespace: %s - got called by session id: %s", namespace, sessionID)
-		ret, err = s.k.GetDestinationRules(ctx, namespace)
+		ret, err = k.GetDestinationRules(ctx, namespace)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -267,17 +312,21 @@ func (s *Server) istioGetDestinationRules(ctx context.Context, ctr mcp.CallToolR
 func (s *Server) istioGetGateways(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: istio_get_gateways failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	name := ctr.GetString("name", "")
 	namespace := ctr.GetString("namespace", "")
 
 	var ret string
-	var err error
 	var duration time.Duration
 
 	if name != "" {
 		// Get specific gateway
 		klog.V(1).Infof("Tool: istio_get_gateways - getting gateway: %s in namespace: %s - got called by session id: %s", name, namespace, sessionID)
-		ret, err = s.k.GetGateway(ctx, namespace, name)
+		ret, err = k.GetGateway(ctx, namespace, name)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -287,7 +336,7 @@ func (s *Server) istioGetGateways(ctx context.Context, ctr mcp.CallToolRequest) 
 	} else {
 		// List all gateways
 		klog.V(1).Infof("Tool: istio_get_gateways - getting gateways in namespace: %s - got called by session id: %s", namespace, sessionID)
-		ret, err = s.k.GetGateways(ctx, namespace)
+		ret, err = k.GetGateways(ctx, namespace)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -303,18 +352,22 @@ func (s *Server) istioGetGateways(ctx context.Context, ctr mcp.CallToolRequest) 
 // istioGetServiceEntries handles the istio_get_service_entries tool request
 func (s *Server) istioGetServiceEntries(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: istio_get_service_entries failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	name := ctr.GetString("name", "")
 	namespace := ctr.GetString("namespace", "")
 
 	var ret string
-	var err error
 	var duration time.Duration
 
 	if name != "" {
 		// Get specific service entry
 		klog.V(1).Infof("Tool: istio_get_service_entries - getting service entry: %s in namespace: %s - got called by session id: %s", name, namespace, sessionID)
-		ret, err = s.k.GetServiceEntry(ctx, namespace, name)
+		ret, err = k.GetServiceEntry(ctx, namespace, name)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -324,7 +377,7 @@ func (s *Server) istioGetServiceEntries(ctx context.Context, ctr mcp.CallToolReq
 	} else {
 		// List all service entries
 		klog.V(1).Infof("Tool: istio_get_service_entries - getting service entries in namespace: %s - got called by session id: %s", namespace, sessionID)
-		ret, err = s.k.GetServiceEntries(ctx, namespace)
+		ret, err = k.GetServiceEntries(ctx, namespace)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -340,18 +393,22 @@ func (s *Server) istioGetServiceEntries(ctx context.Context, ctr mcp.CallToolReq
 // istioGetPeerAuthentications handles the istio_get_peer_authentications tool request
 func (s *Server) istioGetPeerAuthentications(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: istio_get_peer_authentications failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	name := ctr.GetString("name", "")
 	namespace := ctr.GetString("namespace", "")
 
 	var ret string
-	var err error
 	var duration time.Duration
 
 	if name != "" {
 		// Get specific peer authentication
 		klog.V(1).Infof("Tool: istio_get_peer_authentications - getting peer authentication: %s in namespace: %s - got called by session id: %s", name, namespace, sessionID)
-		ret, err = s.k.GetPeerAuthentication(ctx, namespace, name)
+		ret, err = k.GetPeerAuthentication(ctx, namespace, name)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -361,7 +418,7 @@ func (s *Server) istioGetPeerAuthentications(ctx context.Context, ctr mcp.CallTo
 	} else {
 		// List all peer authentications
 		klog.V(1).Infof("Tool: istio_get_peer_authentications - getting peer authentications in namespace: %s - got called by session id: %s", namespace, sessionID)
-		ret, err = s.k.GetPeerAuthentications(ctx, namespace)
+		ret, err = k.GetPeerAuthentications(ctx, namespace)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -377,18 +434,22 @@ func (s *Server) istioGetPeerAuthentications(ctx context.Context, ctr mcp.CallTo
 // istioGetRequestAuthentications handles the istio_get_request_authentications tool request
 func (s *Server) istioGetRequestAuthentications(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: istio_get_request_authentications failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	name := ctr.GetString("name", "")
 	namespace := ctr.GetString("namespace", "")
 
 	var ret string
-	var err error
 	var duration time.Duration
 
 	if name != "" {
 		// Get specific request authentication
 		klog.V(1).Infof("Tool: istio_get_request_authentications - getting request authentication: %s in namespace: %s - got called by session id: %s", name, namespace, sessionID)
-		ret, err = s.k.GetRequestAuthentication(ctx, namespace, name)
+		ret, err = k.GetRequestAuthentication(ctx, namespace, name)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -398,7 +459,7 @@ func (s *Server) istioGetRequestAuthentications(ctx context.Context, ctr mcp.Cal
 	} else {
 		// List all request authentications
 		klog.V(1).Infof("Tool: istio_get_request_authentications - getting request authentications in namespace: %s - got called by session id: %s", namespace, sessionID)
-		ret, err = s.k.GetRequestAuthentications(ctx, namespace)
+		ret, err = k.GetRequestAuthentications(ctx, namespace)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -414,23 +475,27 @@ func (s *Server) istioGetRequestAuthentications(ctx context.Context, ctr mcp.Cal
 // istioGetWasmPlugins handles the istio_get_wasm_plugins tool request
 func (s *Server) istioGetWasmPlugins(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: istio_get_wasm_plugins failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	name := ctr.GetString("name", "")
 	namespace := ctr.GetString("namespace", "")
 
 	var ret string
-	var err error
 	var duration time.Duration
 
 	if name != "" {
 		// Get specific wasm plugin
 		klog.V(1).Infof("Tool: istio_get_wasm_plugins - getting wasm plugin: %s in namespace: %s - got called by session id: %s", name, namespace, sessionID)
-		ret, err = s.k.GetWasmPlugin(ctx, namespace, name)
+		ret, err = k.GetWasmPlugin(ctx, namespace, name)
 		duration = time.Since(start)
 	} else {
 		// List wasm plugins
 		klog.V(1).Infof("Tool: istio_get_wasm_plugins - listing wasm plugins in namespace: %s - got called by session id: %s", namespace, sessionID)
-		ret, err = s.k.GetWasmPlugins(ctx, namespace)
+		ret, err = k.GetWasmPlugins(ctx, namespace)
 		duration = time.Since(start)
 	}
 
@@ -446,18 +511,22 @@ func (s *Server) istioGetWasmPlugins(ctx context.Context, ctr mcp.CallToolReques
 // istioGetAuthorizationPolicies handles the istio_get_authorization_policies tool request
 func (s *Server) istioGetAuthorizationPolicies(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: istio_get_authorization_policies failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	name := ctr.GetString("name", "")
 	namespace := ctr.GetString("namespace", "")
 
 	var ret string
-	var err error
 	var duration time.Duration
 
 	if name != "" {
 		// Get specific authorization policy
 		klog.V(1).Infof("Tool: istio_get_authorization_policies - getting authorization policy: %s in namespace: %s - got called by session id: %s", name, namespace, sessionID)
-		ret, err = s.k.GetAuthorizationPolicy(ctx, namespace, name)
+		ret, err = k.GetAuthorizationPolicy(ctx, namespace, name)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -467,7 +536,7 @@ func (s *Server) istioGetAuthorizationPolicies(ctx context.Context, ctr mcp.Call
 	} else {
 		// List all authorization policies
 		klog.V(1).Infof("Tool: istio_get_authorization_policies - getting authorization policies in namespace: %s - got called by session id: %s", namespace, sessionID)
-		ret, err = s.k.GetAuthorizationPolicies(ctx, namespace)
+		ret, err = k.GetAuthorizationPolicies(ctx, namespace)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -483,18 +552,22 @@ func (s *Server) istioGetAuthorizationPolicies(ctx context.Context, ctr mcp.Call
 // istioGetTelemetries handles the istio_get_telemetries tool request
 func (s *Server) istioGetTelemetries(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: istio_get_telemetries failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	name := ctr.GetString("name", "")
 	namespace := ctr.GetString("namespace", "")
 
 	var ret string
-	var err error
 	var duration time.Duration
 
 	if name != "" {
 		// Get specific telemetry
 		klog.V(1).Infof("Tool: istio_get_telemetries - getting telemetry: %s in namespace: %s - got called by session id: %s", name, namespace, sessionID)
-		ret, err = s.k.GetTelemetry(ctx, namespace, name)
+		ret, err = k.GetTelemetry(ctx, namespace, name)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -504,7 +577,7 @@ func (s *Server) istioGetTelemetries(ctx context.Context, ctr mcp.CallToolReques
 	} else {
 		// List all telemetries
 		klog.V(1).Infof("Tool: istio_get_telemetries - getting telemetries in namespace: %s - got called by session id: %s", namespace, sessionID)
-		ret, err = s.k.GetTelemetries(ctx, namespace)
+		ret, err = k.GetTelemetries(ctx, namespace)
 		duration = time.Since(start)
 
 		if err != nil {
@@ -520,6 +593,11 @@ func (s *Server) istioGetTelemetries(ctx context.Context, ctr mcp.CallToolReques
 // ztunnelConfig handles the ztunnel_config tool request
 func (s *Server) ztunnelConfig(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: ztunnel_config failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	namespace := ctr.GetString("ns", "")
 	configType := ctr.GetString("config_type", "")
@@ -527,7 +605,7 @@ func (s *Server) ztunnelConfig(ctx context.Context, ctr mcp.CallToolRequest) (*m
 
 	klog.V(1).Infof("Tool: ztunnel_config - getting ztunnel config in namespace: %s, configType: %s, pod: %s - got called by session id: %s", namespace, configType, pod, sessionID)
 
-	ret, err := s.k.GetZtunnelConfig(ctx, namespace, configType, pod)
+	ret, err := k.GetZtunnelConfig(ctx, namespace, configType, pod)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -542,6 +620,11 @@ func (s *Server) ztunnelConfig(ctx context.Context, ctr mcp.CallToolRequest) (*m
 // waypoint handles the waypoint tool request
 func (s *Server) waypoint(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: waypoint failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID
 	name := ctr.GetString("name", "")
 	namespace := ctr.GetString("ns", "")
@@ -559,7 +642,7 @@ func (s *Server) waypoint(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Ca
 		return NewTextResult("", fmt.Errorf("ns parameter is required")), nil
 	}
 
-	ret, err := s.k.GetWaypoint(ctx, namespace, name, action)
+	ret, err := k.GetWaypoint(ctx, namespace, name, action)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -574,6 +657,11 @@ func (s *Server) waypoint(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Ca
 // proxyConfig handles the proxy_config tool request
 func (s *Server) proxyConfig(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: proxy_config failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	podName := ctr.GetString("pod_name", "")
 	namespace := ctr.GetString("ns", "")
@@ -586,7 +674,7 @@ func (s *Server) proxyConfig(ctx context.Context, ctr mcp.CallToolRequest) (*mcp
 		return NewTextResult("", fmt.Errorf("pod_name parameter is required")), nil
 	}
 
-	ret, err := s.k.GetProxyConfig(ctx, podName, namespace, configType)
+	ret, err := k.GetProxyConfig(ctx, podName, namespace, configType)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -601,13 +689,18 @@ func (s *Server) proxyConfig(ctx context.Context, ctr mcp.CallToolRequest) (*mcp
 // proxyStatus handles the proxy_status tool request
 func (s *Server) proxyStatus(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: proxy_status failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	podName := ctr.GetString("pod_name", "")
 	namespace := ctr.GetString("ns", "")
 
 	klog.V(1).Infof("Tool: proxy_status - getting proxy status for pod: %s in namespace: %s - got called by session id: %s", podName, namespace, sessionID)
 
-	ret, err := s.k.GetProxyStatus(ctx, podName, namespace)
+	ret, err := k.GetProxyStatus(ctx, podName, namespace)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -622,6 +715,11 @@ func (s *Server) proxyStatus(ctx context.Context, ctr mcp.CallToolRequest) (*mcp
 // analyzeClusterConfiguration handles the analyze_cluster_configuration tool request
 func (s *Server) analyzeClusterConfiguration(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: analyze_cluster_configuration failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	namespace := ctr.GetString("namespace", "")
 	outputFormat := ctr.GetString("output_format", "json")
@@ -631,7 +729,7 @@ func (s *Server) analyzeClusterConfiguration(ctx context.Context, ctr mcp.CallTo
 
 	klog.V(1).Infof("Tool: analyze_cluster_configuration - analyzing configuration for namespace: %s, all_namespaces: %v - got called by session id: %s", namespace, allNamespaces, sessionID)
 
-	ret, err := s.k.GetAnalyze(ctx, namespace, outputFormat, outputThreshold, failureThreshold, allNamespaces)
+	ret, err := k.GetAnalyze(ctx, namespace, outputFormat, outputThreshold, failureThreshold, allNamespaces)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -646,12 +744,17 @@ func (s *Server) analyzeClusterConfiguration(ctx context.Context, ctr mcp.CallTo
 // remoteClusters handles the remote_clusters tool request
 func (s *Server) remoteClusters(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: remote_clusters failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
 	sessionID := getSessionID(ctx)
 	revision := ctr.GetString("revision", "default")
 
 	klog.V(1).Infof("Tool: remote_clusters - getting remote clusters for revision: %s - got called by session id: %s", revision, sessionID)
 
-	ret, err := s.k.GetRemoteClusters(ctx, revision)
+	ret, err := k.GetRemoteClusters(ctx, revision)
 	duration := time.Since(start)
 
 	if err != nil {

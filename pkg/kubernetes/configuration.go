@@ -6,12 +6,7 @@ import (
 )
 
 // GetAvailableAPIResources fetches all available API resources in the cluster
-func GetAvailableAPIResources(ctx context.Context) (string, error) {
-	// Create a new Kubernetes client
-	k, err := NewKubernetes()
-	if err != nil {
-		return "", fmt.Errorf("failed to create Kubernetes client: %v", err)
-	}
+func (k *Kubernetes) GetAvailableAPIResources(ctx context.Context) (string, error) {
 
 	// Use the HTTP API to get API resources
 	response, err := k.MakeAPIRequest("GET", "/apis/v1/api-resources", nil)
