@@ -39,11 +39,11 @@ jobs:
 
   build-pre-prod:
     needs: [test]
-    name: Build and push the pre-prod image to the Docker registry
+    name: Build and push the pre-prod image to the ECR registry
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      id-token: write
     if: github.ref == 'refs/heads/release/dev'
     steps:
       - name: Checkout repository
@@ -53,7 +53,7 @@ jobs:
         id: meta
         with:
           images: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/kubernetes_mcp_server
+            ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}
           labels: |
             maintainer=${{ github.actor }}
             org.opencontainers.image.title=${{ github.repository }}
@@ -71,11 +71,14 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -91,104 +94,13 @@ jobs:
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-  helm-package-push-pre-prod:
-    name: Package and push Helm chart (dev)
-    runs-on: ubuntu-latest
-    needs: [build-pre-prod]
-    permissions:
-      contents: read
-      packages: write
-    if: github.ref == 'refs/heads/release/dev'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        
-      - name: Set up Helm
-        uses: azure/setup-helm@v3
-        with:
-          version: 'latest'
-          
-      - name: Set version
-        id: set_version
-        run: |
-          # Use run_number for chart version
-          echo "chart_version=0.1.${{ github.run_number }}" >> $GITHUB_OUTPUT
-          echo "image_tag=pre-prod-${{ github.run_number }}" >> $GITHUB_OUTPUT
-          echo "Chart version: 0.1.${{ github.run_number }}"
-          echo "Image tag: pre-prod-${{ github.run_number }}"
-            
-      - name: Update Chart.yaml version
-        run: |
-          echo "Updating Chart.yaml with version: ${{ steps.set_version.outputs.chart_version }}"
-          echo "Docker image tag: ${{ steps.set_version.outputs.image_tag }}"
-          
-          # Print the current Chart.yaml
-          echo "Before update:"
-          cat helm/k8s-mcp-server/Chart.yaml
-          
-          # Update with flexible pattern matching
-          sed -i "s/version:.*$/version: ${{ steps.set_version.outputs.chart_version }}/" helm/k8s-mcp-server/Chart.yaml
-          sed -i "s/appVersion:.*$/appVersion: \"${{ steps.set_version.outputs.image_tag }}\"/" helm/k8s-mcp-server/Chart.yaml
-          
-          echo "After update:"
-          cat helm/k8s-mcp-server/Chart.yaml
-          
-      - name: Update values.yaml with new image tag
-        run: |
-          echo "Updating values.yaml with image tag: ${{ steps.set_version.outputs.image_tag }}"
-          
-          # Print the current values.yaml image section
-          echo "Before update:"
-          grep -A 3 "image:" helm/k8s-mcp-server/values.yaml
-          
-          # Update the image tag in values.yaml
-          sed -i "/image:/,/tag:/ s/tag:.*$/tag: ${{ steps.set_version.outputs.image_tag }}/" helm/k8s-mcp-server/values.yaml
-          
-          echo "After update:"
-          grep -A 3 "image:" helm/k8s-mcp-server/values.yaml
-          
-      - name: Update values.yaml with GitHub secrets
-        run: |
-          echo "Updating values.yaml with GitHub secrets"
-          
-          # Update OpenAI secrets - using different delimiters to avoid issues with special characters
-          sed -i '/openai:/,/apiKey:/ s|apiKey:.*$|apiKey: "${{ secrets.OPENAI_API_KEY }}"|' helm/k8s-mcp-server/values.yaml
-          sed -i '/openai:/,/endpoint:/ s|endpoint:.*$|endpoint: "${{ secrets.OPENAI_ENDPOINT }}"|' helm/k8s-mcp-server/values.yaml
-          sed -i '/openai:/,/deploymentName:/ s|deploymentName:.*$|deploymentName: "${{ secrets.OPENAI_DEPLOYMENT_NAME }}"|' helm/k8s-mcp-server/values.yaml
-          sed -i '/openai:/,/apiVersion:/ s|apiVersion:.*$|apiVersion: "${{ secrets.OPENAI_API_VERSION }}"|' helm/k8s-mcp-server/values.yaml
-          sed -i '/openai:/,/maxTokens:/ s|maxTokens:.*$|maxTokens: ${{ secrets.OPENAI_MAX_TOKENS }}|' helm/k8s-mcp-server/values.yaml
-          sed -i '/openai:/,/temperature:/ s|temperature:.*$|temperature: ${{ secrets.OPENAI_TEMPERATURE }}|' helm/k8s-mcp-server/values.yaml
-          sed -i '/openai:/,/topP:/ s|topP:.*$|topP: ${{ secrets.OPENAI_TOP_P }}|' helm/k8s-mcp-server/values.yaml
-          
-          # Update ArgoCD token
-          sed -i '/argocd:/,/token:/ s|token:.*$|token: "${{ secrets.ARGOCD_TOKEN }}"|' helm/k8s-mcp-server/values.yaml
-          
-          # Update Docker config secret
-          sed -i '/image:/,/dockerConfigSecret:/ s|dockerConfigSecret:.*$|dockerConfigSecret: "${{ secrets.DOCKER_CONFIG_SECRET }}"|' helm/k8s-mcp-server/values.yaml
-          
-          echo "GitHub secrets injected into values.yaml"
-          
-      - name: Package Helm chart
-        run: |
-          helm package helm/k8s-mcp-server
-          
-      - name: Login to GitHub Container Registry
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.repository_owner }} --password-stdin
-          
-      - name: Push Helm chart to GitHub Container Registry
-        run: |
-          version="${{ steps.set_version.outputs.chart_version }}"
-          repo_owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          
-          # Push the chart
-          echo "Pushing Helm chart version $version to GitHub Container Registry"
-          helm push --debug kubernetes-mcp-server-${version}.tgz oci://ghcr.io/${repo_owner}/kubernetes-mcp-server
-          
   build-prod:
     needs: [test]
-    name: Build and push the production image to the Docker registry
+    name: Build and push the production image to the ECR registry
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout repository
@@ -198,7 +110,7 @@ jobs:
         id: meta
         with:
           images: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/kubernetes_mcp_server
+            ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}
           labels: |
             maintainer=${{ github.actor }}
             org.opencontainers.image.title=${{ github.repository }}
@@ -216,11 +128,14 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -229,99 +144,113 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-  helm-package-push-production:
-    name: Package and push Helm chart (prod)
+  deploy-pre-prod:
+    name: Deploy pre-prod image to GCP VM
+    needs: [build-pre-prod]
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/release/dev'
+    steps:
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.GCP_SSH_KEY }}
+      - name: Deploy to GCP VM
+        env:
+          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          GCP_VM_USER: ${{ secrets.GCP_VM_USER }}
+          GCP_VM_HOST: ${{ secrets.GCP_VM_HOST }}
+        run: |
+          ssh -o StrictHostKeyChecking=no $GCP_VM_USER@$GCP_VM_HOST '
+            export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
+            export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
+            export AWS_REGION="$AWS_REGION"
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+            IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:pre-prod-${{ github.run_number }}"
+            docker pull $IMAGE
+            docker stop kubernetes-mcp-server || true
+            docker rm kubernetes-mcp-server || true
+            docker network create k8s-mcp-network || true
+            docker run -d --name kubernetes-mcp-server \
+              --restart unless-stopped \
+              --network k8s-mcp-network \
+              -p 8081:8081 \
+              -p 8082:8082 \
+              -e AZURE_OPENAI_API_KEY="$OPENAI_API_KEY" \
+              -e AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT" \
+              -e AZURE_OPENAI_DEPLOYMENT_NAME="$OPENAI_DEPLOYMENT_NAME" \
+              -e OPENAI_API_VERSION="$OPENAI_API_VERSION" \
+              -e AZURE_OPENAI_MAX_TOKENS="$OPENAI_MAX_TOKENS" \
+              -e AZURE_OPENAI_TEMPERATURE="$OPENAI_TEMPERATURE" \
+              -e AZURE_OPENAI_TOP_P="OPENAI_TOP_P" \
+              $IMAGE
+            echo "Container status:"
+            docker ps | grep kubernetes-mcp-server
+            echo "Port check:"
+            (ss -tuln || netstat -tuln) | grep 8081 || true
+            echo "Initial logs:"
+            docker logs --tail 50 kubernetes-mcp-server
+          '
+
+  deploy-prod:
+    name: Deploy prod image to GCP VM
     needs: [build-prod]
-    permissions:
-      contents: read
-      packages: write
+    runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        
-      - name: Set up Helm
-        uses: azure/setup-helm@v3
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          version: 'latest'
-          
-      - name: Set version
-        id: set_version
+          ssh-private-key: ${{ secrets.GCP_SSH_KEY }}
+      - name: Deploy to GCP VM
+        env:
+          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          GCP_VM_USER: ${{ secrets.GCP_VM_USER }}
+          GCP_VM_HOST: ${{ secrets.GCP_VM_HOST }}
         run: |
-          # Use run_number for chart version
-          echo "chart_version=0.1.${{ github.run_number }}" >> $GITHUB_OUTPUT
-          echo "image_tag=production-${{ github.run_number }}" >> $GITHUB_OUTPUT
-          echo "Chart version: 0.1.${{ github.run_number }}"
-          echo "Image tag: production-${{ github.run_number }}"
-          
-      - name: Update Chart.yaml version
-        run: |
-          echo "Updating Chart.yaml with version: ${{ steps.set_version.outputs.chart_version }}"
-          echo "Docker image tag: ${{ steps.set_version.outputs.image_tag }}"
-          
-          # Print the current Chart.yaml
-          echo "Before update:"
-          cat helm/k8s-mcp-server/Chart.yaml
-          
-          # Update with flexible pattern matching
-          sed -i "s/version:.*$/version: ${{ steps.set_version.outputs.chart_version }}/" helm/k8s-mcp-server/Chart.yaml
-          sed -i "s/appVersion:.*$/appVersion: \"${{ steps.set_version.outputs.image_tag }}\"/" helm/k8s-mcp-server/Chart.yaml
-          
-          echo "After update:"
-          cat helm/k8s-mcp-server/Chart.yaml
-          
-      - name: Update values.yaml with new image tag
-        run: |
-          echo "Updating values.yaml with image tag: ${{ steps.set_version.outputs.image_tag }}"
-          
-          # Print the current values.yaml image section
-          echo "Before update:"
-          grep -A 3 "image:" helm/k8s-mcp-server/values.yaml
-          
-          # Update the image tag in values.yaml
-          sed -i "/image:/,/tag:/ s/tag:.*$/tag: ${{ steps.set_version.outputs.image_tag }}/" helm/k8s-mcp-server/values.yaml
-          
-          echo "After update:"
-          grep -A 3 "image:" helm/k8s-mcp-server/values.yaml
-          
-      - name: Update values.yaml with GitHub secrets
-        run: |
-          echo "Updating values.yaml with GitHub secrets"
-          
-          # Update OpenAI secrets - using different delimiters to avoid issues with special characters
-          sed -i '/openai:/,/apiKey:/ s|apiKey:.*$|apiKey: "${{ secrets.OPENAI_API_KEY }}"|' helm/k8s-mcp-server/values.yaml
-          sed -i '/openai:/,/endpoint:/ s|endpoint:.*$|endpoint: "${{ secrets.OPENAI_ENDPOINT }}"|' helm/k8s-mcp-server/values.yaml
-          sed -i '/openai:/,/deploymentName:/ s|deploymentName:.*$|deploymentName: "${{ secrets.OPENAI_DEPLOYMENT_NAME }}"|' helm/k8s-mcp-server/values.yaml
-          sed -i '/openai:/,/apiVersion:/ s|apiVersion:.*$|apiVersion: "${{ secrets.OPENAI_API_VERSION }}"|' helm/k8s-mcp-server/values.yaml
-          sed -i '/openai:/,/maxTokens:/ s|maxTokens:.*$|maxTokens: ${{ secrets.OPENAI_MAX_TOKENS }}|' helm/k8s-mcp-server/values.yaml
-          sed -i '/openai:/,/temperature:/ s|temperature:.*$|temperature: ${{ secrets.OPENAI_TEMPERATURE }}|' helm/k8s-mcp-server/values.yaml
-          sed -i '/openai:/,/topP:/ s|topP:.*$|topP: ${{ secrets.OPENAI_TOP_P }}|' helm/k8s-mcp-server/values.yaml
-          
-          # Update ArgoCD token
-          sed -i '/argocd:/,/token:/ s|token:.*$|token: "${{ secrets.ARGOCD_TOKEN }}"|' helm/k8s-mcp-server/values.yaml
-          
-          # Update Docker config secret
-          sed -i '/image:/,/dockerConfigSecret:/ s|dockerConfigSecret:.*$|dockerConfigSecret: "${{ secrets.DOCKER_CONFIG_SECRET }}"|' helm/k8s-mcp-server/values.yaml
-          
-          echo "GitHub secrets injected into values.yaml"
-          
-      - name: Package Helm chart
-        run: |
-          helm package helm/k8s-mcp-server
-          
-      - name: Login to GitHub Container Registry
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.repository_owner }} --password-stdin
-          
-      - name: Push Helm chart to GitHub Container Registry
-        run: |
-          version="${{ steps.set_version.outputs.chart_version }}"
-          repo_owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          
-          # Push the chart
-          echo "Pushing Helm chart version $version to GitHub Container Registry"
-          helm push --debug kubernetes-mcp-server-${version}.tgz oci://ghcr.io/${repo_owner}/kubernetes-mcp-server
+          ssh -o StrictHostKeyChecking=no $GCP_VM_USER@$GCP_VM_HOST '
+            export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
+            export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
+            export AWS_REGION="$AWS_REGION"
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+            IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:production-${{ github.run_number }}"
+            docker pull $IMAGE
+            docker stop kubernetes-mcp-server || true
+            docker rm kubernetes-mcp-server || true
+            docker network create k8s-mcp-network || true
+            docker run -d --name kubernetes-mcp-server \
+              --restart unless-stopped \
+              --network k8s-mcp-network \
+              -p 8081:8081 \
+              -p 8082:8082 \
+              -e AZURE_OPENAI_API_KEY="$OPENAI_API_KEY" \
+              -e AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT" \
+              -e AZURE_OPENAI_DEPLOYMENT_NAME="$OPENAI_DEPLOYMENT_NAME" \
+              -e OPENAI_API_VERSION="$OPENAI_API_VERSION" \
+              -e AZURE_OPENAI_MAX_TOKENS="$OPENAI_MAX_TOKENS" \
+              -e AZURE_OPENAI_TEMPERATURE="$OPENAI_TEMPERATURE" \
+              -e AZURE_OPENAI_TOP_P="$OPENAI_TOP_P" \
+              $IMAGE
+            echo "Container status:"
+            docker ps | grep kubernetes-mcp-server
+            echo "Port check:"
+            (ss -tuln || netstat -tuln) | grep 8081 || true
+            echo "Initial logs:"
+            docker logs --tail 50 kubernetes-mcp-server
+          '
 
-  
+
