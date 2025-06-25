@@ -162,21 +162,13 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.GCP_SSH_KEY }}
       - name: Deploy to GCP VM
-        env:
-          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          GCP_VM_USER: ${{ secrets.GCP_VM_USER }}
-          GCP_VM_HOST: ${{ secrets.GCP_VM_HOST }}
         run: |
-          ssh -o StrictHostKeyChecking=no $GCP_VM_USER@$GCP_VM_HOST '
-            export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
-            export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
-            export AWS_REGION="$AWS_REGION"
-            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-            IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:pre-prod-${{ github.run_number }}"
+          ssh -o StrictHostKeyChecking=no ${{ secrets.GCP_VM_USER }}@${{ secrets.GCP_VM_HOST }} <<EOF
+            export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            export AWS_REGION=${{ secrets.AWS_REGION }}
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:pre-prod-${{ github.run_number }}
             docker pull $IMAGE
             docker stop kubernetes-mcp-server || true
             docker rm kubernetes-mcp-server || true
@@ -186,13 +178,13 @@ jobs:
               --network k8s-mcp-network \
               -p 8081:8081 \
               -p 8082:8082 \
-              -e AZURE_OPENAI_API_KEY="$OPENAI_API_KEY" \
-              -e AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT" \
-              -e AZURE_OPENAI_DEPLOYMENT_NAME="$OPENAI_DEPLOYMENT_NAME" \
-              -e OPENAI_API_VERSION="$OPENAI_API_VERSION" \
-              -e AZURE_OPENAI_MAX_TOKENS="$OPENAI_MAX_TOKENS" \
-              -e AZURE_OPENAI_TEMPERATURE="$OPENAI_TEMPERATURE" \
-              -e AZURE_OPENAI_TOP_P="OPENAI_TOP_P" \
+              -e AZURE_OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+              -e AZURE_OPENAI_ENDPOINT=${{ secrets.OPENAI_ENDPOINT }} \
+              -e AZURE_OPENAI_DEPLOYMENT_NAME=${{ secrets.OPENAI_DEPLOYMENT_NAME }} \
+              -e OPENAI_API_VERSION=${{ secrets.OPENAI_API_VERSION }} \
+              -e AZURE_OPENAI_MAX_TOKENS=${{ secrets.OPENAI_MAX_TOKENS }} \
+              -e AZURE_OPENAI_TEMPERATURE=${{ secrets.OPENAI_TEMPERATURE }} \
+              -e AZURE_OPENAI_TOP_P=${{ secrets.OPENAI_TOP_P }} \
               $IMAGE
             echo "Container status:"
             docker ps | grep kubernetes-mcp-server
@@ -200,7 +192,7 @@ jobs:
             (ss -tuln || netstat -tuln) | grep 8081 || true
             echo "Initial logs:"
             docker logs --tail 50 kubernetes-mcp-server
-          '
+          EOF
 
   deploy-prod:
     name: Deploy prod image to GCP VM
@@ -213,21 +205,13 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.GCP_SSH_KEY }}
       - name: Deploy to GCP VM
-        env:
-          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          GCP_VM_USER: ${{ secrets.GCP_VM_USER }}
-          GCP_VM_HOST: ${{ secrets.GCP_VM_HOST }}
         run: |
-          ssh -o StrictHostKeyChecking=no $GCP_VM_USER@$GCP_VM_HOST '
-            export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
-            export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
-            export AWS_REGION="$AWS_REGION"
-            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-            IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:production-${{ github.run_number }}"
+          ssh -o StrictHostKeyChecking=no ${{ secrets.GCP_VM_USER }}@${{ secrets.GCP_VM_HOST }} <<EOF
+            export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            export AWS_REGION=${{ secrets.AWS_REGION }}
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:production-${{ github.run_number }}
             docker pull $IMAGE
             docker stop kubernetes-mcp-server || true
             docker rm kubernetes-mcp-server || true
@@ -237,13 +221,13 @@ jobs:
               --network k8s-mcp-network \
               -p 8081:8081 \
               -p 8082:8082 \
-              -e AZURE_OPENAI_API_KEY="$OPENAI_API_KEY" \
-              -e AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT" \
-              -e AZURE_OPENAI_DEPLOYMENT_NAME="$OPENAI_DEPLOYMENT_NAME" \
-              -e OPENAI_API_VERSION="$OPENAI_API_VERSION" \
-              -e AZURE_OPENAI_MAX_TOKENS="$OPENAI_MAX_TOKENS" \
-              -e AZURE_OPENAI_TEMPERATURE="$OPENAI_TEMPERATURE" \
-              -e AZURE_OPENAI_TOP_P="$OPENAI_TOP_P" \
+              -e AZURE_OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+              -e AZURE_OPENAI_ENDPOINT=${{ secrets.OPENAI_ENDPOINT }} \
+              -e AZURE_OPENAI_DEPLOYMENT_NAME=${{ secrets.OPENAI_DEPLOYMENT_NAME }} \
+              -e OPENAI_API_VERSION=${{ secrets.OPENAI_API_VERSION }} \
+              -e AZURE_OPENAI_MAX_TOKENS=${{ secrets.OPENAI_MAX_TOKENS }} \
+              -e AZURE_OPENAI_TEMPERATURE=${{ secrets.OPENAI_TEMPERATURE }} \
+              -e AZURE_OPENAI_TOP_P=${{ secrets.OPENAI_TOP_P }} \
               $IMAGE
             echo "Container status:"
             docker ps | grep kubernetes-mcp-server
@@ -251,6 +235,6 @@ jobs:
             (ss -tuln || netstat -tuln) | grep 8081 || true
             echo "Initial logs:"
             docker logs --tail 50 kubernetes-mcp-server
-          '
+          EOF
 
 
