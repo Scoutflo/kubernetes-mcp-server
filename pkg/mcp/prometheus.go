@@ -193,29 +193,6 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert"), mcp.Required()),
 			mcp.WithString("alertname", mcp.Description("Name of the specific alert to delete within the rule group (optional)")),
 		), Handler: s.prometheusDeleteAlert},
-		// {Tool: mcp.NewTool("prometheus_clean_tombstones",
-		// 	mcp.WithDescription("Tool for cleaning Prometheus tombstones. Removes tombstone files created during Prometheus data deletion operations. Use this tool to maintain database cleanliness and recover storage space. Tombstones are markers for deleted data and can be safely removed after their retention period."),
-		// ), Handler: s.prometheusCleanTombstones},
-		// {Tool: mcp.NewTool("prometheus_create_snapshot",
-		// 	mcp.WithDescription("Tool for creating Prometheus snapshots. Creates a snapshot of the current Prometheus TSDB data. Use this tool for backup purposes or creating point-in-time copies of the data. You can optionally skip snapshotting the head block (latest, incomplete data)."),
-		// 	mcp.WithBoolean("skip_head", mcp.Description("Skip head block flag")),
-		// ), Handler: s.prometheusCreateSnapshot},
-		// {Tool: mcp.NewTool("prometheus_delete_series",
-		// 	mcp.WithDescription("Tool for deleting Prometheus series data. Deletes time series data matching specific criteria in Prometheus. Use this tool carefully to remove obsolete data or free up storage space. Deleted data cannot be recovered. You can specify time ranges and series selectors."),
-		// 	mcp.WithArray("match", mcp.Description("Series selectors"),
-		// 		func(schema map[string]interface{}) {
-		// 			schema["type"] = "array"
-		// 			schema["items"] = map[string]interface{}{
-		// 				"type": "string",
-		// 			}
-		// 		},
-		// 		mcp.Required()),
-		// 	mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format (optional)")),
-		// 	mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format (optional)")),
-		// ), Handler: s.prometheusDeleteSeries},
-		// {Tool: mcp.NewTool("prometheus_alert_manager",
-		// 	mcp.WithDescription("Tool for getting Prometheus alertmanager discovery state. Provides information about the Alertmanager instances known to Prometheus. Use this tool to verify the connection status between Prometheus and its Alertmanagers. Shows both active and dropped Alertmanager instances."),
-		// ), Handler: s.prometheusAlertManagers},
 		{Tool: mcp.NewTool("prometheus_runtimeinfo",
 			mcp.WithDescription("Tool for getting Prometheus runtime information. Provides detailed information about the Prometheus server's runtime state. Use this tool to monitor server health and performance through details about garbage collection, memory usage, and other runtime metrics."),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
@@ -227,9 +204,6 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithNumber("limit", mcp.Description("Number of items limit")),
 		), Handler: s.prometheusTSDBStatus},
-		// {Tool: mcp.NewTool("prometheus_WALReplay",
-		// 	mcp.WithDescription("Tool for getting Prometheus WAL replay status. Retrieves the status of Write-Ahead Log (WAL) replay operations in Prometheus. Use this tool to monitor the progress of WAL replay during server startup or recovery. Helps track data durability and recovery progress."),
-		// ), Handler: s.prometheusWALReplay},
 	}
 }
 
