@@ -88,8 +88,6 @@ type Kubernetes struct {
 	// External service endpoints and tokens
 	ArgoCDEndpoint  string
 	ArgoCDNamespace string
-	GrafanaEndpoint string
-	GrafanaToken    string
 }
 
 // NewKubernetesWithCredentials creates a new Kubernetes client with the provided URL and token
@@ -112,8 +110,6 @@ func NewKubernetesWithCredentials(k8sURL, k8sToken string) (*Kubernetes, error) 
 	// Load external service configurations from environment variables
 	k8s.ArgoCDEndpoint = os.Getenv("ARGOCD_ENDPOINT")
 	k8s.ArgoCDNamespace = os.Getenv("ARGOCD_NAMESPACE")
-	k8s.GrafanaEndpoint = os.Getenv("GRAFANA_ENDPOINT")
-	k8s.GrafanaToken = os.Getenv("GRAFANA_TOKEN")
 
 	return k8s, nil
 }

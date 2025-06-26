@@ -100,7 +100,7 @@ func (s *Server) grafanaHealthCheck(ctx context.Context, ctr mcp.CallToolRequest
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 
-	result, err := k.HealthCheck()
+	result, err := k.HealthCheck(ctx)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -132,7 +132,7 @@ func (s *Server) grafanaGetDashboardByUID(ctx context.Context, ctr mcp.CallToolR
 	klog.V(1).Infof("Tool: grafana_get_dashboard_by_uid - uid: %s - got called by session id: %s", uid, sessionID)
 
 	// Call the Kubernetes client to get the dashboard
-	result, err := k.GetDashboardByUID(uid)
+	result, err := k.GetDashboardByUID(ctx, uid)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -160,7 +160,7 @@ func (s *Server) grafanaSearchDashboards(ctx context.Context, ctr mcp.CallToolRe
 	klog.V(1).Infof("Tool: grafana_search_dashboards - query: %s - got called by session id: %s", query, sessionID)
 
 	// Call the Kubernetes client to search dashboards
-	result, err := k.SearchDashboards(query)
+	result, err := k.SearchDashboards(ctx, query)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -215,7 +215,7 @@ func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolReq
 		folderUID, message, overwrite, userID, len(dashboard), sessionID)
 
 	// Call the Kubernetes client to update the dashboard
-	result, err := k.UpdateDashboard(dashboard, folderUID, message, overwrite, userID)
+	result, err := k.UpdateDashboard(ctx, dashboard, folderUID, message, overwrite, userID)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -247,7 +247,7 @@ func (s *Server) grafanaGetDashboardPanelQueries(ctx context.Context, ctr mcp.Ca
 	klog.V(1).Infof("Tool: grafana_get_dashboard_panel_queries - uid: %s - got called by session id: %s", uid, sessionID)
 
 	// Call the Kubernetes client to get the dashboard panel queries
-	result, err := k.GetDashboardPanelQueries(uid)
+	result, err := k.GetDashboardPanelQueries(ctx, uid)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -275,7 +275,7 @@ func (s *Server) grafanaListDatasources(ctx context.Context, ctr mcp.CallToolReq
 	klog.V(1).Infof("Tool: grafana_list_datasources - type: %s - got called by session id: %s", dsType, sessionID)
 
 	// Call the Kubernetes client to list datasources
-	result, err := k.ListDatasources(dsType)
+	result, err := k.ListDatasources(ctx, dsType)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -307,7 +307,7 @@ func (s *Server) grafanaGetDatasourceByUID(ctx context.Context, ctr mcp.CallTool
 	klog.V(1).Infof("Tool: grafana_get_datasource_by_uid - uid: %s - got called by session id: %s", uid, sessionID)
 
 	// Call the Kubernetes client to get the datasource by UID
-	result, err := k.GetDatasourceByUID(uid)
+	result, err := k.GetDatasourceByUID(ctx, uid)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -339,7 +339,7 @@ func (s *Server) grafanaGetDatasourceByName(ctx context.Context, ctr mcp.CallToo
 	klog.V(1).Infof("Tool: grafana_get_datasource_by_name - name: %s - got called by session id: %s", name, sessionID)
 
 	// Call the Kubernetes client to get the datasource by name
-	result, err := k.GetDatasourceByName(name)
+	result, err := k.GetDatasourceByName(ctx, name)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -392,7 +392,7 @@ func (s *Server) grafanaListAlertRules(ctx context.Context, ctr mcp.CallToolRequ
 	klog.V(1).Infof("Tool: grafana_list_alert_rules - limit: %d, page: %d, label_selectors_count: %d - got called by session id: %s", limit, page, len(labelSelectors), sessionID)
 
 	// Call the Kubernetes client to list alert rules
-	result, err := k.ListAlertRules(limit, page, labelSelectors)
+	result, err := k.ListAlertRules(ctx, limit, page, labelSelectors)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -424,7 +424,7 @@ func (s *Server) grafanaGetAlertRuleByUID(ctx context.Context, ctr mcp.CallToolR
 	klog.V(1).Infof("Tool: grafana_get_alert_rule_by_uid - uid: %s - got called by session id: %s", uid, sessionID)
 
 	// Call the Kubernetes client to get the alert rule by UID
-	result, err := k.GetAlertRuleByUID(uid)
+	result, err := k.GetAlertRuleByUID(ctx, uid)
 	duration := time.Since(start)
 
 	if err != nil {
