@@ -30,10 +30,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				mcp.WithString("repo",
 					mcp.Description("Filter applications by repository URL (optional)"),
 				),
-				mcp.WithString("namespace",
-					mcp.Description("Filter applications by namespace"),
-					mcp.Required(),
-				),
 				mcp.WithString("refresh",
 					mcp.Description("Forces application reconciliation if set to 'hard' or 'normal' (optional)"),
 				),
@@ -52,10 +48,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				mcp.WithString("project",
 					mcp.Description("Project of the application"),
 				),
-				mcp.WithString("namespace",
-					mcp.Description("Namespace of the application"),
-					mcp.Required(),
-				),
 				mcp.WithString("refresh",
 					mcp.Description("Forces application reconciliation if set to 'hard' or 'normal' (optional)"),
 				),
@@ -70,9 +62,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
-				),
-				mcp.WithString("application_namespace",
-					mcp.Description("The application namespace (optional)"),
 				),
 			),
 			Handler: s.argocdGetApplicationEvents,
@@ -94,19 +83,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				),
 				mcp.WithString("dry_run",
 					mcp.Description("If 'true', preview the sync without making changes (accepted values: 'true', 'false')"),
-				),
-				mcp.WithString("namespace",
-					mcp.Description("Namespace of the application"),
-					mcp.Required(),
-				),
-				mcp.WithArray("resources",
-					mcp.Description("List of specific resources to sync (optional), format: [\"group:kind:name\"]"),
-					func(schema map[string]interface{}) {
-						schema["type"] = "array"
-						schema["items"] = map[string]interface{}{
-							"type": "string",
-						}
-					},
 				),
 			),
 			Handler: s.argocdSyncApplication,
@@ -151,9 +127,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				),
 				mcp.WithString("self_heal",
 					mcp.Description("Enable self-healing (accepted values: 'true', 'false', default: 'false')"),
-				),
-				mcp.WithString("namespace",
-					mcp.Description("Application namespace"),
 				),
 				mcp.WithString("validate",
 					mcp.Description("Whether to validate the application before creation (accepted values: 'true', 'false', default: 'true')"),
@@ -221,10 +194,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				mcp.WithString("propagation_policy",
 					mcp.Description("The propagation policy ('foreground', 'background', or 'orphan')"),
 				),
-				mcp.WithString("namespace",
-					mcp.Description("The application namespace"),
-					mcp.Required(),
-				),
 			),
 			Handler: s.argocdDeleteApplication,
 		},
@@ -235,10 +204,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
-					mcp.Required(),
-				),
-				mcp.WithString("namespace",
-					mcp.Description("The application namespace"),
 					mcp.Required(),
 				),
 			),
@@ -253,10 +218,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("The name of the application"),
 					mcp.Required(),
 				),
-				mcp.WithString("namespace",
-					mcp.Description("The application namespace"),
-					mcp.Required(),
-				),
 			),
 			Handler: s.argocdGetApplicationManagedResources,
 		},
@@ -267,10 +228,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
-					mcp.Required(),
-				),
-				mcp.WithString("application_namespace",
-					mcp.Description("The namespace of the application"),
 					mcp.Required(),
 				),
 				mcp.WithString("resource_ref",
@@ -295,10 +252,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("The name of the application"),
 					mcp.Required(),
 				),
-				mcp.WithString("application_namespace",
-					mcp.Description("The namespace of the application"),
-					mcp.Required(),
-				),
 				mcp.WithString("resource_ref",
 					mcp.Description("The resource reference in the format of a map with keys 'name', 'namespace', and optional 'uid'"),
 					mcp.Required(),
@@ -315,10 +268,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("The name of the application"),
 					mcp.Required(),
 				),
-				mcp.WithString("app_namespace",
-					mcp.Description("The namespace of the application"),
-					mcp.Required(),
-				),
 				mcp.WithString("resource_ref",
 					mcp.Description("The resource reference in the format of a map with keys 'name', 'namespace', 'kind' (optional), 'group' (optional), and 'version' (optional)"),
 					mcp.Required(),
@@ -333,10 +282,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
-					mcp.Required(),
-				),
-				mcp.WithString("app_namespace",
-					mcp.Description("The namespace of the application"),
 					mcp.Required(),
 				),
 				mcp.WithString("resource_ref",
@@ -374,26 +319,13 @@ func (s *Server) argocdListApplications(ctx context.Context, ctr mcp.CallToolReq
 	project := ctr.GetString("project", "")
 	name := ctr.GetString("name", "")
 	repo := ctr.GetString("repo", "")
-	namespace := ctr.GetString("namespace", "")
 	refresh := ctr.GetString("refresh", "")
 
-	klog.V(1).Infof("Tool: argocd_list_applications - project: %s, name: %s, repo: %s, namespace: %s, refresh: %s - got called",
-		project, name, repo, namespace, refresh)
+	klog.V(1).Infof("Tool: argocd_list_applications - project: %s, name: %s, repo: %s, refresh: %s - got called",
+		project, name, repo, refresh)
 
-	// Create ArgoCD client
-	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_list_applications failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
-	}
-	defer func() {
-		if err := closer.Close(); err != nil {
-			klog.Warningf("Failed to close ArgoCD client connection: %v", err)
-		}
-	}()
-
-	// Call the ListApplications method with individual parameters
-	appList, err := argoClient.ListApplications(ctx, project, name, repo, namespace, refresh)
+	// Call the ListApplications method using the K8s Dashboard API
+	result, err := k.ListApplications(ctx, project, name, repo, refresh)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -401,95 +333,14 @@ func (s *Server) argocdListApplications(ctx context.Context, ctr mcp.CallToolReq
 		return NewTextResult("", fmt.Errorf("failed to list ArgoCD applications: %w", err)), nil
 	}
 
-	// Format the output as compact JSON
-	if len(appList.Items) == 0 {
+	// Return the result directly as it's already in JSON format
+	if result == "" || result == "null" || result == "{}" {
 		klog.V(1).Infof("Tool call: argocd_list_applications completed successfully in %v - no applications found", duration)
 		return NewTextResult(`{"applications": [], "count": 0, "message": "No applications found matching the criteria"}`, nil), nil
 	}
 
-	// Create a simplified structure for easier reading
-	type ApplicationSummary struct {
-		Name           string `json:"name"`
-		Project        string `json:"project"`
-		SyncStatus     string `json:"sync_status"`
-		HealthStatus   string `json:"health_status"`
-		RepoURL        string `json:"repo_url"`
-		Path           string `json:"path"`
-		TargetRevision string `json:"target_revision"`
-		Namespace      string `json:"namespace"`
-		DestNamespace  string `json:"dest_namespace"`
-		Server         string `json:"dest_server"`
-	}
-
-	type ApplicationListResponse struct {
-		Applications []ApplicationSummary `json:"applications"`
-		Count        int                  `json:"count"`
-		Filters      map[string]string    `json:"filters,omitempty"`
-	}
-
-	var summaries []ApplicationSummary
-	for _, app := range appList.Items {
-		syncStatus := "Unknown"
-		if app.Status.Sync.Status != "" {
-			syncStatus = app.Status.Sync.Status
-		}
-
-		healthStatus := "Unknown"
-		if app.Status.Health.Status != "" {
-			healthStatus = app.Status.Health.Status
-		}
-
-		summary := ApplicationSummary{
-			Name:           app.Metadata.Name,
-			Project:        app.Spec.Project,
-			SyncStatus:     syncStatus,
-			HealthStatus:   healthStatus,
-			RepoURL:        app.Spec.Source.RepoURL,
-			Path:           app.Spec.Source.Path,
-			TargetRevision: app.Spec.Source.TargetRevision,
-			Namespace:      app.Metadata.Namespace,
-			DestNamespace:  app.Spec.Destination.Namespace,
-			Server:         app.Spec.Destination.Server,
-		}
-		summaries = append(summaries, summary)
-	}
-
-	// Build filters map
-	filters := make(map[string]string)
-	if project != "" {
-		filters["project"] = project
-	}
-	if name != "" {
-		filters["name"] = name
-	}
-	if repo != "" {
-		filters["repo"] = repo
-	}
-	if namespace != "" {
-		filters["namespace"] = namespace
-	}
-	if refresh != "" {
-		filters["refresh"] = refresh
-	}
-
-	response := ApplicationListResponse{
-		Applications: summaries,
-		Count:        len(summaries),
-	}
-
-	if len(filters) > 0 {
-		response.Filters = filters
-	}
-
-	// Return as compact JSON
-	jsonResult, err := json.Marshal(response)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_list_applications failed after %v: failed to marshal response: %v", duration, err)
-		return NewTextResult("", fmt.Errorf("failed to marshal applications list: %w", err)), nil
-	}
-
-	klog.V(1).Infof("Tool call: argocd_list_applications completed successfully in %v - found %d applications", duration, len(summaries))
-	return NewTextResult(string(jsonResult), nil), nil
+	klog.V(1).Infof("Tool call: argocd_list_applications completed successfully in %v", duration)
+	return NewTextResult(result, nil), nil
 }
 
 // argocdGetApplication gets detailed information about a specific application
@@ -497,7 +348,7 @@ func (s *Server) argocdGetApplication(ctx context.Context, ctr mcp.CallToolReque
 	start := time.Now()
 	k, err := s.getKubernetesClient(ctr)
 	if err != nil {
-		klog.Errorf("Tool call: argocd_sync_application failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		klog.Errorf("Tool call: argocd_get_application failed to get Kubernetes client after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 	// Extract parameters
@@ -507,25 +358,12 @@ func (s *Server) argocdGetApplication(ctx context.Context, ctr mcp.CallToolReque
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	namespace := ctr.GetString("namespace", "")
 	refresh := ctr.GetString("refresh", "")
 
-	klog.V(1).Infof("Tool: argocd_get_application - name: %s, namespace: %s, refresh: %s - got called", name, namespace, refresh)
+	klog.V(1).Infof("Tool: argocd_get_application - name: %s, refresh: %s - got called", name, refresh)
 
-	// Create ArgoCD client
-	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_application failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
-	}
-	defer func() {
-		if err := closer.Close(); err != nil {
-			klog.Warningf("Failed to close ArgoCD client connection: %v", err)
-		}
-	}()
-
-	// Get application details
-	app, err := argoClient.GetApplication(ctx, name, refresh)
+	// Get application details using the K8s Dashboard API
+	result, err := k.GetApplication(ctx, name, refresh)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -533,37 +371,8 @@ func (s *Server) argocdGetApplication(ctx context.Context, ctr mcp.CallToolReque
 		return NewTextResult("", fmt.Errorf("failed to get application '%s': %w", name, err)), nil
 	}
 
-	// Build a user-friendly summary of the application
-	var sb strings.Builder
-
-	// Provide full JSON for detailed information
-	sb.WriteString("\nFull Application Details (JSON):\n")
-
-	// Format as JSON with indentation
-	jsonResult, err := formatJSON(app)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_application failed after %v: failed to format JSON: %v", duration, err)
-		return NewTextResult("", err), nil
-	}
-
-	sb.WriteString(jsonResult)
-
-	// Add sync policy information
-	if app.Spec.SyncPolicy != nil && app.Spec.SyncPolicy.Automated != nil {
-		sb.WriteString("Sync Policy: Automated")
-		if app.Spec.SyncPolicy.Automated.Prune {
-			sb.WriteString(" (with pruning)")
-		}
-		if app.Spec.SyncPolicy.Automated.SelfHeal {
-			sb.WriteString(" (with self-healing)")
-		}
-		sb.WriteString("\n")
-	} else {
-		sb.WriteString("Sync Policy: Manual\n")
-	}
-
 	klog.V(1).Infof("Tool call: argocd_get_application completed successfully in %v", duration)
-	return NewTextResult(sb.String(), nil), nil
+	return NewTextResult(result, nil), nil
 }
 
 // argocdSyncApplication syncs an ArgoCD application
@@ -584,28 +393,12 @@ func (s *Server) argocdSyncApplication(ctx context.Context, ctr mcp.CallToolRequ
 	revision := ctr.GetString("revision", "")
 	prune := ctr.GetBool("prune", false)
 	dryRun := ctr.GetBool("dry_run", false)
-	namespace := ctr.GetString("namespace", "")
 
-	// Extract resources array
-	resources := ctr.GetStringSlice("resources", []string{})
+	klog.V(1).Infof("Tool: argocd_sync_application - name: %s, revision: %s, prune: %t, dry_run: %t - got called",
+		name, revision, prune, dryRun)
 
-	klog.V(1).Infof("Tool: argocd_sync_application - name: %s, namespace: %s, revision: %s, prune: %t, dry_run: %t, resources: %v - got called",
-		name, namespace, revision, prune, dryRun, resources)
-
-	// Create ArgoCD client
-	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_sync_application failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
-	}
-	defer func() {
-		if err := closer.Close(); err != nil {
-			klog.Warningf("Failed to close ArgoCD client connection: %v", err)
-		}
-	}()
-
-	// Sync the application
-	err = argoClient.SyncApplication(ctx, name, revision, prune, dryRun)
+	// Sync the application using the K8s Dashboard API
+	result, err := k.SyncApplication(ctx, name, revision, prune, dryRun)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -613,57 +406,6 @@ func (s *Server) argocdSyncApplication(ctx context.Context, ctr mcp.CallToolRequ
 		return NewTextResult("", fmt.Errorf("failed to sync application '%s': %w", name, err)), nil
 	}
 
-	// Prepare the response message
-	mode := "live"
-	if dryRun {
-		mode = "dry-run"
-	}
-
-	pruneMsg := ""
-	if prune {
-		pruneMsg = " with pruning enabled"
-	}
-
-	revisionMsg := ""
-	if revision != "" {
-		revisionMsg = fmt.Sprintf(" to revision '%s'", revision)
-	}
-
-	resourcesMsg := ""
-	if len(resources) > 0 {
-		resourcesMsg = fmt.Sprintf(" (specific resources: %s)", strings.Join(resources, ", "))
-	}
-
-	// Build a more detailed success message
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Successfully initiated sync of application '%s'%s in %s mode%s%s\n\n",
-		name, revisionMsg, mode, pruneMsg, resourcesMsg))
-
-	// Get the latest application status to provide more context
-	app, appErr := argoClient.GetApplication(ctx, name, "normal")
-	if appErr == nil {
-		sb.WriteString("Current application status:\n")
-		sb.WriteString(fmt.Sprintf("- Sync Status: %s\n", app.Status.Sync.Status))
-		sb.WriteString(fmt.Sprintf("- Health Status: %s\n", app.Status.Health.Status))
-
-		if app.Status.OperationState != nil {
-			sb.WriteString(fmt.Sprintf("- Operation Phase: %s\n", app.Status.OperationState.Phase))
-			if app.Status.OperationState.Message != "" {
-				sb.WriteString(fmt.Sprintf("- Operation Message: %s\n", app.Status.OperationState.Message))
-			}
-		}
-
-		// Add resource status information
-		if len(app.Status.Resources) > 0 {
-			sb.WriteString("\nResources:\n")
-			for _, res := range app.Status.Resources {
-				sb.WriteString(fmt.Sprintf("- %s/%s: %s\n",
-					res.Kind, res.Name, res.Status))
-			}
-		}
-	}
-
-	result := sb.String()
 	klog.V(1).Infof("Tool call: argocd_sync_application completed successfully in %v", duration)
 	return NewTextResult(result, nil), nil
 }
@@ -722,49 +464,27 @@ func (s *Server) argocdCreateApplication(ctx context.Context, ctr mcp.CallToolRe
 	automatedSync := ctr.GetBool("automated_sync", false)
 	prune := ctr.GetBool("prune", false)
 	selfHeal := ctr.GetBool("self_heal", false)
-	namespace := ctr.GetString("namespace", "")
 	validate := ctr.GetBool("validate", true)
 	upsert := ctr.GetBool("upsert", false)
 
-	klog.V(1).Infof("Tool: argocd_create_application - name: %s, project: %s, repo_url: %s, path: %s, dest_server: %s, dest_namespace: %s, revision: %s, automated_sync: %t, prune: %t, self_heal: %t, namespace: %s, validate: %t, upsert: %t - got called",
-		name, project, repoURL, path, destServer, destNamespace, revision, automatedSync, prune, selfHeal, namespace, validate, upsert)
+	klog.V(1).Infof("Tool: argocd_create_application - name: %s, project: %s, repo_url: %s, path: %s, dest_server: %s, dest_namespace: %s, revision: %s, automated_sync: %t, prune: %t, self_heal: %t, validate: %t, upsert: %t - got called",
+		name, project, repoURL, path, destServer, destNamespace, revision, automatedSync, prune, selfHeal, validate, upsert)
 
-	// Parse boolean flags with defaults
+	// Create the application using the K8s Dashboard API
+	automatedSyncStr := fmt.Sprintf("%t", automatedSync)
+	pruneStr := fmt.Sprintf("%t", prune)
+	selfHealStr := fmt.Sprintf("%t", selfHeal)
+	validateStr := fmt.Sprintf("%t", validate)
+	upsertStr := fmt.Sprintf("%t", upsert)
 
-	// Create ArgoCD client
-	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_create_application failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
-	}
-	defer func() {
-		if err := closer.Close(); err != nil {
-			klog.Warningf("Failed to close ArgoCD client connection: %v", err)
-		}
-	}()
-
-	// Create the application
-	createdApp, err := argoClient.CreateApplication(ctx, name, project, repoURL, path, destServer, destNamespace,
-		revision, automatedSync, prune, selfHeal, namespace, validate, upsert)
+	result, err := k.CreateApplication(ctx, name, project, repoURL, path, destServer, destNamespace,
+		revision, automatedSyncStr, pruneStr, selfHealStr, validateStr, upsertStr)
 	duration := time.Since(start)
 
 	if err != nil {
 		klog.Errorf("Tool call: argocd_create_application failed after %v: %v", duration, err)
 		return NewTextResult("", fmt.Errorf("failed to create application '%s': %w", name, err)), nil
 	}
-
-	// Format the response with a clear success message
-	successMsg := fmt.Sprintf("Successfully created application '%s' in project '%s'.\n\nApplication details:\n", name, project)
-
-	// Format the application details as JSON
-	appDetails, err := formatJSON(createdApp)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_create_application failed after %v: failed to format JSON: %v", duration, err)
-		return NewTextResult("", err), nil
-	}
-
-	// Combine success message with application details
-	result := successMsg + appDetails
 
 	klog.V(1).Infof("Tool call: argocd_create_application completed successfully in %v", duration)
 	return NewTextResult(result, nil), nil
@@ -818,68 +538,30 @@ func (s *Server) argocdUpdateApplication(ctx context.Context, ctr mcp.CallToolRe
 	klog.V(1).Infof("Tool: argocd_update_application - name: %s, project: %s, repo_url: %s, path: %s, dest_server: %s, dest_namespace: %s, revision: %s, validate: %t - got called",
 		name, project, repoURL, path, destServer, destNamespace, revision, validate)
 
-	// Create ArgoCD client
-	argoClient, closer, err := k.NewArgoClient(ctx, "")
-	if err != nil {
-		klog.Errorf("Tool call: argocd_update_application failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
+	// Update the application using the K8s Dashboard API
+	automatedSyncStr := ""
+	if automatedSync != nil {
+		automatedSyncStr = fmt.Sprintf("%t", *automatedSync)
 	}
-	defer func() {
-		if err := closer.Close(); err != nil {
-			klog.Warningf("Failed to close ArgoCD client connection: %v", err)
-		}
-	}()
+	pruneStr := ""
+	if prune != nil {
+		pruneStr = fmt.Sprintf("%t", *prune)
+	}
+	selfHealStr := ""
+	if selfHeal != nil {
+		selfHealStr = fmt.Sprintf("%t", *selfHeal)
+	}
+	validateStr = fmt.Sprintf("%t", validate)
 
-	// Update the application
-	updatedApp, err := argoClient.UpdateApplication(ctx, name, project, repoURL, path, destServer, destNamespace,
-		revision, automatedSync, prune, selfHeal, validate)
+	var result string
+	result, err = k.UpdateApplication(ctx, name, project, repoURL, path, destServer, destNamespace,
+		revision, automatedSyncStr, pruneStr, selfHealStr, validateStr)
 	duration := time.Since(start)
 
 	if err != nil {
 		klog.Errorf("Tool call: argocd_update_application failed after %v: %v", duration, err)
 		return NewTextResult("", fmt.Errorf("failed to update application '%s': %w", name, err)), nil
 	}
-
-	// Create a success message listing what was updated
-	var updatedFields []string
-	if project != "" {
-		updatedFields = append(updatedFields, "project")
-	}
-	if repoURL != "" {
-		updatedFields = append(updatedFields, "repository URL")
-	}
-	if path != "" {
-		updatedFields = append(updatedFields, "path")
-	}
-	if destServer != "" {
-		updatedFields = append(updatedFields, "destination server")
-	}
-	if destNamespace != "" {
-		updatedFields = append(updatedFields, "destination namespace")
-	}
-	if revision != "" {
-		updatedFields = append(updatedFields, "revision")
-	}
-	if automatedSync != nil || prune != nil || selfHeal != nil {
-		updatedFields = append(updatedFields, "sync policy")
-	}
-
-	var updateDesc string
-	if len(updatedFields) > 0 {
-		updateDesc = fmt.Sprintf(" with updated %s", strings.Join(updatedFields, ", "))
-	}
-
-	successMsg := fmt.Sprintf("Successfully updated application '%s'%s.\n\nApplication details:\n", name, updateDesc)
-
-	// Format the updated application as JSON
-	appDetails, err := formatJSON(updatedApp)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_update_application failed after %v: failed to format JSON: %v", duration, err)
-		return NewTextResult("", err), nil
-	}
-
-	// Combine success message with application details
-	result := successMsg + appDetails
 
 	klog.V(1).Infof("Tool call: argocd_update_application completed successfully in %v", duration)
 	return NewTextResult(result, nil), nil
@@ -902,7 +584,6 @@ func (s *Server) argocdDeleteApplication(ctx context.Context, ctr mcp.CallToolRe
 
 	cascade := ctr.GetBool("cascade", true)
 	propagationPolicy := ctr.GetString("propagation_policy", "")
-	namespace := ctr.GetString("namespace", "")
 
 	// Default cascade to true if not specified
 
@@ -915,80 +596,26 @@ func (s *Server) argocdDeleteApplication(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("invalid propagation policy: must be 'foreground', 'background', or 'orphan'")), nil
 	}
 
-	klog.V(1).Infof("Tool: argocd_delete_application - name: %s, cascade: %t, propagation_policy: %s, namespace: %s - got called",
-		name, cascade, propagationPolicy, namespace)
+	klog.V(1).Infof("Tool: argocd_delete_application - name: %s, cascade: %t, propagation_policy: %s - got called",
+		name, cascade, propagationPolicy)
 
 	// Log the operation for debugging
 	klog.Infof("Deleting ArgoCD application '%s' (cascade=%t, propagationPolicy=%s, namespace=%s)",
-		name, cascade, propagationPolicy, namespace)
+		name, cascade, propagationPolicy)
 
-	// Create ArgoCD client
-	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_delete_application failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
-	}
-	defer func() {
-		if err := closer.Close(); err != nil {
-			klog.Warningf("Failed to close ArgoCD client connection: %v", err)
-		}
-	}()
-
-	// First check if the application exists
-	app, err := argoClient.GetApplication(ctx, name, "")
-	if err != nil {
-		duration := time.Since(start)
-		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "404") {
-			klog.Errorf("Tool call: argocd_delete_application failed after %v: application not found", duration)
-			return NewTextResult("", fmt.Errorf("application '%s' not found", name)), nil
-		}
-		klog.Errorf("Tool call: argocd_delete_application failed after %v: failed to verify application existence: %v", duration, err)
-		return NewTextResult("", fmt.Errorf("failed to verify application existence: %w", err)), nil
-	}
-
-	// Capture some details about the application before deleting it
-	appProject := app.Spec.Project
-	appDestNamespace := app.Spec.Destination.Namespace
-	appRepoURL := app.Spec.Source.RepoURL
-	appPath := app.Spec.Source.Path
-
-	// Delete the application
-	err = argoClient.DeleteApplication(ctx, name, cascade, propagationPolicy, namespace)
+	// Delete the application using the K8s Dashboard API
+	cascadeStr := fmt.Sprintf("%t", cascade)
+	result, err := k.DeleteApplication(ctx, name, cascadeStr, propagationPolicy)
 	duration := time.Since(start)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "415") {
-			// Specific handling for content type errors
-			klog.Errorf("Tool call: argocd_delete_application failed after %v: content type error (415)", duration)
-			return NewTextResult("", fmt.Errorf("content type error (415) when deleting application. This may indicate an API compatibility issue with ArgoCD server")), nil
-		}
 		klog.Errorf("Tool call: argocd_delete_application failed after %v: %v", duration, err)
 		return NewTextResult("", fmt.Errorf("failed to delete application '%s': %w", name, err)), nil
 	}
 
-	// Build detailed success message
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("✅ Successfully deleted ArgoCD application '%s'\n\n", name))
-	sb.WriteString("Deleted application details:\n")
-	sb.WriteString(fmt.Sprintf("- Project: %s\n", appProject))
-	sb.WriteString(fmt.Sprintf("- Namespace: %s\n", appDestNamespace))
-	sb.WriteString(fmt.Sprintf("- Repository: %s\n", appRepoURL))
-	sb.WriteString(fmt.Sprintf("- Path: %s\n", appPath))
-
-	sb.WriteString("\nDeletion options:\n")
-	if cascade {
-		sb.WriteString("- Cascade: true (application resources were also deleted)\n")
-	} else {
-		sb.WriteString("- Cascade: false (application resources were preserved)\n")
-	}
-
-	if propagationPolicy != "" {
-		sb.WriteString(fmt.Sprintf("- Propagation Policy: %s\n", propagationPolicy))
-	}
-
 	klog.Info(fmt.Sprintf("Successfully deleted application '%s'", name))
 	klog.V(1).Infof("Tool call: argocd_delete_application completed successfully in %v", duration)
-	return NewTextResult(sb.String(), nil), nil
+	return NewTextResult(result, nil), nil
 }
 
 // argocdGetApplicationResourceTree returns the resource tree for an application
@@ -1006,24 +633,10 @@ func (s *Server) argocdGetApplicationResourceTree(ctx context.Context, ctr mcp.C
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	namespace := ctr.GetString("namespace", "")
+	klog.V(1).Infof("Tool: argocd_get_application_resource_tree - name: %s - got called", name)
 
-	klog.V(1).Infof("Tool: argocd_get_application_resource_tree - name: %s, namespace: %s - got called", name, namespace)
-
-	// Create ArgoCD client
-	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_application_resource_tree failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
-	}
-	defer func() {
-		if err := closer.Close(); err != nil {
-			klog.Warningf("Failed to close ArgoCD client connection: %v", err)
-		}
-	}()
-
-	// Get application resource tree
-	resourceTree, err := argoClient.GetApplicationResourceTree(ctx, name)
+	// Get application resource tree using the K8s Dashboard API
+	result, err := k.GetApplicationResourceTree(ctx, name)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -1031,35 +644,8 @@ func (s *Server) argocdGetApplicationResourceTree(ctx context.Context, ctr mcp.C
 		return NewTextResult("", fmt.Errorf("failed to get resource tree for application '%s': %w", name, err)), nil
 	}
 
-	// Format and return the resource tree as JSON
-	jsonResult, err := formatJSON(resourceTree)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_application_resource_tree failed after %v: failed to format JSON: %v", duration, err)
-		return NewTextResult("", err), nil
-	}
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Resource tree for application '%s':\n\n", name))
-
-	sb.WriteString("Full resource tree (JSON):\n")
-	sb.WriteString(jsonResult)
-
-	// Add summary of resource counts by kind
-	if len(resourceTree.Nodes) > 0 {
-		kindCounts := make(map[string]int)
-		for _, node := range resourceTree.Nodes {
-			kindCounts[node.Kind]++
-		}
-
-		sb.WriteString("Resource summary by kind:\n")
-		for kind, count := range kindCounts {
-			sb.WriteString(fmt.Sprintf("- %s: %d\n", kind, count))
-		}
-		sb.WriteString("\n")
-	}
-
-	klog.V(1).Infof("Tool call: argocd_get_application_resource_tree completed successfully in %v - found %d nodes", duration, len(resourceTree.Nodes))
-	return NewTextResult(sb.String(), nil), nil
+	klog.V(1).Infof("Tool call: argocd_get_application_resource_tree completed successfully in %v", duration)
+	return NewTextResult(result, nil), nil
 }
 
 // argocdGetApplicationManagedResources returns the managed resources for an application
@@ -1077,24 +663,10 @@ func (s *Server) argocdGetApplicationManagedResources(ctx context.Context, ctr m
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	namespace := ctr.GetString("namespace", "")
+	klog.V(1).Infof("Tool: argocd_get_application_managed_resources - name: %s - got called", name)
 
-	klog.V(1).Infof("Tool: argocd_get_application_managed_resources - name: %s, namespace: %s - got called", name, namespace)
-
-	// Create ArgoCD client
-	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_application_managed_resources failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
-	}
-	defer func() {
-		if err := closer.Close(); err != nil {
-			klog.Warningf("Failed to close ArgoCD client connection: %v", err)
-		}
-	}()
-
-	// Get application managed resources
-	managedResources, err := argoClient.GetApplicationManagedResources(ctx, name)
+	// Get application managed resources using the K8s Dashboard API
+	result, err := k.GetApplicationManagedResources(ctx, name)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -1102,44 +674,8 @@ func (s *Server) argocdGetApplicationManagedResources(ctx context.Context, ctr m
 		return NewTextResult("", fmt.Errorf("failed to get managed resources for application '%s': %w", name, err)), nil
 	}
 
-	// Format and return the managed resources as JSON
-	jsonResult, err := formatJSON(managedResources)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_application_managed_resources failed after %v: failed to format JSON: %v", duration, err)
-		return NewTextResult("", err), nil
-	}
-
-	var sb strings.Builder
-	sb.WriteString("Full managed resources (JSON):\n")
-	sb.WriteString(jsonResult)
-
-	sb.WriteString(fmt.Sprintf("Managed resources for application '%s':\n\n", name))
-
-	// Add summary of resource counts
-	if len(managedResources.Items) > 0 {
-		sb.WriteString(fmt.Sprintf("Total managed resources: %d\n\n", len(managedResources.Items)))
-
-		// Group resources by kind and count them
-		kindCounts := make(map[string]int)
-		for _, item := range managedResources.Items {
-			key := fmt.Sprintf("%s/%s", item.Group, item.Kind)
-			if item.Group == "" {
-				key = item.Kind
-			}
-			kindCounts[key]++
-		}
-
-		sb.WriteString("Resources by kind:\n")
-		for kind, count := range kindCounts {
-			sb.WriteString(fmt.Sprintf("- %s: %d\n", kind, count))
-		}
-		sb.WriteString("\n")
-	} else {
-		sb.WriteString("No managed resources found.\n\n")
-	}
-
-	klog.V(1).Infof("Tool call: argocd_get_application_managed_resources completed successfully in %v - found %d resources", duration, len(managedResources.Items))
-	return NewTextResult(sb.String(), nil), nil
+	klog.V(1).Infof("Tool call: argocd_get_application_managed_resources completed successfully in %v", duration)
+	return NewTextResult(result, nil), nil
 }
 
 // argocdGetApplicationWorkloadLogs returns logs for application workload
@@ -1155,12 +691,6 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 	if err != nil {
 		klog.Errorf("Tool call: argocd_get_application_workload_logs failed after %v: missing application_name parameter", time.Since(start))
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
-	}
-
-	appNamespace, err := ctr.RequireString("application_namespace")
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_application_workload_logs failed after %v: missing application_namespace parameter", time.Since(start))
-		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
 	}
 
 	// Extract resource_ref parameter which could be a string or map
@@ -1203,7 +733,7 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 			}
 		case string:
 			// It's a JSON string, try to parse it
-			if err := json.Unmarshal([]byte(ref), &resourceRef); err != nil {
+			if err = json.Unmarshal([]byte(ref), &resourceRef); err != nil {
 				klog.Errorf("Tool call: argocd_get_application_workload_logs failed after %v: failed to parse resource_ref JSON: %v", time.Since(start), err)
 				return NewTextResult("", fmt.Errorf("failed to parse resource_ref JSON: %w", err)), nil
 			}
@@ -1240,23 +770,14 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 	followStr := ctr.GetString("follow", "false")
 	follow := strings.ToLower(followStr) == "true"
 
-	klog.V(1).Infof("Tool: argocd_get_application_workload_logs - application: %s, namespace: %s, resource: %s/%s/%s, tail: %s, follow: %t - got called",
-		name, appNamespace, resourceRef.Kind, resourceRef.Namespace, resourceRef.Name, tailStr, follow)
+	klog.V(1).Infof("Tool: argocd_get_application_workload_logs - application: %s, resource: %s/%s/%s, tail: %s, follow: %t - got called",
+		name, resourceRef.Kind, resourceRef.Namespace, resourceRef.Name, tailStr, follow)
 
-	// Create ArgoCD client
-	argoClient, closer, err := k.NewArgoClient(ctx, appNamespace)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_application_workload_logs failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
-	}
-	defer func() {
-		if err := closer.Close(); err != nil {
-			klog.Warningf("Failed to close ArgoCD client connection: %v", err)
-		}
-	}()
+	// Get workload logs using the K8s Dashboard API
+	followStr = fmt.Sprintf("%t", follow)
+	resourceRefJSON, _ := json.Marshal(resourceRef)
 
-	// Get workload logs
-	logs, err := argoClient.GetWorkloadLogs(ctx, name, appNamespace, resourceRef, follow, tailStr)
+	result, err := k.GetApplicationWorkloadLogs(ctx, name, string(resourceRefJSON), followStr, tailStr)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -1265,26 +786,8 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 			resourceRef.Name, name, err)), nil
 	}
 
-	// Format the logs
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Logs for %s '%s' in namespace '%s' from application '%s':\n\n",
-		resourceRef.Kind, resourceRef.Name, resourceRef.Namespace, name))
-
-	if resourceRef.Container != "" {
-		sb.WriteString(fmt.Sprintf("Container: %s\n\n", resourceRef.Container))
-	}
-
-	if len(logs) == 0 {
-		sb.WriteString("No logs available.\n")
-	} else {
-		for _, logEntry := range logs {
-			sb.WriteString(logEntry.Content)
-			sb.WriteString("\n")
-		}
-	}
-
-	klog.V(1).Infof("Tool call: argocd_get_application_workload_logs completed successfully in %v - retrieved %d log entries", duration, len(logs))
-	return NewTextResult(sb.String(), nil), nil
+	klog.V(1).Infof("Tool call: argocd_get_application_workload_logs completed successfully in %v", duration)
+	return NewTextResult(result, nil), nil
 }
 
 // argocdGetResourceEvents returns events for a resource managed by an application
@@ -1302,12 +805,6 @@ func (s *Server) argocdGetResourceEvents(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	appNamespace, err := ctr.RequireString("application_namespace")
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_resource_events failed after %v: missing application_namespace parameter", time.Since(start))
-		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
-	}
-
 	args := ctr.GetRawArguments()
 	argsMap, ok := args.(map[string]interface{})
 	if !ok {
@@ -1317,34 +814,27 @@ func (s *Server) argocdGetResourceEvents(ctx context.Context, ctr mcp.CallToolRe
 	resourceRef := argsMap["resource_ref"].(map[string]interface{})
 
 	resourceName, ok := resourceRef["name"].(string)
-	if err != nil {
+	if !ok {
 		klog.Errorf("Tool call: argocd_get_resource_events failed after %v: missing resource_ref.name", time.Since(start))
 		return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
 	}
 
 	resourceNamespace, ok := resourceRef["namespace"].(string)
-	if err != nil {
+	if !ok {
 		klog.Errorf("Tool call: argocd_get_resource_events failed after %v: missing resource_ref.namespace", time.Since(start))
 		return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
 	}
 
-	klog.V(1).Infof("Tool: argocd_get_resource_events - application: %s, app_namespace: %s, resource: %s/%s - got called",
-		name, appNamespace, resourceNamespace, resourceName)
+	klog.V(1).Infof("Tool: argocd_get_resource_events - application: %s, resource: %s/%s - got called",
+		name, resourceNamespace, resourceName)
 
-	// Create ArgoCD client
-	argoClient, closer, err := k.NewArgoClient(ctx, appNamespace)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_resource_events failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
-	}
-	defer func() {
-		if err := closer.Close(); err != nil {
-			klog.Warningf("Failed to close ArgoCD client connection: %v", err)
-		}
-	}()
+	// Get resource events using the K8s Dashboard API
+	resourceRefJSON, _ := json.Marshal(map[string]interface{}{
+		"name":      resourceName,
+		"namespace": resourceNamespace,
+	})
 
-	// Get resource events
-	events, err := argoClient.GetResourceEvents(ctx, name, appNamespace, resourceNamespace, resourceName)
+	result, err := k.GetApplicationResourceEvents(ctx, name, string(resourceRefJSON))
 	duration := time.Since(start)
 
 	if err != nil {
@@ -1353,56 +843,8 @@ func (s *Server) argocdGetResourceEvents(ctx context.Context, ctr mcp.CallToolRe
 			resourceName, name, err)), nil
 	}
 
-	// Format and return the events
-	jsonResult, err := formatJSON(events)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_resource_events failed after %v: failed to format JSON: %v", duration, err)
-		return NewTextResult("", err), nil
-	}
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Events for resource '%s' in namespace '%s' from application '%s':\n\n",
-		resourceName, resourceNamespace, name))
-
-	if len(events.Items) == 0 {
-		sb.WriteString("No events found.\n\n")
-	} else {
-		sb.WriteString(fmt.Sprintf("Found %d events:\n\n", len(events.Items)))
-
-		// Create a summary table with the most relevant event information
-		sb.WriteString("TYPE      REASON               AGE     MESSAGE\n")
-		sb.WriteString("----      ------               ---     -------\n")
-
-		for _, event := range events.Items {
-			// Format age as a duration from LastTimestamp to now
-			age := "unknown"
-			if event.LastTimestamp != "" {
-				if lastTime, err := time.Parse(time.RFC3339, event.LastTimestamp); err == nil {
-					age = formatTimeAgo(time.Since(lastTime))
-				}
-			}
-
-			// Truncate message if it's too long
-			message := event.Message
-			if len(message) > 50 {
-				message = message[:47] + "..."
-			}
-
-			sb.WriteString(fmt.Sprintf("%-9s %-20s %-8s %s\n",
-				event.Type,
-				event.Reason,
-				age,
-				message))
-		}
-
-		sb.WriteString("\n")
-	}
-
-	sb.WriteString("Full events (JSON):\n")
-	sb.WriteString(jsonResult)
-
-	klog.V(1).Infof("Tool call: argocd_get_resource_events completed successfully in %v - found %d events", duration, len(events.Items))
-	return NewTextResult(sb.String(), nil), nil
+	klog.V(1).Infof("Tool call: argocd_get_resource_events completed successfully in %v", duration)
+	return NewTextResult(result, nil), nil
 }
 
 // formatTimeAgo formats a duration in a human-readable format for the "time ago" use case
@@ -1432,12 +874,6 @@ func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolR
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	appNamespace, err := ctr.RequireString("app_namespace")
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_resource_actions failed after %v: missing app_namespace parameter", time.Since(start))
-		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
-	}
-
 	// Extract resource parameters from resourceRef object
 	args := ctr.GetRawArguments()
 	argsMap, ok := args.(map[string]interface{})
@@ -1448,19 +884,19 @@ func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolR
 	resourceRef := argsMap["resource_ref"].(map[string]interface{})
 
 	resourceName, ok := resourceRef["name"].(string)
-	if err != nil {
+	if !ok {
 		klog.Errorf("Tool call: argocd_get_resource_actions failed after %v: missing resource_ref.name", time.Since(start))
 		return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
 	}
 
 	resourceNamespace, ok := resourceRef["namespace"].(string)
-	if err != nil {
+	if !ok {
 		klog.Errorf("Tool call: argocd_get_resource_actions failed after %v: missing resource_ref.namespace", time.Since(start))
 		return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
 	}
 
 	resourceKind, ok := resourceRef["kind"].(string)
-	if err != nil {
+	if !ok {
 		klog.Errorf("Tool call: argocd_get_resource_actions failed after %v: missing resource_ref.kind", time.Since(start))
 		return NewTextResult("", fmt.Errorf("resource_ref.kind is required")), nil
 	}
@@ -1471,29 +907,24 @@ func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolR
 	}
 
 	resourceVersion, ok := resourceRef["version"].(string)
-	if err != nil {
+	if !ok {
 		klog.Errorf("Tool call: argocd_get_resource_actions failed after %v: missing resource_ref.version", time.Since(start))
 		return NewTextResult("", fmt.Errorf("resource_ref.version is required")), nil
 	}
 
-	klog.V(1).Infof("Tool: argocd_get_resource_actions - application: %s, app_namespace: %s, resource: %s/%s/%s/%s/%s - got called",
-		name, appNamespace, resourceGroup, resourceVersion, resourceKind, resourceNamespace, resourceName)
+	klog.V(1).Infof("Tool: argocd_get_resource_actions - application: %s, resource: %s/%s/%s/%s/%s - got called",
+		name, resourceGroup, resourceVersion, resourceKind, resourceNamespace, resourceName)
 
-	// Create ArgoCD client
-	argoClient, closer, err := k.NewArgoClient(ctx, appNamespace)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_resource_actions failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
-	}
-	defer func() {
-		if err := closer.Close(); err != nil {
-			klog.Warningf("Failed to close ArgoCD client connection: %v", err)
-		}
-	}()
+	// Get resource actions using the K8s Dashboard API
+	resourceRefJSON, _ := json.Marshal(map[string]interface{}{
+		"name":      resourceName,
+		"namespace": resourceNamespace,
+		"kind":      resourceKind,
+		"group":     resourceGroup,
+		"version":   resourceVersion,
+	})
 
-	// Get resource actions
-	actions, err := argoClient.GetResourceActions(ctx, name, appNamespace, resourceNamespace, resourceName,
-		resourceKind, resourceGroup, resourceVersion)
+	result, err := k.GetResourceActions(ctx, name, string(resourceRefJSON))
 	duration := time.Since(start)
 
 	if err != nil {
@@ -1502,40 +933,8 @@ func (s *Server) argocdGetResourceActions(ctx context.Context, ctr mcp.CallToolR
 			resourceName, name, err)), nil
 	}
 
-	// Format and return the actions
-	jsonResult, err := formatJSON(actions)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_resource_actions failed after %v: failed to format JSON: %v", duration, err)
-		return NewTextResult("", err), nil
-	}
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Available actions for %s '%s' in namespace '%s' from application '%s':\n\n",
-		resourceKind, resourceName, resourceNamespace, name))
-
-	if len(actions.Actions) == 0 {
-		sb.WriteString("No actions available for this resource.\n\n")
-	} else {
-		sb.WriteString(fmt.Sprintf("Found %d available actions:\n\n", len(actions.Actions)))
-
-		for _, action := range actions.Actions {
-			sb.WriteString(fmt.Sprintf("- %s: %s\n", action.Name, action.DisplayName))
-			if action.Disabled {
-				sb.WriteString("  (Currently disabled)\n")
-			}
-			if action.Background {
-				sb.WriteString("  (Runs in background)\n")
-			}
-		}
-
-		sb.WriteString("\n")
-	}
-
-	sb.WriteString("Full actions (JSON):\n")
-	sb.WriteString(jsonResult)
-
-	klog.V(1).Infof("Tool call: argocd_get_resource_actions completed successfully in %v - found %d actions", duration, len(actions.Actions))
-	return NewTextResult(sb.String(), nil), nil
+	klog.V(1).Infof("Tool call: argocd_get_resource_actions completed successfully in %v", duration)
+	return NewTextResult(result, nil), nil
 }
 
 // argocdRunResourceAction runs an action on a resource managed by an application
@@ -1551,12 +950,6 @@ func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRe
 	if err != nil {
 		klog.Errorf("Tool call: argocd_run_resource_action failed after %v: missing name parameter", time.Since(start))
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
-	}
-
-	appNamespace, err := ctr.RequireString("app_namespace")
-	if err != nil {
-		klog.Errorf("Tool call: argocd_run_resource_action failed after %v: missing app_namespace parameter", time.Since(start))
-		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
 	}
 
 	// Extract resource parameters from resourceRef object
@@ -1599,24 +992,19 @@ func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("action name is required")), nil
 	}
 
-	klog.V(1).Infof("Tool: argocd_run_resource_action - application: %s, app_namespace: %s, resource: %s/%s/%s/%s/%s, action: %s - got called",
-		name, appNamespace, resourceGroup, resourceVersion, resourceKind, resourceNamespace, resourceName, action)
+	klog.V(1).Infof("Tool: argocd_run_resource_action - application: %s, resource: %s/%s/%s/%s/%s, action: %s - got called",
+		name, resourceGroup, resourceVersion, resourceKind, resourceNamespace, resourceName, action)
 
-	// Create ArgoCD client
-	argoClient, closer, err := k.NewArgoClient(ctx, appNamespace)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_run_resource_action failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
-	}
-	defer func() {
-		if err := closer.Close(); err != nil {
-			klog.Warningf("Failed to close ArgoCD client connection: %v", err)
-		}
-	}()
+	// Run the action using the K8s Dashboard API
+	resourceRefJSON, _ := json.Marshal(map[string]interface{}{
+		"name":      resourceName,
+		"namespace": resourceNamespace,
+		"kind":      resourceKind,
+		"group":     resourceGroup,
+		"version":   resourceVersion,
+	})
 
-	// Run the action
-	result, err := argoClient.RunResourceAction(ctx, name, appNamespace, resourceNamespace, resourceName,
-		resourceKind, resourceGroup, resourceVersion, action)
+	result, err := k.RunResourceAction(ctx, name, string(resourceRefJSON), action)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -1625,22 +1013,8 @@ func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRe
 			action, resourceName, name, err)), nil
 	}
 
-	// Format and return the result
-	jsonResult, err := formatJSON(result)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_run_resource_action failed after %v: failed to format JSON: %v", duration, err)
-		return NewTextResult("", err), nil
-	}
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Successfully ran action '%s' on %s '%s' in namespace '%s' from application '%s'.\n\n",
-		action, resourceKind, resourceName, resourceNamespace, name))
-
-	sb.WriteString("Action result (JSON):\n")
-	sb.WriteString(jsonResult)
-
 	klog.V(1).Infof("Tool call: argocd_run_resource_action completed successfully in %v", duration)
-	return NewTextResult(sb.String(), nil), nil
+	return NewTextResult(result, nil), nil
 }
 
 // argocdGetApplicationEvents returns events for an application
@@ -1658,28 +1032,10 @@ func (s *Server) argocdGetApplicationEvents(ctx context.Context, ctr mcp.CallToo
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
-	namespace, err := ctr.RequireString("application_namespace")
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_application_events failed after %v: missing application_namespace parameter", time.Since(start))
-		return NewTextResult("", fmt.Errorf("application namespace is required")), nil
-	}
+	klog.V(1).Infof("Tool: argocd_get_application_events - application: %s - got called", name)
 
-	klog.V(1).Infof("Tool: argocd_get_application_events - application: %s, namespace: %s - got called", name, namespace)
-
-	// Create ArgoCD client
-	argoClient, closer, err := k.NewArgoClient(ctx, namespace)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_application_events failed after %v: failed to initialize ArgoCD client: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize ArgoCD client: %w", err)), nil
-	}
-	defer func() {
-		if err := closer.Close(); err != nil {
-			klog.Warningf("Failed to close ArgoCD client connection: %v", err)
-		}
-	}()
-
-	// Get application events
-	events, err := argoClient.GetApplicationEvents(ctx, name, namespace)
+	// Get application events using the K8s Dashboard API
+	result, err := k.GetApplicationEvents(ctx, name)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -1687,78 +1043,6 @@ func (s *Server) argocdGetApplicationEvents(ctx context.Context, ctr mcp.CallToo
 		return NewTextResult("", fmt.Errorf("failed to get events for application '%s': %w", name, err)), nil
 	}
 
-	// Format as JSON with indentation
-	jsonResult, err := formatJSON(events)
-	if err != nil {
-		klog.Errorf("Tool call: argocd_get_application_events failed after %v: failed to format JSON: %v", duration, err)
-		return NewTextResult("", err), nil
-	}
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Events for application '%s':\n\n", name))
-
-	if len(events.Items) == 0 {
-		sb.WriteString("No events found.\n\n")
-	} else {
-		sb.WriteString(fmt.Sprintf("Total events: %d\n\n", len(events.Items)))
-
-		// Show a table-like structure for events
-		sb.WriteString("REASON                 TYPE       AGE        MESSAGE\n")
-		sb.WriteString("------                 ----       ---        -------\n")
-
-		for _, event := range events.Items {
-			// Format age as a duration from LastTimestamp to now
-			age := "unknown"
-			if event.LastTimestamp != "" {
-				if lastTime, err := time.Parse(time.RFC3339, event.LastTimestamp); err == nil {
-					age = formatTimeAgo(time.Since(lastTime))
-				}
-			}
-
-			// Truncate message if it's too long
-			message := event.Message
-			if len(message) > 60 {
-				message = message[:57] + "..."
-			}
-
-			sb.WriteString(fmt.Sprintf("%-22s %-10s %-10s %s\n",
-				event.Reason,
-				event.Type,
-				age,
-				message))
-		}
-
-		sb.WriteString("\n")
-
-		// Add more detailed information for each event
-		sb.WriteString("Event Details:\n\n")
-		for i, event := range events.Items {
-			sb.WriteString(fmt.Sprintf("Event #%d:\n", i+1))
-			sb.WriteString(fmt.Sprintf("  Type: %s\n", event.Type))
-			sb.WriteString(fmt.Sprintf("  Reason: %s\n", event.Reason))
-			sb.WriteString(fmt.Sprintf("  Message: %s\n", event.Message))
-			if event.Count > 1 {
-				sb.WriteString(fmt.Sprintf("  Count: %d\n", event.Count))
-			}
-			if event.FirstTimestamp != "" {
-				sb.WriteString(fmt.Sprintf("  First Seen: %s\n", event.FirstTimestamp))
-			}
-			if event.LastTimestamp != "" {
-				sb.WriteString(fmt.Sprintf("  Last Seen: %s\n", event.LastTimestamp))
-			}
-			if event.InvolvedObject.Kind != "" {
-				sb.WriteString(fmt.Sprintf("  Involved Object: %s/%s\n", event.InvolvedObject.Kind, event.InvolvedObject.Name))
-			}
-			if event.Source.Component != "" {
-				sb.WriteString(fmt.Sprintf("  Source: %s\n", event.Source.Component))
-			}
-			sb.WriteString("\n")
-		}
-	}
-
-	sb.WriteString("Full events (JSON):\n")
-	sb.WriteString(jsonResult)
-
-	klog.V(1).Infof("Tool call: argocd_get_application_events completed successfully in %v - found %d events", duration, len(events.Items))
-	return NewTextResult(sb.String(), nil), nil
+	klog.V(1).Infof("Tool call: argocd_get_application_events completed successfully in %v", duration)
+	return NewTextResult(result, nil), nil
 }

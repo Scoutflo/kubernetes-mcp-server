@@ -2,13 +2,9 @@ package kubernetes
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"strings"
-	"time"
 )
 
 // ArgoCD API paths
@@ -283,953 +279,378 @@ type JWTToken struct {
 	IssuedAt int64 `json:"iat"`
 }
 
-// NewArgoClient creates a new ArgoCD HTTP client
-func (k *Kubernetes) NewArgoClient(ctx context.Context, requestNamespace string) (*ArgoClient, io.Closer, error) {
-	namespace := func() string {
-		if requestNamespace != "" {
-			return requestNamespace
-		}
-		return namespaceOrDefault(k.ArgoCDNamespace)
-	}()
+// ListApplications lists ArgoCD applications with filtering options
+func (k *Kubernetes) ListApplications(ctx context.Context, project, name, repo, refresh string) (string, error) {
+	endpoint := "/apis/v1/argocd/applications"
 
-	// Get ArgoCD credentials and generate token
-	username := "admin" // Default ArgoCD username
-	password, err := k.GetArgoCDPassword(ctx, namespace)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get ArgoCD password: %w", err)
-	}
-
-	token, err := k.fetchArgoToken(ctx, username, password)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch ArgoCD token: %w", err)
-	}
-
-	client := &ArgoClient{
-		serverURL: k.ArgoCDEndpoint,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		namespace: namespace,
-		authToken: token,
-	}
-
-	// Create a closer function that does nothing since we don't have a persistent connection
-	closer := io.NopCloser(strings.NewReader(""))
-
-	return client, closer, nil
-}
-
-// GetArgoCDPassword retrieves the ArgoCD admin password from Kubernetes secret via API
-func (k *Kubernetes) GetArgoCDPassword(ctx context.Context, namespace string) (string, error) {
-	// Create query parameters for the API call
-	endpoint := fmt.Sprintf("/apis/v1/get-argocd-password?namespace=%s", url.QueryEscape(namespace))
-
-	// Make API request to get ArgoCD password
-	response, err := k.MakeAPIRequest("GET", endpoint, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to get ArgoCD password: %w", err)
-	}
-
-	// Parse the response to extract the password
-	var result struct {
-		Password string `json:"password"`
-	}
-	if err := json.Unmarshal(response, &result); err != nil {
-		return "", fmt.Errorf("failed to parse ArgoCD password response: %v", err)
-	}
-
-	return result.Password, nil
-}
-
-// fetchArgoToken authenticates with ArgoCD and returns an authentication token
-func (k *Kubernetes) fetchArgoToken(ctx context.Context, username, password string) (string, error) {
-	if k.ArgoCDEndpoint == "" {
-		return "", fmt.Errorf("ArgoCD endpoint not configured")
-	}
-
-	// Ensure ArgoCD URL ends with /
-	argoURL := k.ArgoCDEndpoint
-	if !strings.HasSuffix(argoURL, "/") {
-		argoURL = argoURL + "/"
-	}
-
-	sessionURL := fmt.Sprintf("%sapi/v1/session", argoURL)
-
-	// Create session request
-	sessionReq := SessionRequest{
-		Username: username,
-		Password: password,
-	}
-
-	// Marshal request body
-	reqBody, err := json.Marshal(sessionReq)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal session request: %w", err)
-	}
-
-	// Create HTTP request
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, sessionURL, strings.NewReader(string(reqBody)))
-	if err != nil {
-		return "", fmt.Errorf("failed to create session request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	// Create HTTP client with timeout
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-
-	// Execute request
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to execute session request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("ArgoCD authentication failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Parse response
-	var sessionResp SessionResponse
-	if err := json.NewDecoder(resp.Body).Decode(&sessionResp); err != nil {
-		return "", fmt.Errorf("failed to parse session response: %w", err)
-	}
-
-	if sessionResp.Token == "" {
-		return "", fmt.Errorf("empty token received from ArgoCD")
-	}
-
-	return sessionResp.Token, nil
-}
-
-// doRequest is a helper function to make HTTP requests to ArgoCD API
-func (c *ArgoClient) doRequest(ctx context.Context, method, path string, queryParams map[string]string, body interface{}) (*http.Response, error) {
-	// Build full URL with query parameters
-	apiURL := fmt.Sprintf("%s%s", strings.TrimSuffix(c.serverURL, "/"), path)
-
-	if len(queryParams) > 0 {
-		values := url.Values{}
-		for k, v := range queryParams {
-			values.Add(k, v)
-		}
-		apiURL = fmt.Sprintf("%s?%s", apiURL, values.Encode())
-	}
-
-	var reqBody io.Reader
-	if body != nil {
-		jsonData, err := json.Marshal(body)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling request body: %w", err)
-		}
-		reqBody = strings.NewReader(string(jsonData))
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, apiURL, reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-
-	// Add auth header if token exists
-	if c.authToken != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.authToken))
-	}
-
-	// Only set Content-Type for requests with a body
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	// For DELETE requests, explicitly add Accept header
-	if method == http.MethodDelete {
-		req.Header.Set("Accept", "application/json")
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %w", err)
-	}
-
-	return resp, nil
-}
-
-// ListApplications lists ArgoCD applications with filtering
-func (c *ArgoClient) ListApplications(ctx context.Context, project, name, repo, namespace, refresh string) (*ApplicationList, error) {
-	// Build query parameters
-	queryParams := make(map[string]string)
+	params := url.Values{}
 	if project != "" {
-		queryParams["project"] = project
+		params.Add("project", project)
 	}
 	if name != "" {
-		queryParams["name"] = name
+		params.Add("name", name)
 	}
 	if repo != "" {
-		queryParams["repo"] = repo
-	}
-	if namespace != "" {
-		queryParams["appNamespace"] = namespace
+		params.Add("repo", repo)
 	}
 	if refresh != "" {
-		queryParams["refresh"] = refresh
+		params.Add("refresh", refresh)
 	}
 
-	resp, err := c.doRequest(ctx, http.MethodGet, ArgoCDApplicationsPath, queryParams, nil)
+	if len(params) > 0 {
+		endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
+	}
+
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("failed to list ArgoCD applications: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("list applications failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	var appList ApplicationList
-	err = json.NewDecoder(resp.Body).Decode(&appList)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing applications list: %w", err)
-	}
-
-	return &appList, nil
+	return string(response), nil
 }
 
-// GetApplication gets details of a specific ArgoCD application
-func (c *ArgoClient) GetApplication(ctx context.Context, appName string, refresh string) (*Application, error) {
-	path := fmt.Sprintf(ArgoCDApplicationPath, appName)
+// GetApplication gets detailed information about a specific ArgoCD application
+func (k *Kubernetes) GetApplication(ctx context.Context, name, refresh string) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("application name is required")
+	}
 
-	queryParams := make(map[string]string)
+	endpoint := "/apis/v1/argocd/application"
+
+	params := url.Values{}
+	params.Add("name", name)
 	if refresh != "" {
-		queryParams["refresh"] = refresh
+		params.Add("refresh", refresh)
 	}
 
-	resp, err := c.doRequest(ctx, http.MethodGet, path, queryParams, nil)
+	endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
+
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("failed to get ArgoCD application %s: %w", name, err)
 	}
-	defer resp.Body.Close()
+	return string(response), nil
+}
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("get application failed with status code %d: %s", resp.StatusCode, string(body))
+// GetApplicationEvents returns events for an ArgoCD application
+func (k *Kubernetes) GetApplicationEvents(ctx context.Context, appName string) (string, error) {
+	if appName == "" {
+		return "", fmt.Errorf("application name is required")
 	}
 
-	var app Application
-	err = json.NewDecoder(resp.Body).Decode(&app)
+	endpoint := "/apis/v1/argocd/application-events"
+
+	params := url.Values{}
+	params.Add("name", appName)
+
+	endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
+
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing application: %w", err)
+		return "", fmt.Errorf("failed to get events for ArgoCD application %s: %w", appName, err)
 	}
-
-	return &app, nil
+	return string(response), nil
 }
 
 // SyncApplication syncs an ArgoCD application
-func (c *ArgoClient) SyncApplication(ctx context.Context, appName, revision string, prune, dryRun bool) error {
-	path := fmt.Sprintf(ArgoCDApplicationSyncPath, appName)
-
-	syncRequest := SyncRequest{
-		Revision: revision,
-		Prune:    prune,
-		DryRun:   dryRun,
+func (k *Kubernetes) SyncApplication(ctx context.Context, name, revision string, prune, dryRun bool) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("application name is required")
 	}
 
-	resp, err := c.doRequest(ctx, http.MethodPost, path, nil, syncRequest)
+	endpoint := "/apis/v1/argocd/sync-application"
+
+	params := url.Values{}
+	params.Add("name", name)
+	if revision != "" {
+		params.Add("revision", revision)
+	}
+	if prune {
+		params.Add("prune", "true")
+	}
+	if dryRun {
+		params.Add("dry_run", "true")
+	}
+
+	endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
+
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {
-		return err
+		return "", fmt.Errorf("failed to sync ArgoCD application %s: %w", name, err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("sync application failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	return nil
+	return string(response), nil
 }
 
-// ListProjects lists ArgoCD projects
-func (c *ArgoClient) ListProjects(ctx context.Context) (*ProjectList, error) {
-	resp, err := c.doRequest(ctx, http.MethodGet, ArgoCDProjectsPath, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("list projects failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	var projectList ProjectList
-	err = json.NewDecoder(resp.Body).Decode(&projectList)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing projects list: %w", err)
-	}
-
-	return &projectList, nil
-}
-
-// GetProject gets details of a specific ArgoCD project
-func (c *ArgoClient) GetProject(ctx context.Context, projectName string) (*Project, error) {
-	path := fmt.Sprintf("%s/%s", ArgoCDProjectsPath, projectName)
-
-	resp, err := c.doRequest(ctx, http.MethodGet, path, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("get project failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	var project Project
-	err = json.NewDecoder(resp.Body).Decode(&project)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing project: %w", err)
-	}
-
-	return &project, nil
+// CreateApplicationRequest represents the request body for creating an application
+type CreateApplicationRequest struct {
+	Name          string `json:"name"`
+	Project       string `json:"project"`
+	RepoURL       string `json:"repo_url"`
+	Path          string `json:"path"`
+	DestServer    string `json:"dest_server"`
+	DestNamespace string `json:"dest_namespace"`
+	Revision      string `json:"revision,omitempty"`
+	AutomatedSync string `json:"automated_sync,omitempty"`
+	Prune         string `json:"prune,omitempty"`
+	SelfHeal      string `json:"self_heal,omitempty"`
+	Namespace     string `json:"namespace,omitempty"`
+	Validate      string `json:"validate,omitempty"`
+	Upsert        string `json:"upsert,omitempty"`
 }
 
 // CreateApplication creates a new ArgoCD application
-func (c *ArgoClient) CreateApplication(ctx context.Context, name, project, repoURL, path, destServer, destNamespace, revision string,
-	automatedSync, prune, selfHeal bool, namespace string, validate, upsert bool) (*Application, error) {
-
-	// Build application object
-	app := Application{
-		Kind:       "Application",
-		APIVersion: "argoproj.io/v1alpha1",
-		Metadata: Metadata{
-			Name: name,
-		},
-		Spec: ApplicationSpec{
-			Project: project,
-			Source: ApplicationSource{
-				RepoURL:        repoURL,
-				Path:           path,
-				TargetRevision: revision,
-			},
-			Destination: ApplicationDestination{
-				Server:    destServer,
-				Namespace: destNamespace,
-			},
-		},
+func (k *Kubernetes) CreateApplication(ctx context.Context, name, project, repoURL, path, destServer, destNamespace, revision, automatedSync, prune, selfHeal, validate, upsert string) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("application name is required")
+	}
+	if project == "" {
+		return "", fmt.Errorf("project name is required")
 	}
 
-	// Set namespace if provided
-	if namespace != "" {
-		app.Metadata.Namespace = namespace
+	endpoint := "/apis/v1/argocd/create-application"
+
+	requestBody := CreateApplicationRequest{
+		Name:          name,
+		Project:       project,
+		RepoURL:       repoURL,
+		Path:          path,
+		DestServer:    destServer,
+		DestNamespace: destNamespace,
+		Revision:      revision,
+		AutomatedSync: automatedSync,
+		Prune:         prune,
+		SelfHeal:      selfHeal,
+		Validate:      validate,
+		Upsert:        upsert,
 	}
 
-	// Set sync policy if automated sync is enabled
-	if automatedSync {
-		app.Spec.SyncPolicy = &SyncPolicy{
-			Automated: &Automated{
-				Prune:    prune,
-				SelfHeal: selfHeal,
-			},
-		}
-	}
-
-	// Build query parameters
-	queryParams := make(map[string]string)
-	if validate {
-		queryParams["validate"] = "true"
-	}
-	if upsert {
-		queryParams["upsert"] = "true"
-	}
-
-	// Send request
-	resp, err := c.doRequest(ctx, http.MethodPost, ArgoCDApplicationsPath, queryParams, app)
+	response, err := k.MakeAPIRequest("POST", endpoint, requestBody)
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("failed to create ArgoCD application %s: %w", name, err)
 	}
-	defer resp.Body.Close()
+	return string(response), nil
+}
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("create application failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Parse response
-	var createdApp Application
-	err = json.NewDecoder(resp.Body).Decode(&createdApp)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing created application: %w", err)
-	}
-
-	return &createdApp, nil
+// UpdateApplicationRequest represents the request body for updating an application
+type UpdateApplicationRequest struct {
+	Name          string `json:"name"`
+	Project       string `json:"project,omitempty"`
+	RepoURL       string `json:"repo_url,omitempty"`
+	Path          string `json:"path,omitempty"`
+	DestServer    string `json:"dest_server,omitempty"`
+	DestNamespace string `json:"dest_namespace,omitempty"`
+	Revision      string `json:"revision,omitempty"`
+	AutomatedSync string `json:"automated_sync,omitempty"`
+	Prune         string `json:"prune,omitempty"`
+	SelfHeal      string `json:"self_heal,omitempty"`
+	Validate      string `json:"validate,omitempty"`
 }
 
 // UpdateApplication updates an existing ArgoCD application
-func (c *ArgoClient) UpdateApplication(ctx context.Context, name, project, repoURL, path, destServer, destNamespace, revision string,
-	automatedSync, prune, selfHeal *bool, validate bool) (*Application, error) {
+func (k *Kubernetes) UpdateApplication(ctx context.Context, name, project, repoURL, path, destServer, destNamespace, revision, automatedSync, prune, selfHeal, validate string) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("application name is required")
+	}
 
-	// First get the current application to modify
-	existingApp, err := c.GetApplication(ctx, name, "")
+	endpoint := "/apis/v1/argocd/update-application"
+
+	requestBody := UpdateApplicationRequest{
+		Name:          name,
+		Project:       project,
+		RepoURL:       repoURL,
+		Path:          path,
+		DestServer:    destServer,
+		DestNamespace: destNamespace,
+		Revision:      revision,
+		AutomatedSync: automatedSync,
+		Prune:         prune,
+		SelfHeal:      selfHeal,
+		Validate:      validate,
+	}
+
+	response, err := k.MakeAPIRequest("POST", endpoint, requestBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get existing application: %w", err)
+		return "", fmt.Errorf("failed to update ArgoCD application %s: %w", name, err)
 	}
-
-	// Update project if provided
-	if project != "" {
-		existingApp.Spec.Project = project
-	}
-
-	// Update source fields if provided
-	if repoURL != "" {
-		existingApp.Spec.Source.RepoURL = repoURL
-	}
-	if path != "" {
-		existingApp.Spec.Source.Path = path
-	}
-	if revision != "" {
-		existingApp.Spec.Source.TargetRevision = revision
-	}
-
-	// Update destination fields if provided
-	if destServer != "" {
-		existingApp.Spec.Destination.Server = destServer
-	}
-	if destNamespace != "" {
-		existingApp.Spec.Destination.Namespace = destNamespace
-	}
-
-	// Update sync policy if needed
-	if automatedSync != nil || prune != nil || selfHeal != nil {
-		// Create sync policy if it doesn't exist
-		if existingApp.Spec.SyncPolicy == nil {
-			existingApp.Spec.SyncPolicy = &SyncPolicy{}
-		}
-
-		// Handle automated sync
-		if automatedSync != nil {
-			if *automatedSync {
-				// Create automated section if it doesn't exist
-				if existingApp.Spec.SyncPolicy.Automated == nil {
-					existingApp.Spec.SyncPolicy.Automated = &Automated{}
-				}
-
-				// Update prune and selfHeal if provided
-				if prune != nil {
-					existingApp.Spec.SyncPolicy.Automated.Prune = *prune
-				}
-				if selfHeal != nil {
-					existingApp.Spec.SyncPolicy.Automated.SelfHeal = *selfHeal
-				}
-			} else {
-				// Remove automated section
-				existingApp.Spec.SyncPolicy.Automated = nil
-			}
-		}
-	}
-
-	// Build query parameters
-	queryParams := make(map[string]string)
-	if validate {
-		queryParams["validate"] = "true"
-	}
-
-	// Send update request
-	updatePath := fmt.Sprintf(ArgoCDApplicationPath, name)
-	resp, err := c.doRequest(ctx, http.MethodPut, updatePath, queryParams, existingApp)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("update application failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Parse response
-	var updatedApp Application
-	err = json.NewDecoder(resp.Body).Decode(&updatedApp)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing updated application: %w", err)
-	}
-
-	return &updatedApp, nil
+	return string(response), nil
 }
 
-// DeleteApplicationWithBody deletes an ArgoCD application using a body in the DELETE request
-// Some ArgoCD versions or configurations expect a body with the DELETE request
-func (c *ArgoClient) DeleteApplicationWithBody(ctx context.Context, name string, cascade bool, propagationPolicy, namespace string) error {
-	// Create a request body - some ArgoCD versions expect this
-	type DeleteRequest struct {
-		Name              string `json:"name"`
-		Cascade           bool   `json:"cascade"`
-		PropagationPolicy string `json:"propagationPolicy,omitempty"`
-		AppNamespace      string `json:"appNamespace,omitempty"`
-	}
-
-	requestBody := DeleteRequest{
-		Name:    name,
-		Cascade: cascade,
-	}
-
-	if propagationPolicy != "" {
-		requestBody.PropagationPolicy = propagationPolicy
-	}
-
-	if namespace != "" {
-		requestBody.AppNamespace = namespace
-	}
-
-	// Send delete request with body
-	deletePath := fmt.Sprintf(ArgoCDApplicationPath, name)
-	resp, err := c.doRequest(ctx, http.MethodDelete, deletePath, nil, requestBody)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("delete application failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	return nil
+// DeleteApplicationRequest represents the request body for deleting an application
+type DeleteApplicationRequest struct {
+	Name              string `json:"name"`
+	Cascade           string `json:"cascade,omitempty"`
+	PropagationPolicy string `json:"propagation_policy,omitempty"`
 }
 
 // DeleteApplication deletes an ArgoCD application
-// This method tries both with and without a body to accommodate different ArgoCD versions
-func (c *ArgoClient) DeleteApplication(ctx context.Context, name string, cascade bool, propagationPolicy, namespace string) error {
-	// First try with query parameters
-	queryParams := make(map[string]string)
-	queryParams["cascade"] = fmt.Sprintf("%t", cascade)
-
-	if propagationPolicy != "" {
-		queryParams["propagationPolicy"] = propagationPolicy
+func (k *Kubernetes) DeleteApplication(ctx context.Context, name, cascade, propagationPolicy string) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("application name is required")
 	}
 
-	if namespace != "" {
-		queryParams["appNamespace"] = namespace
+	endpoint := "/apis/v1/argocd/delete-application"
+
+	requestBody := DeleteApplicationRequest{
+		Name:              name,
+		Cascade:           cascade,
+		PropagationPolicy: propagationPolicy,
 	}
 
-	// Send delete request
-	deletePath := fmt.Sprintf(ArgoCDApplicationPath, name)
-
-	// The ArgoCD API expects a proper DELETE request with no content body
-	// but with the correct headers for authorization and optional query parameters
-	resp, err := c.doRequest(ctx, http.MethodDelete, deletePath, queryParams, nil)
+	response, err := k.MakeAPIRequest("POST", endpoint, requestBody)
 	if err != nil {
-		return err
+		return "", fmt.Errorf("failed to delete ArgoCD application %s: %w", name, err)
+	}
+	return string(response), nil
+}
+
+// GetApplicationResourceTree gets the resource tree for an ArgoCD application
+func (k *Kubernetes) GetApplicationResourceTree(ctx context.Context, name string) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("application name is required")
 	}
 
-	defer resp.Body.Close()
+	endpoint := "/apis/v1/argocd/application-resource-tree"
 
-	// If successful, return
-	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusAccepted {
-		return nil
+	params := url.Values{}
+	params.Add("name", name)
+
+	endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
+
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to get resource tree for ArgoCD application %s: %w", name, err)
+	}
+	return string(response), nil
+}
+
+// GetApplicationManagedResources gets the managed resources for an ArgoCD application
+func (k *Kubernetes) GetApplicationManagedResources(ctx context.Context, name string) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("application name is required")
 	}
 
-	// If we get a 415 error, try the alternative method with body
-	if resp.StatusCode == http.StatusUnsupportedMediaType {
-		return c.DeleteApplicationWithBody(ctx, name, cascade, propagationPolicy, namespace)
+	endpoint := "/apis/v1/argocd/application-managed-resources"
+
+	params := url.Values{}
+	params.Add("name", name)
+
+	endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
+
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to get managed resources for ArgoCD application %s: %w", name, err)
+	}
+	return string(response), nil
+}
+
+// GetApplicationWorkloadLogs gets logs for application workload
+func (k *Kubernetes) GetApplicationWorkloadLogs(ctx context.Context, appName, resourceRef, tail, follow string) (string, error) {
+	if appName == "" {
+		return "", fmt.Errorf("application name is required")
+	}
+	if resourceRef == "" {
+		return "", fmt.Errorf("resource reference is required")
 	}
 
-	// Other error
-	body, _ := io.ReadAll(resp.Body)
-	return fmt.Errorf("delete application failed with status code %d: %s", resp.StatusCode, string(body))
+	endpoint := "/apis/v1/argocd/application-workload-logs"
+
+	params := url.Values{}
+	params.Add("application_name", appName)
+	params.Add("resource_ref", resourceRef)
+	if tail != "" {
+		params.Add("tail", tail)
+	}
+	if follow != "" {
+		params.Add("follow", follow)
+	}
+
+	endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
+
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to get workload logs for ArgoCD application %s: %w", appName, err)
+	}
+	return string(response), nil
 }
 
-// ApplicationResourceTree represents the resource tree of an application
-type ApplicationResourceTree struct {
-	Nodes []ResourceNode `json:"nodes"`
-	Edges []ResourceEdge `json:"edges"`
+// GetApplicationResourceEvents gets events for a resource managed by an application
+func (k *Kubernetes) GetApplicationResourceEvents(ctx context.Context, appName, resourceRef string) (string, error) {
+	if appName == "" {
+		return "", fmt.Errorf("application name is required")
+	}
+	if resourceRef == "" {
+		return "", fmt.Errorf("resource reference is required")
+	}
+
+	endpoint := "/apis/v1/argocd/application-resource-events"
+
+	params := url.Values{}
+	params.Add("application_name", appName)
+	params.Add("resource_ref", resourceRef)
+
+	endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
+
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to get resource events for ArgoCD application %s: %w", appName, err)
+	}
+	return string(response), nil
 }
 
-// ResourceNode represents a node in the application resource tree
-type ResourceNode struct {
-	Group           string            `json:"group"`
-	Version         string            `json:"version"`
-	Kind            string            `json:"kind"`
-	Namespace       string            `json:"namespace"`
-	Name            string            `json:"name"`
-	UID             string            `json:"uid"`
-	ResourceVersion string            `json:"resourceVersion"`
-	Health          HealthStatus      `json:"health,omitempty"`
-	Status          string            `json:"status,omitempty"`
-	Info            []ResourceInfo    `json:"info,omitempty"`
-	NetworkingInfo  *NetworkingInfo   `json:"networkingInfo,omitempty"`
-	ResourceStatus  *ResourceStatus   `json:"resourceStatus,omitempty"`
-	Images          []string          `json:"images,omitempty"`
-	CreatedAt       string            `json:"createdAt,omitempty"`
-	ParentRefs      []ParentRef       `json:"parentRefs,omitempty"`
-	Annotations     map[string]string `json:"annotations,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
+// GetResourceActions gets available actions for a resource managed by an application
+func (k *Kubernetes) GetResourceActions(ctx context.Context, appName, resourceRef string) (string, error) {
+	if appName == "" {
+		return "", fmt.Errorf("application name is required")
+	}
+	if resourceRef == "" {
+		return "", fmt.Errorf("resource reference is required")
+	}
+
+	endpoint := "/apis/v1/argocd/resource-actions"
+
+	params := url.Values{}
+	params.Add("application_name", appName)
+	params.Add("resource_ref", resourceRef)
+
+	endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
+
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to get resource actions for ArgoCD application %s: %w", appName, err)
+	}
+	return string(response), nil
 }
 
-// ResourceEdge represents an edge in the application resource tree
-type ResourceEdge struct {
-	From string `json:"from"`
-	To   string `json:"to"`
-}
-
-// ResourceInfo represents information about a resource
-type ResourceInfo struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
-
-// NetworkingInfo contains networking information about a resource
-type NetworkingInfo struct {
-	TargetLabels map[string]string `json:"targetLabels,omitempty"`
-	Labels       map[string]string `json:"labels,omitempty"`
-	Ingress      []Ingress         `json:"ingress,omitempty"`
-	ExternalURLs []string          `json:"externalURLs,omitempty"`
-}
-
-// Ingress contains information about an ingress resource
-type Ingress struct {
-	Host  string        `json:"host"`
-	Paths []IngressPath `json:"paths"`
-}
-
-// IngressPath represents a path in an ingress
-type IngressPath struct {
-	Path     string `json:"path"`
-	Backend  string `json:"backend"`
-	Service  string `json:"service"`
-	Port     int    `json:"port"`
-	Protocol string `json:"protocol,omitempty"`
-}
-
-// ParentRef represents a reference to a parent resource
-type ParentRef struct {
-	Group     string `json:"group"`
-	Version   string `json:"version"`
-	Kind      string `json:"kind"`
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
-	UID       string `json:"uid"`
-}
-
-// ApplicationManagedResourcesResponse represents managed resources response
-type ApplicationManagedResourcesResponse struct {
-	Items []ResourceDiff `json:"items"`
-}
-
-// ResourceDiff represents a diff of a resource
-type ResourceDiff struct {
-	Group               string `json:"group"`
-	Kind                string `json:"kind"`
-	Name                string `json:"name"`
-	Namespace           string `json:"namespace"`
-	Hook                bool   `json:"hook"`
-	NormalizedLiveState string `json:"normalizedLiveState,omitempty"`
-	PredictedLiveState  string `json:"predictedLiveState,omitempty"`
-	TargetState         string `json:"targetState,omitempty"`
-	LiveState           string `json:"liveState,omitempty"`
-	Modified            bool   `json:"modified,omitempty"`
-}
-
-// ApplicationLog represents a log entry from an application
-type ApplicationLog struct {
-	Content   string `json:"content"`
-	PodName   string `json:"podName"`
-	TimeStamp string `json:"timeStamp,omitempty"`
-	Container string `json:"container,omitempty"`
-}
-
-// Event represents a Kubernetes event
-type Event struct {
-	Metadata       Metadata    `json:"metadata"`
-	Type           string      `json:"type"`
-	Reason         string      `json:"reason"`
-	Message        string      `json:"message"`
-	Count          int         `json:"count"`
-	FirstTimestamp string      `json:"firstTimestamp"`
-	LastTimestamp  string      `json:"lastTimestamp"`
-	InvolvedObject ObjectRef   `json:"involvedObject"`
-	Source         EventSource `json:"source"`
-}
-
-// EventSource represents the source of an event
-type EventSource struct {
-	Component string `json:"component,omitempty"`
-	Host      string `json:"host,omitempty"`
-}
-
-// ObjectRef contains reference to an object
-type ObjectRef struct {
-	Kind            string `json:"kind"`
+// RunResourceActionRequest represents the request body for running a resource action
+type RunResourceActionRequest struct {
+	ApplicationName string `json:"application_name"`
 	Namespace       string `json:"namespace,omitempty"`
-	Name            string `json:"name"`
-	UID             string `json:"uid,omitempty"`
-	ResourceVersion string `json:"resourceVersion,omitempty"`
+	ResourceRef     string `json:"resource_ref"`
+	Action          string `json:"action"`
 }
 
-// EventList represents a list of events
-type EventList struct {
-	Items []Event `json:"items"`
-}
+// RunResourceAction runs an action on a resource managed by an application
+func (k *Kubernetes) RunResourceAction(ctx context.Context, appName, resourceRef, action string) (string, error) {
+	if appName == "" {
+		return "", fmt.Errorf("application name is required")
+	}
+	if resourceRef == "" {
+		return "", fmt.Errorf("resource reference is required")
+	}
+	if action == "" {
+		return "", fmt.Errorf("action is required")
+	}
 
-// ResourceAction represents an action that can be performed on a resource
-type ResourceAction struct {
-	Name        string `json:"name"`
-	DisplayName string `json:"displayName"`
-	Description string `json:"description,omitempty"`
-	Disabled    bool   `json:"disabled"`
-	Background  bool   `json:"background"`
-}
+	endpoint := "/apis/v1/argocd/run-resource-action"
 
-// ResourceActionsResponse represents available actions for a resource
-type ResourceActionsResponse struct {
-	Actions []ResourceAction `json:"actions"`
-}
+	requestBody := RunResourceActionRequest{
+		ApplicationName: appName,
+		ResourceRef:     resourceRef,
+		Action:          action,
+	}
 
-// GetApplicationResourceTree gets the resource tree for an application
-func (c *ArgoClient) GetApplicationResourceTree(ctx context.Context, appName string) (*ApplicationResourceTree, error) {
-	path := fmt.Sprintf("/api/v1/applications/%s/resource-tree", appName)
-
-	resp, err := c.doRequest(ctx, http.MethodGet, path, nil, nil)
+	response, err := k.MakeAPIRequest("POST", endpoint, requestBody)
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("failed to run resource action for ArgoCD application %s: %w", appName, err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("get application resource tree failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	var resourceTree ApplicationResourceTree
-	err = json.NewDecoder(resp.Body).Decode(&resourceTree)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing application resource tree: %w", err)
-	}
-
-	return &resourceTree, nil
-}
-
-// GetApplicationManagedResources gets the managed resources for an application
-func (c *ArgoClient) GetApplicationManagedResources(ctx context.Context, appName string) (*ApplicationManagedResourcesResponse, error) {
-	path := fmt.Sprintf("/api/v1/applications/%s/managed-resources", appName)
-
-	resp, err := c.doRequest(ctx, http.MethodGet, path, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("get application managed resources failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	var managedResources ApplicationManagedResourcesResponse
-	err = json.NewDecoder(resp.Body).Decode(&managedResources)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing application managed resources: %w", err)
-	}
-
-	return &managedResources, nil
-}
-
-// GetWorkloadLogs gets logs for a workload in an application
-func (c *ArgoClient) GetWorkloadLogs(ctx context.Context, appName, appNamespace string, resourceRef ResourceRef, follow bool, tailLines string) ([]ApplicationLog, error) {
-	path := fmt.Sprintf("/api/v1/applications/%s/logs", appName)
-
-	// Build query parameters
-	queryParams := make(map[string]string)
-	queryParams["appNamespace"] = appNamespace
-	queryParams["namespace"] = resourceRef.Namespace
-	queryParams["name"] = resourceRef.Name
-	queryParams["kind"] = resourceRef.Kind
-	queryParams["group"] = resourceRef.Group
-	queryParams["resourceVersion"] = resourceRef.Version
-
-	if resourceRef.Container != "" {
-		queryParams["container"] = resourceRef.Container
-	}
-
-	// Use provided tail lines or default
-	if tailLines != "" {
-		queryParams["tailLines"] = tailLines
-	} else {
-		queryParams["tailLines"] = "100" // Default to 100 lines
-	}
-
-	// Set follow parameter
-	if follow {
-		queryParams["follow"] = "true"
-	} else {
-		queryParams["follow"] = "false"
-	}
-
-	resp, err := c.doRequest(ctx, http.MethodGet, path, queryParams, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("get workload logs failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Read the entire response body
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading logs response: %w", err)
-	}
-
-	// Try to parse as JSON first
-	var logs []ApplicationLog
-	if err := json.Unmarshal(bodyBytes, &logs); err != nil {
-		// If JSON parsing fails, treat as plain text
-		logLines := strings.Split(string(bodyBytes), "\n")
-		for _, line := range logLines {
-			if line != "" {
-				logs = append(logs, ApplicationLog{
-					Content:   line,
-					PodName:   resourceRef.Name,
-					Container: resourceRef.Container,
-				})
-			}
-		}
-	}
-
-	return logs, nil
-}
-
-// GetResourceEvents gets events for a resource in an application
-func (c *ArgoClient) GetResourceEvents(ctx context.Context, appName, appNamespace, resourceNamespace, resourceName string) (*EventList, error) {
-	path := fmt.Sprintf("/api/v1/applications/%s/events", appName)
-
-	queryParams := make(map[string]string)
-	queryParams["appNamespace"] = appNamespace
-	queryParams["resourceNamespace"] = resourceNamespace
-	queryParams["resourceName"] = resourceName
-
-	resp, err := c.doRequest(ctx, http.MethodGet, path, queryParams, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var events EventList
-	if err := json.NewDecoder(resp.Body).Decode(&events); err != nil {
-		return nil, fmt.Errorf("failed to parse events response: %w", err)
-	}
-
-	return &events, nil
-}
-
-// GetApplicationEvents gets events for an application
-func (c *ArgoClient) GetApplicationEvents(ctx context.Context, appName, appNamespace string) (*EventList, error) {
-	path := fmt.Sprintf("/api/v1/applications/%s/events", appName)
-
-	queryParams := make(map[string]string)
-	if appNamespace != "" {
-		queryParams["appNamespace"] = appNamespace
-	}
-
-	resp, err := c.doRequest(ctx, http.MethodGet, path, queryParams, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var events EventList
-	if err := json.NewDecoder(resp.Body).Decode(&events); err != nil {
-		return nil, fmt.Errorf("failed to parse events response: %w", err)
-	}
-
-	return &events, nil
-}
-
-// GetResourceActions gets available actions for a resource in an application
-func (c *ArgoClient) GetResourceActions(ctx context.Context, appName, appNamespace, resourceNamespace, resourceName,
-	resourceKind, resourceGroup, resourceVersion string) (*ResourceActionsResponse, error) {
-
-	path := fmt.Sprintf("/api/v1/applications/%s/resource/actions", appName)
-
-	// Build query parameters
-	queryParams := make(map[string]string)
-	queryParams["appNamespace"] = appNamespace
-	queryParams["namespace"] = resourceNamespace
-	queryParams["name"] = resourceName
-	queryParams["kind"] = resourceKind
-
-	if resourceGroup != "" {
-		queryParams["group"] = resourceGroup
-	}
-
-	if resourceVersion != "" {
-		queryParams["version"] = resourceVersion
-	}
-
-	resp, err := c.doRequest(ctx, http.MethodGet, path, queryParams, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("get resource actions failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	var actions ResourceActionsResponse
-	err = json.NewDecoder(resp.Body).Decode(&actions)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing resource actions: %w", err)
-	}
-
-	return &actions, nil
-}
-
-// RunResourceAction runs an action on a resource in an application
-func (c *ArgoClient) RunResourceAction(ctx context.Context, appName, appNamespace, resourceNamespace, resourceName,
-	resourceKind, resourceGroup, resourceVersion, actionName string) (*Application, error) {
-
-	path := fmt.Sprintf("/api/v1/applications/%s/resource/actions", appName)
-
-	// Build query parameters
-	queryParams := make(map[string]string)
-	queryParams["appNamespace"] = appNamespace
-	queryParams["namespace"] = resourceNamespace
-	queryParams["name"] = resourceName
-	queryParams["kind"] = resourceKind
-
-	if resourceGroup != "" {
-		queryParams["group"] = resourceGroup
-	}
-
-	if resourceVersion != "" {
-		queryParams["version"] = resourceVersion
-	}
-
-	// Action name is passed in the body
-	actionBody := map[string]string{
-		"action": actionName,
-	}
-
-	resp, err := c.doRequest(ctx, http.MethodPost, path, queryParams, actionBody)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("run resource action failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	var result Application
-	err = json.NewDecoder(resp.Body).Decode(&result)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing action result: %w", err)
-	}
-
-	return &result, nil
+	return string(response), nil
 }

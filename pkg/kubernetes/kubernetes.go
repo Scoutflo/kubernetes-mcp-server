@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -84,10 +83,6 @@ func (h *HTTPClient) MakeRequest(method, endpoint string, body interface{}) ([]b
 type Kubernetes struct {
 	// HTTP Client for K8s Dashboard API
 	HTTPClient *HTTPClient
-
-	// External service endpoints and tokens
-	ArgoCDEndpoint  string
-	ArgoCDNamespace string
 }
 
 // NewKubernetesWithCredentials creates a new Kubernetes client with the provided URL and token
@@ -106,10 +101,6 @@ func NewKubernetesWithCredentials(k8sURL, k8sToken string) (*Kubernetes, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to K8s Dashboard API: %w", err)
 	}
-
-	// Load external service configurations from environment variables
-	k8s.ArgoCDEndpoint = os.Getenv("ARGOCD_ENDPOINT")
-	k8s.ArgoCDNamespace = os.Getenv("ARGOCD_NAMESPACE")
 
 	return k8s, nil
 }
