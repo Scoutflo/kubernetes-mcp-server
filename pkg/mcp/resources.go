@@ -407,8 +407,10 @@ func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*
 		return NewTextResult("", errors.New("failed to patch resource, missing argument resource_name")), nil
 	}
 
-	patch, err := ctr.RequireString("patch")
-	if err != nil {
+	// Get patch as an object from raw arguments
+	rawArgs := ctr.GetRawArguments().(map[string]interface{})
+	patchObj, exists := rawArgs["patch"]
+	if !exists {
 		klog.Errorf("Tool call: resources_patch failed after %v: missing patch parameter", time.Since(start))
 		return NewTextResult("", errors.New("failed to patch resource, missing argument patch")), nil
 	}
@@ -427,8 +429,8 @@ func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*
 		return NewTextResult("", fmt.Errorf("invalid patch_type: %s. Must be one of: json, merge, strategic", patchType)), nil
 	}
 
-	// Convert the patch to JSON
-	patchJSON, err := json.Marshal(patch)
+	// Convert the patch object to JSON
+	patchJSON, err := json.Marshal(patchObj)
 	if err != nil {
 		klog.Errorf("Tool call: resources_patch failed after %v: failed to marshal patch: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to marshal patch data: %v", err)), nil
