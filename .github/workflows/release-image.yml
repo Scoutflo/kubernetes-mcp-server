@@ -3,7 +3,7 @@ name: Release as container image
 on:
   push:
     branches:
-      - main
+      - mainv2
       - release/dev
     tags:
       - '*'
@@ -101,7 +101,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/mainv2'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -116,7 +116,7 @@ jobs:
             org.opencontainers.image.title=${{ github.repository }}
             org.opencontainers.image.description="Docker image for ${{ github.repository }}"
             org.opencontainers.image.source=${{ github.repositoryUrl }}
-            org.opencontainers.image.documentation=${{ github.repositoryUrl }}/blob/main/README.md
+            org.opencontainers.image.documentation=${{ github.repositoryUrl }}/blob/mainv2/README.md
           tags: |
             type=raw,value=production-${{ github.run_number }}
       - name: Set up Docker Buildx
@@ -199,7 +199,7 @@ jobs:
     name: Deploy prod image to GCP VM
     needs: [build-prod]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/mainv2'
     steps:
       - name: Install SSH key
         uses: webfactory/ssh-agent@v0.9.0
