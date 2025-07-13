@@ -84,6 +84,7 @@ func (s *Server) initializeTools() error {
 		s.initPromptGenerator(),
 		s.initGrafana(),
 		s.initIstio(),
+		s.initKiali(),
 	)
 
 	s.server.SetTools(tools...)
