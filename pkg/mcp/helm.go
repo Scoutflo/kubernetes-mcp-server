@@ -16,7 +16,7 @@ import (
 func (s *Server) initHelm() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("helm_add_repository",
-			mcp.WithDescription("Add a Helm chart repository"),
+			mcp.WithDescription("Add a Helm chart repository to enable access to application charts for deployment. This tool ensures the availability of necessary charts to support new deployments or updates. Configures in real-time."),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
@@ -33,7 +33,7 @@ func (s *Server) initHelm() []server.ServerTool {
 		), Handler: s.helmAddRepository},
 
 		{Tool: mcp.NewTool("helm_list_repositories",
-			mcp.WithDescription("List all configured Helm repositories"),
+			mcp.WithDescription("List all configured Helm repositories to verify available chart sources. This tool confirms the presence of repositories needed for deploying or updating applications."),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("random_string",
@@ -43,7 +43,7 @@ func (s *Server) initHelm() []server.ServerTool {
 		), Handler: s.helmListRepositories},
 
 		{Tool: mcp.NewTool("helm_update_repositories",
-			mcp.WithDescription("Update Helm repositories to get the latest charts"),
+			mcp.WithDescription("Update Helm repositories to fetch the latest chart versions. This tool ensures access to current charts for deploying patches or new application versions."),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("repo_name",
@@ -52,12 +52,7 @@ func (s *Server) initHelm() []server.ServerTool {
 		), Handler: s.helmUpdateRepositories},
 
 		{Tool: mcp.NewTool("helm_get_release",
-			mcp.WithDescription("Get detailed information about a Helm release, available resources are: "+
-				"all (download all information for a named release), "+
-				"hooks (download all hooks for a named release), "+
-				"manifest (download the manifest for a named release. The manifest is a YAML-formatted file containing the complete state of the release.), "+
-				"notes (download the notes for a named release. The notes are a text document that contains information about the release.), "+
-				"values (download the values for a named release. The values are a YAML-formatted file containing the values for the release.)"),
+			mcp.WithDescription("Retrieve detailed information about a specific Helm release, including its configuration and status. This tool inspects deployment settings to diagnose issues like misconfigurations or version mismatches."),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
@@ -73,13 +68,7 @@ func (s *Server) initHelm() []server.ServerTool {
 		), Handler: s.helmGetRelease},
 
 		{Tool: mcp.NewTool("helm_list_releases",
-			mcp.WithDescription("List all of the Helm releases for a specific namespace "+
-				"If the --filter flag is provided, it will be treated as a filter. Filters are "+
-				"regular expressions (Perl compatible) that are applied to the list of releases. "+
-				"Only items that match the filter will be returned. "+
-				"Usage: helm list --filter 'ara[a-z]+' "+
-				"NAME                UPDATED                                  CHART "+
-				"maudlin-arachnid    2020-06-18 14:17:46.125134977 +0000 UTC  alpine-0.1.0"),
+			mcp.WithDescription("List all Helm releases in a namespace to review deployed applications and their statuses. This tool identifies deployment issues, such as version conflicts, for resolution during incident analysis."),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("namespace",
@@ -115,9 +104,7 @@ func (s *Server) initHelm() []server.ServerTool {
 		), Handler: s.helmListReleases},
 
 		{Tool: mcp.NewTool("helm_install_release",
-			mcp.WithDescription("Install a Helm chart. The chart argument can be either: a chart reference('example/mariadb'), "+
-				"a path to a chart directory, a packaged chart, or a fully qualified URL. "+
-				"For chart references, the latest version will be specified unless the '--version' flag is set."),
+			mcp.WithDescription("Install a Helm chart to deploy a new application or apply a configuration fix. This tool supports rapid deployment of solutions to address issues identified in the cluster."),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
@@ -161,12 +148,7 @@ func (s *Server) initHelm() []server.ServerTool {
 		), Handler: s.helmInstallRelease},
 
 		{Tool: mcp.NewTool("helm_uninstall_release",
-			mcp.WithDescription("Uninstall a Helm release takes a release name and namespace as arguments "+
-				"It removes all of the resources associated with the last release of the chart "+
-				"as well as the release history, freeing it up for future use. "+
-				"Use the '--dry-run' flag to see which releases will be uninstalled without actually "+
-				"uninstalling them. "+
-				"Usage: helm uninstall RELEASE_NAME [...] [flags]"),
+			mcp.WithDescription("Uninstall a Helm release to remove an application or correct a deployment error. This tool facilitates cleanup to prevent resource conflicts and ensure stable cluster operation."),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
@@ -186,10 +168,7 @@ func (s *Server) initHelm() []server.ServerTool {
 		), Handler: s.helmUninstallRelease},
 
 		{Tool: mcp.NewTool("helm_upgrade_release",
-			mcp.WithDescription("Upgrade a release to a new version of a chart. The upgrade arguments must be a release and chart. The chart "+
-				"argument can be either: a chart reference('example/mariadb'), a path to a chart directory, "+
-				"a packaged chart, or a fully qualified URL. For chart references, the latest "+
-				"version will be specified unless the '--version' flag is set."),
+			mcp.WithDescription("Upgrade a Helm release to apply a new chart version with bug fixes or configuration changes. This tool resolves deployment issues by updating applications to stable versions."),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
@@ -581,6 +560,27 @@ func (s *Server) helmUpgradeRelease(ctx context.Context, ctr mcp.CallToolRequest
 		if valueFiles, ok := argsMap["values"].([]interface{}); ok {
 			for _, vf := range valueFiles {
 				if strVal, ok := vf.(string); ok {
+					opts.Values = append(opts.Values, strVal)
+				}
+			}
+		}
+	}
+
+	klog.V(1).Infof("Tool: helm_upgrade_release - name: %s, chart: %s, namespace: %s, version: %s, set_count: %d, values_count: %d - got called by session id: %s",
+		name, chart, namespace, opts.Version, len(opts.Set), len(opts.Values), sessionID)
+
+	// Upgrade the release using kubernetes client
+	result, err := k.UpgradeRelease(ctx, name, chart, opts)
+	duration := time.Since(start)
+
+	if err != nil {
+		klog.Errorf("Tool call: helm_upgrade_release failed after %v: %v by session id: %s", duration, err, sessionID)
+		return NewTextResult("", fmt.Errorf("failed to upgrade release: %v", err)), nil
+	}
+
+	klog.V(1).Infof("Tool call: helm_upgrade_release completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
+	return NewTextResult(result, nil), nil
+}
 					opts.Values = append(opts.Values, strVal)
 				}
 			}

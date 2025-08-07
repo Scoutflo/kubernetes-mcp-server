@@ -14,7 +14,7 @@ import (
 func (s *Server) initConnectivity() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("check_service_connectivity",
-			mcp.WithDescription("Check connectivity to a Kubernetes service"),
+			mcp.WithDescription("Verify connectivity to a Kubernetes service by testing DNS resolution, port availability, and reachability. This tool diagnoses network issues impacting application functionality, ensuring reliable communication. Validates in real-time."),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("service_name",
@@ -23,7 +23,7 @@ func (s *Server) initConnectivity() []server.ServerTool {
 			),
 		), Handler: s.checkServiceConnectivity},
 		{Tool: mcp.NewTool("check_ingress_connectivity",
-			mcp.WithDescription("Check connectivity to a Kubernetes ingress host"),
+			mcp.WithDescription("Verify connectivity to a Kubernetes ingress host to ensure external access to services. This tool troubleshoots routing issues, validating proper ingress configuration. Operates in real-time."),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("ingress_host",

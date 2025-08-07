@@ -18,7 +18,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 	return []server.ServerTool{
 		{
 			Tool: mcp.NewTool("argocd_list_applications",
-				mcp.WithDescription("List applications in ArgoCD with filtering options"),
+				mcp.WithDescription("List all applications managed by ArgoCD to overview their status and configuration. This tool identifies applications requiring attention for incident analysis or deployment management."),
 				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("project",
@@ -38,7 +38,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("argocd_get_application",
-				mcp.WithDescription("Get detailed information about a specific ArgoCD application"),
+				mcp.WithDescription("Retrieve detailed information about a specific ArgoCD application, including sync status and configuration. This tool inspects application settings to diagnose issues like configuration drift during incident resolution."),
 				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
@@ -56,7 +56,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("argocd_get_application_events",
-				mcp.WithDescription("Returns events for an application"),
+				mcp.WithDescription("Retrieve events for a specific ArgoCD application to trace actions, errors, or changes. This tool supports root cause analysis by providing historical data for incident investigation."),
 				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("application_name",
@@ -68,7 +68,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("argocd_sync_application",
-				mcp.WithDescription("Sync an ArgoCD application to its desired state"),
+				mcp.WithDescription("Synchronize an ArgoCD application with its Git-defined state to align with desired configurations. This tool resolves synchronization issues to restore application functionality."),
 				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
@@ -89,7 +89,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("argocd_create_application",
-				mcp.WithDescription("Create a new application in ArgoCD"),
+				mcp.WithDescription("Create a new ArgoCD application to deploy or test configurations. This tool enables setup of applications for validating solutions or managing deployments."),
 				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
@@ -139,7 +139,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("argocd_update_application",
-				mcp.WithDescription("Update an existing application in ArgoCD"),
+				mcp.WithDescription("Update an existing ArgoCD application's configuration to apply changes or fixes. This tool supports resolution of issues by modifying application settings during incident management."),
 				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
@@ -181,7 +181,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("argocd_delete_application",
-				mcp.WithDescription("Delete an application from ArgoCD"),
+				mcp.WithDescription("Delete an ArgoCD application to remove unnecessary or problematic configurations. This tool facilitates cleanup to prevent resource conflicts during incident resolution."),
 				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
@@ -199,7 +199,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("argocd_get_application_resource_tree",
-				mcp.WithDescription("Returns resource tree for application by application name"),
+				mcp.WithDescription("Retrieve the hierarchical structure of resources managed by an ArgoCD application to understand dependencies. This tool aids in diagnosing issues by mapping resource relationships during incident analysis."),
 				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
@@ -211,7 +211,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("argocd_get_application_managed_resources",
-				mcp.WithDescription("Returns managed resources for application by application name"),
+				mcp.WithDescription("List all Kubernetes resources managed by an ArgoCD application to verify their presence and configuration. This tool ensures resources align with desired states for incident resolution."),
 				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
@@ -223,7 +223,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("argocd_get_application_workload_logs",
-				mcp.WithDescription("Returns logs for application workload (Deployment, StatefulSet, Pod, etc.) by application name and resource details"),
+				mcp.WithDescription("Retrieve logs from workloads in an ArgoCD application to analyze runtime behavior and errors. This tool provides real-time insights for debugging application issues."),
 				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("application_name",
@@ -245,7 +245,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("argocd_get_resource_events",
-				mcp.WithDescription("Returns events for a resource that is managed by an application"),
+				mcp.WithDescription("Retrieve events for a specific Kubernetes resource managed by ArgoCD to diagnose resource-specific issues. This tool supports historical root cause analysis of incidents."),
 				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("application_name",
@@ -261,7 +261,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("argocd_get_resource_actions",
-				mcp.WithDescription("Returns actions for a resource that is managed by an application"),
+				mcp.WithDescription("List available actions for a managed ArgoCD resource to identify possible interventions. This tool supports planning remediation or management tasks for affected resources."),
 				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
@@ -277,7 +277,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("argocd_run_resource_action",
-				mcp.WithDescription("Runs an action on a resource"),
+				mcp.WithDescription("Execute a specific action on an ArgoCD-managed resource to address issues or test fixes. This tool applies interventions, such as restarting resources, during incident resolution."),
 				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
