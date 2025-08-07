@@ -442,9 +442,3 @@ func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*
 	klog.V(1).Infof("Tool call: resources_patch completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
-		return NewTextResult("", fmt.Errorf("failed to patch resource: %v", err)), nil
-	}
-
-	klog.V(1).Infof("Tool call: resources_patch completed successfully in %v by session id: %s", duration, sessionID)
-	return NewTextResult(ret, nil), nil
-}
