@@ -581,24 +581,3 @@ func (s *Server) helmUpgradeRelease(ctx context.Context, ctr mcp.CallToolRequest
 	klog.V(1).Infof("Tool call: helm_upgrade_release completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
 	return NewTextResult(result, nil), nil
 }
-					opts.Values = append(opts.Values, strVal)
-				}
-			}
-		}
-	}
-
-	klog.V(1).Infof("Tool: helm_upgrade_release - name: %s, chart: %s, namespace: %s, version: %s, set_count: %d, values_count: %d - got called by session id: %s",
-		name, chart, namespace, opts.Version, len(opts.Set), len(opts.Values), sessionID)
-
-	// Upgrade the release using kubernetes client
-	result, err := k.UpgradeRelease(ctx, name, chart, opts)
-	duration := time.Since(start)
-
-	if err != nil {
-		klog.Errorf("Tool call: helm_upgrade_release failed after %v: %v by session id: %s", duration, err, sessionID)
-		return NewTextResult("", fmt.Errorf("failed to upgrade release: %v", err)), nil
-	}
-
-	klog.V(1).Infof("Tool call: helm_upgrade_release completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
-	return NewTextResult(result, nil), nil
-}
