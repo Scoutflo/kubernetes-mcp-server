@@ -16,7 +16,7 @@ import (
 func (s *Server) initHelm() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("helm_add_repository",
-			mcp.WithDescription("Add a Helm chart repository"),
+			mcp.WithDescription("Register new Helm chart repositories to access application packages for deployment and management"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
@@ -33,7 +33,7 @@ func (s *Server) initHelm() []server.ServerTool {
 		), Handler: s.helmAddRepository},
 
 		{Tool: mcp.NewTool("helm_list_repositories",
-			mcp.WithDescription("List all configured Helm repositories"),
+			mcp.WithDescription("Display all configured Helm repositories to verify available chart sources for application deployment"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("random_string",
@@ -43,7 +43,7 @@ func (s *Server) initHelm() []server.ServerTool {
 		), Handler: s.helmListRepositories},
 
 		{Tool: mcp.NewTool("helm_update_repositories",
-			mcp.WithDescription("Update Helm repositories to get the latest charts"),
+			mcp.WithDescription("Refresh Helm repositories to fetch latest chart versions and ensure access to updates"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("repo_name",
@@ -52,12 +52,7 @@ func (s *Server) initHelm() []server.ServerTool {
 		), Handler: s.helmUpdateRepositories},
 
 		{Tool: mcp.NewTool("helm_get_release",
-			mcp.WithDescription("Get detailed information about a Helm release, available resources are: "+
-				"all (download all information for a named release), "+
-				"hooks (download all hooks for a named release), "+
-				"manifest (download the manifest for a named release. The manifest is a YAML-formatted file containing the complete state of the release.), "+
-				"notes (download the notes for a named release. The notes are a text document that contains information about the release.), "+
-				"values (download the values for a named release. The values are a YAML-formatted file containing the values for the release.)"),
+			mcp.WithDescription("Inspect detailed information about Helm releases including revision history and deployment status"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
@@ -73,13 +68,7 @@ func (s *Server) initHelm() []server.ServerTool {
 		), Handler: s.helmGetRelease},
 
 		{Tool: mcp.NewTool("helm_list_releases",
-			mcp.WithDescription("List all of the Helm releases for a specific namespace "+
-				"If the --filter flag is provided, it will be treated as a filter. Filters are "+
-				"regular expressions (Perl compatible) that are applied to the list of releases. "+
-				"Only items that match the filter will be returned. "+
-				"Usage: helm list --filter 'ara[a-z]+' "+
-				"NAME                UPDATED                                  CHART "+
-				"maudlin-arachnid    2020-06-18 14:17:46.125134977 +0000 UTC  alpine-0.1.0"),
+			mcp.WithDescription("List deployed Helm applications with their current status across specified namespaces"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("namespace",
@@ -115,9 +104,7 @@ func (s *Server) initHelm() []server.ServerTool {
 		), Handler: s.helmListReleases},
 
 		{Tool: mcp.NewTool("helm_install_release",
-			mcp.WithDescription("Install a Helm chart. The chart argument can be either: a chart reference('example/mariadb'), "+
-				"a path to a chart directory, a packaged chart, or a fully qualified URL. "+
-				"For chart references, the latest version will be specified unless the '--version' flag is set."),
+			mcp.WithDescription("Deploy new applications or services using Helm charts with customizable configurations"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
@@ -125,111 +112,90 @@ func (s *Server) initHelm() []server.ServerTool {
 				mcp.Required(),
 			),
 			mcp.WithString("chart",
-				mcp.Description("The chart to install (chart reference, a path to packaged chart, a path to an unpacked chart directory or URL)"),
+				mcp.Description("The chart to install. Can be a chart reference, a path to a packaged chart, a path to an unpacked chart directory, or a URL"),
 				mcp.Required(),
 			),
 			mcp.WithString("namespace",
-				mcp.Description("The namespace to install the release in"),
+				mcp.Description("The namespace to install the release into (optional)"),
 			),
-			mcp.WithArray("set",
-				mcp.Description("A list of key-value pairs to set on the release (e.g., [\"key1=val1\", \"key2=val2\"])"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
+			mcp.WithString("values",
+				mcp.Description("Values to override the default chart values (YAML format)"),
 			),
-			mcp.WithArray("values",
-				mcp.Description("A list of files to use as the value source (e.g., [\"myvalues.yaml\", \"override.yaml\"])"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
-			),
-			mcp.WithString("repo_url",
-				mcp.Description("Chart repository url where to locate the requested chart"),
+			mcp.WithString("set",
+				mcp.Description("Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)"),
 			),
 			mcp.WithString("version",
-				mcp.Description("Specify a version constraint for the chart version to use"),
+				mcp.Description("Specify the exact chart version to install. If this is not specified, the latest version is installed"),
 			),
-			// mcp.WithString("wait",
-			// 	mcp.Description("If 'true', wait for the release to be installed (accepted values: 'true', 'false')"),
-			// ),
+			mcp.WithString("create_namespace",
+				mcp.Description("Create the namespace if it doesn't exist (accepted values: 'true', 'false')"),
+			),
+			mcp.WithString("wait",
+				mcp.Description("If set, will wait until all Pods, PVCs, Services, and minimum number of Pods of a Deployment, StatefulSet, or ReplicaSet are in a ready state before marking the release as successful (accepted values: 'true', 'false')"),
+			),
+			mcp.WithString("timeout",
+				mcp.Description("Time to wait for any individual Kubernetes operation (like Jobs for hooks) (default 5m0s)"),
+			),
 		), Handler: s.helmInstallRelease},
 
 		{Tool: mcp.NewTool("helm_uninstall_release",
-			mcp.WithDescription("Uninstall a Helm release takes a release name and namespace as arguments "+
-				"It removes all of the resources associated with the last release of the chart "+
-				"as well as the release history, freeing it up for future use. "+
-				"Use the '--dry-run' flag to see which releases will be uninstalled without actually "+
-				"uninstalling them. "+
-				"Usage: helm uninstall RELEASE_NAME [...] [flags]"),
+			mcp.WithDescription("Remove Helm-managed applications to decommission services and free cluster resources"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
-				mcp.Description("The name of the release"),
+				mcp.Description("The name of the release to uninstall"),
 				mcp.Required(),
 			),
 			mcp.WithString("namespace",
-				mcp.Description("The namespace to uninstall the release from"),
-				mcp.Required(),
+				mcp.Description("The namespace of the release (optional)"),
 			),
-			mcp.WithString("dry_run",
-				mcp.Description("If 'true', show which releases will be uninstalled without actually uninstalling them (accepted values: 'true', 'false')"),
+			mcp.WithString("keep_history",
+				mcp.Description("Remove all associated resources and mark the release as deleted, but retain the release history (accepted values: 'true', 'false')"),
 			),
 			mcp.WithString("wait",
-				mcp.Description("If 'true', wait for the release to be uninstalled (accepted values: 'true', 'false')"),
+				mcp.Description("If set, will wait until all the resources are deleted before returning. It will wait for as long as --timeout (accepted values: 'true', 'false')"),
+			),
+			mcp.WithString("timeout",
+				mcp.Description("Time to wait for any individual Kubernetes operation (like Jobs for hooks) (default 5m0s)"),
 			),
 		), Handler: s.helmUninstallRelease},
 
 		{Tool: mcp.NewTool("helm_upgrade_release",
-			mcp.WithDescription("Upgrade a release to a new version of a chart. The upgrade arguments must be a release and chart. The chart "+
-				"argument can be either: a chart reference('example/mariadb'), a path to a chart directory, "+
-				"a packaged chart, or a fully qualified URL. For chart references, the latest "+
-				"version will be specified unless the '--version' flag is set."),
+			mcp.WithDescription("Update existing Helm releases to new versions or modified configuration settings"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
-				mcp.Description("The name of the release"),
+				mcp.Description("The name of the release to upgrade"),
 				mcp.Required(),
 			),
 			mcp.WithString("chart",
-				mcp.Description("The chart to upgrade (chart reference, a path to packaged chart, a path to an unpacked chart directory or URL)"),
+				mcp.Description("The chart to upgrade to. Can be a chart reference, a path to a packaged chart, a path to an unpacked chart directory, or a URL"),
 				mcp.Required(),
 			),
 			mcp.WithString("namespace",
-				mcp.Description("The namespace to upgrade the release in"),
+				mcp.Description("The namespace of the release (optional)"),
 			),
-			mcp.WithArray("set",
-				mcp.Description("A list of key-value pairs to set on the release (e.g., [\"key1=val1\", \"key2=val2\"])"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
+			mcp.WithString("values",
+				mcp.Description("Values to override the default chart values (YAML format)"),
 			),
-			mcp.WithArray("values",
-				mcp.Description("A list of files to use as the value source (e.g., [\"myvalues.yaml\", \"override.yaml\"])"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
-			),
-			mcp.WithString("repo_url",
-				mcp.Description("Chart repository url where to locate the requested chart"),
+			mcp.WithString("set",
+				mcp.Description("Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)"),
 			),
 			mcp.WithString("version",
-				mcp.Description("Specify a version constraint for the chart version to use"),
+				mcp.Description("Specify the exact chart version to upgrade to. If this is not specified, the latest version is installed"),
 			),
-			// mcp.WithString("wait",
-			// 	mcp.Description("If 'true', wait for the release to be upgraded (accepted values: 'true', 'false')"),
-			// ),
+			mcp.WithString("wait",
+				mcp.Description("If set, will wait until all Pods, PVCs, Services, and minimum number of Pods of a Deployment, StatefulSet, or ReplicaSet are in a ready state before marking the release as successful (accepted values: 'true', 'false')"),
+			),
+			mcp.WithString("timeout",
+				mcp.Description("Time to wait for any individual Kubernetes operation (like Jobs for hooks) (default 5m0s)"),
+			),
+			mcp.WithString("reset_values",
+				mcp.Description("When upgrading, reset the values to the ones built into the chart and merge in any new values (accepted values: 'true', 'false')"),
+			),
+			mcp.WithString("reuse_values",
+				mcp.Description("When upgrading, reuse the last release's values and merge in any new values (accepted values: 'true', 'false')"),
+			),
 		), Handler: s.helmUpgradeRelease},
 	}
 }

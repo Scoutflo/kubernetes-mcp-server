@@ -13,13 +13,12 @@ import (
 func (s *Server) initMetricsServer() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("nodes_metrics",
-			mcp.WithDescription("Get CPU and memory metrics for all nodes or a specific node"),
-			mcp.WithString("name", mcp.Description("Name of the node (optional, if not provided will return metrics for all nodes)")),
+			mcp.WithDescription("Retrieve real-time CPU and memory utilization metrics for cluster node performance monitoring"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.nodesMetrics},
 		{Tool: mcp.NewTool("pods_metrics",
-			mcp.WithDescription("Get CPU and memory metrics for pods in a namespace"),
+			mcp.WithDescription("Collect resource usage statistics for pods to analyze application performance characteristics"),
 			mcp.WithString("namespace", mcp.Description("Namespace to get pod metrics from (optional, if not provided will use default namespace)")),
 			mcp.WithString("name", mcp.Description("Name of the pod (optional, if not provided will return metrics for all pods in the namespace)")),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),

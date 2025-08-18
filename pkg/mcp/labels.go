@@ -16,8 +16,7 @@ func (s *Server) initLabels() []server.ServerTool {
 	commonApiVersion = fmt.Sprintf("(common apiVersion and kind include: %s)", commonApiVersion)
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("label_resource",
-			mcp.WithDescription("Apply labels to a Kubernetes resource\n"+
-				commonApiVersion),
+			mcp.WithDescription("Apply organizational labels to Kubernetes resources for improved grouping and selection"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
@@ -40,10 +39,8 @@ func (s *Server) initLabels() []server.ServerTool {
 				mcp.Required(),
 			),
 		), Handler: s.labelResource},
-
 		{Tool: mcp.NewTool("remove_label",
-			mcp.WithDescription("Remove a label from a Kubernetes resource\n"+
-				commonApiVersion),
+			mcp.WithDescription("Delete specific labels from resources to update categorization and organization schemes"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
@@ -66,10 +63,8 @@ func (s *Server) initLabels() []server.ServerTool {
 				mcp.Required(),
 			),
 		), Handler: s.removeLabel},
-
 		{Tool: mcp.NewTool("annotate_resource",
-			mcp.WithDescription("Apply annotations to a Kubernetes resource\n"+
-				commonApiVersion),
+			mcp.WithDescription("Attach metadata annotations to resources for documentation and operational tracking"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
@@ -92,10 +87,8 @@ func (s *Server) initLabels() []server.ServerTool {
 				mcp.Required(),
 			),
 		), Handler: s.annotateResource},
-
 		{Tool: mcp.NewTool("remove_annotation",
-			mcp.WithDescription("Remove an annotation from a Kubernetes resource\n"+
-				commonApiVersion),
+			mcp.WithDescription("Clear specific annotations from resources to maintain accurate metadata records"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
