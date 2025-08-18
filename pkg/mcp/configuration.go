@@ -13,7 +13,7 @@ import (
 func (s *Server) initConfiguration() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("get_available_API_resources",
-			mcp.WithDescription("Get all available and supported API resources in the Kubernetes cluster"),
+			mcp.WithDescription("Discover all available Kubernetes API resources to understand cluster capabilities and object types for exploration"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.getAvailableAPIResources},

@@ -13,7 +13,7 @@ import (
 func (s *Server) initEvents() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("events_list",
-			mcp.WithDescription("List all the Kubernetes events in the current cluster from all namespaces with optional filtering by namespace, resource name, kind, or API version"),
+			mcp.WithDescription("Review cluster-wide events with timestamps and severity levels to track system changes and errors"),
 			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
 			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("namespace",
