@@ -17,8 +17,6 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("create_argo_rollout_config",
 				mcp.WithDescription("Generate a YAML configuration for Argo Rollouts with specified deployment strategy"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				// Required parameters
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout"),
@@ -101,8 +99,6 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("promote_argo_rollout",
 				mcp.WithDescription("Promote an Argo Rollout to advance it to the next step"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout to promote"),
 					mcp.Required(),
@@ -120,8 +116,6 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("abort_argo_rollout",
 				mcp.WithDescription("Abort an in-progress Argo Rollout and revert to the stable version"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout to abort"),
 					mcp.Required(),
@@ -136,8 +130,6 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("get_argo_rollout",
 				mcp.WithDescription("Get the status of an Argo Rollout"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout"),
 					mcp.Required(),
@@ -155,8 +147,6 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("set_argo_rollout_weight",
 				mcp.WithDescription("Set the canary weight for an Argo Rollout"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout"),
 					mcp.Required(),
@@ -175,8 +165,6 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("pause_argo_rollout",
 				mcp.WithDescription("Pause an Argo Rollout to temporarily halt progression"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout to pause"),
 					mcp.Required(),
@@ -191,8 +179,6 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("set_argo_rollout_image",
 				mcp.WithDescription("Set the image for a container in an Argo Rollouts deployment"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout"),
 					mcp.Required(),

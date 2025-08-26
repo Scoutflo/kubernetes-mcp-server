@@ -17,8 +17,6 @@ func (s *Server) initRollouts() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("rollout",
 				mcp.WithDescription("The rollout action to perform on the resource (history, pause, restart, resume, status, undo)"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("action", mcp.Description("The action to perform on the resource"), mcp.Required()),
 				mcp.WithString("resource_type", mcp.Description("The type of resource to rollout (deployment, daemonset, statefulset)"), mcp.Required()),
 				mcp.WithString("resource_name", mcp.Description("The name of the resource to rollout"), mcp.Required()),

@@ -22,8 +22,6 @@ func (s *Server) initPromptGenerator() []server.ServerTool {
 				mcp.Description("Natural language description of the prompt to generate"),
 				mcp.Required(),
 			),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.promptGenerator},
 	}
 }

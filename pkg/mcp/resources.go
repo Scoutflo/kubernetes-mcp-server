@@ -21,8 +21,6 @@ func (s *Server) initResources() []server.ServerTool {
 		{Tool: mcp.NewTool("resources_list",
 			mcp.WithDescription("List Kubernetes resources and objects in the current cluster by providing their apiVersion and kind and optionally the namespace\n"+
 				commonApiVersion),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resources (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -38,8 +36,6 @@ func (s *Server) initResources() []server.ServerTool {
 		{Tool: mcp.NewTool("resources_get",
 			mcp.WithDescription("Get a Kubernetes resource in the current cluster by providing its apiVersion, kind, optionally the namespace, and its name\n"+
 				commonApiVersion),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -56,8 +52,6 @@ func (s *Server) initResources() []server.ServerTool {
 		{Tool: mcp.NewTool("resources_create_or_update",
 			mcp.WithDescription("Create or update a Kubernetes resource in the current cluster by providing a YAML or JSON representation of the resource\n"+
 				commonApiVersion),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("resource",
 				mcp.Description("A JSON or YAML containing a representation of the Kubernetes resource. Should include top-level fields such as apiVersion,kind,metadata, and spec"),
 				mcp.Required(),
@@ -66,8 +60,6 @@ func (s *Server) initResources() []server.ServerTool {
 		{Tool: mcp.NewTool("resources_delete",
 			mcp.WithDescription("Delete a Kubernetes resource in the current cluster by providing its apiVersion, kind, optionally the namespace, and its name\n"+
 				commonApiVersion),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -84,8 +76,6 @@ func (s *Server) initResources() []server.ServerTool {
 		{Tool: mcp.NewTool("get_resources_yaml",
 			mcp.WithDescription("Get the YAML representation of a resource in Kubernetes\n"+
 				commonApiVersion),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -101,8 +91,6 @@ func (s *Server) initResources() []server.ServerTool {
 		), Handler: s.resourcesYaml},
 		{Tool: mcp.NewTool("apply_manifest",
 			mcp.WithDescription("Apply a YAML resource file to the Kubernetes cluster"),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("manifest_path",
 				mcp.Description("The path to the manifest file to apply (either this or yaml_content must be provided)"),
 			),
@@ -113,8 +101,6 @@ func (s *Server) initResources() []server.ServerTool {
 		{Tool: mcp.NewTool("resources_patch",
 			mcp.WithDescription("Patch a resource in Kubernetes\n"+
 				commonApiVersion),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
