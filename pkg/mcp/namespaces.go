@@ -15,8 +15,6 @@ func (s *Server) initNamespaces() []server.ServerTool {
 	ret = append(ret, server.ServerTool{
 		Tool: mcp.NewTool("namespaces_list",
 			mcp.WithDescription("List all the Kubernetes namespaces in the current cluster"),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.namespacesList,
 	})
 	return ret
