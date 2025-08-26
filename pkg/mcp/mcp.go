@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
@@ -20,6 +21,11 @@ const (
 	// HealthPort is the port used for health checks
 	HealthPort = 8082
 )
+
+type K8sCredentials struct {
+	K8sURL   string `json:"k8surl"`
+	K8sToken string `json:"k8stoken"`
+}
 
 type Server struct {
 	server      *server.MCPServer
@@ -166,12 +172,22 @@ func getSessionID(ctx context.Context) string {
 // If k8surl and k8stoken are provided in the request, it creates a new client with those credentials
 // Otherwise, it tries to use environment variables as fallback
 func (s *Server) getKubernetesClient(ctr mcp.CallToolRequest) (*kubernetes.Kubernetes, error) {
-	k8sURL := ctr.GetString("k8surl", "")
-	k8sToken := ctr.GetString("k8stoken", "")
 
-	if k8sURL != "" && k8sToken != "" {
+	meta, err := ctr.Params.Meta.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal meta: %v", err)
+	}
+
+	klog.V(0).Infof("ctr.Params.Meta: %v", ctr.Params.Meta)
+
+	k8sCredentials := K8sCredentials{}
+	if err := json.Unmarshal(meta, &k8sCredentials); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal meta: %v", err)
+	}
+
+	if k8sCredentials.K8sURL != "" && k8sCredentials.K8sToken != "" {
 		// Create client with provided credentials
-		return kubernetes.NewKubernetesWithCredentials(k8sURL, k8sToken)
+		return kubernetes.NewKubernetesWithCredentials(k8sCredentials.K8sURL, k8sCredentials.K8sToken)
 	}
 
 	// Fallback to environment variables if no credentials provided in request
