@@ -1,4 +1,6 @@
+_output/
 .idea/
+.vscode/
 .docusaurus/
 node_modules/
 

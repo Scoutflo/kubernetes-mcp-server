@@ -1,12 +1,13 @@
 package mcp
 
 import (
-	"github.com/manusa/kubernetes-mcp-server/pkg/kubernetes"
+	"testing"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/kubernetes"
 	"github.com/mark3labs/mcp-go/mcp"
 	"k8s.io/client-go/rest"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"sigs.k8s.io/yaml"
-	"testing"
 )
 
 func TestConfigurationView(t *testing.T) {
@@ -50,7 +51,7 @@ func TestConfigurationView(t *testing.T) {
 			if decoded.Clusters[0].Name != "fake" {
 				t.Errorf("fake-cluster not found: %v", decoded.Clusters)
 			}
-			if decoded.Clusters[0].Cluster.Server != "https://example.com" {
+			if decoded.Clusters[0].Cluster.Server != "https://127.0.0.1:6443" {
 				t.Errorf("fake-server not found: %v", decoded.Clusters)
 			}
 		})
@@ -78,7 +79,7 @@ func TestConfigurationView(t *testing.T) {
 		})
 		t.Run("configuration_view with minified=false returns additional context info", func(t *testing.T) {
 			if len(decoded.Contexts) != 2 {
-				t.Errorf("invalid context count, expected2, got %v", len(decoded.Contexts))
+				t.Fatalf("invalid context count, expected2, got %v", len(decoded.Contexts))
 			}
 			if decoded.Contexts[0].Name != "additional-context" {
 				t.Errorf("additional-context not found: %v", decoded.Contexts)

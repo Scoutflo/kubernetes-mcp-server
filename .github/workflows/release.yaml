@@ -44,6 +44,8 @@ jobs:
           make npm-publish
   python:
     name: Release Python
+    # Python logic requires the tag/release version to be available from GitHub
+    needs: release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

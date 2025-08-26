@@ -1,40 +1,48 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"testing"
+	"time"
+
+	"github.com/containers/kubernetes-mcp-server/pkg/config"
+	"github.com/containers/kubernetes-mcp-server/pkg/output"
 	"github.com/mark3labs/mcp-go/client"
+	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1spec "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	toolswatch "k8s.io/client-go/tools/watch"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/textlogger"
 	"k8s.io/utils/ptr"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/env"
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/remote"
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/store"
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/versions"
 	"sigs.k8s.io/controller-runtime/tools/setup-envtest/workflows"
-	"testing"
-	"time"
 )
 
 // envTest has an expensive setup, so we only want to do it once per entire test run.
@@ -44,6 +52,9 @@ var envTestUser = envtest.User{Name: "test-user", Groups: []string{"test:users"}
 
 func TestMain(m *testing.M) {
 	// Set up
+	_ = os.Setenv("KUBECONFIG", "/dev/null")     // Avoid interference from existing kubeconfig
+	_ = os.Setenv("KUBERNETES_SERVICE_HOST", "") // Avoid interference from in-cluster config
+	_ = os.Setenv("KUBERNETES_SERVICE_PORT", "") // Avoid interference from in-cluster config
 	envTestDir, err := store.DefaultStoreDir()
 	if err != nil {
 		panic(err)
@@ -65,7 +76,7 @@ func TestMain(m *testing.M) {
 	}
 	envTestEnv.CheckCoherence()
 	workflows.Use{}.Do(envTestEnv)
-	versionDir := envTestEnv.Platform.Platform.BaseName(*envTestEnv.Version.AsConcrete())
+	versionDir := envTestEnv.Platform.BaseName(*envTestEnv.Version.AsConcrete())
 	envTest = &envtest.Environment{
 		BinaryAssetsDirectory: filepath.Join(envTestDir, "k8s", versionDir),
 	}
@@ -92,28 +103,65 @@ func TestMain(m *testing.M) {
 }
 
 type mcpContext struct {
+	profile    Profile
+	listOutput output.Output
+	logLevel   int
+
+	staticConfig  *config.StaticConfig
+	clientOptions []transport.ClientOption
+	before        func(*mcpContext)
+	after         func(*mcpContext)
 	ctx           context.Context
 	tempDir       string
 	cancel        context.CancelFunc
 	mcpServer     *Server
 	mcpHttpServer *httptest.Server
-	mcpClient     *client.SSEMCPClient
+	mcpClient     *client.Client
+	klogState     klog.State
+	logBuffer     bytes.Buffer
 }
 
 func (c *mcpContext) beforeEach(t *testing.T) {
 	var err error
-	c.ctx, c.cancel = context.WithCancel(context.Background())
+	c.ctx, c.cancel = context.WithCancel(t.Context())
 	c.tempDir = t.TempDir()
 	c.withKubeConfig(nil)
-	if c.mcpServer, err = NewSever(); err != nil {
+	if c.profile == nil {
+		c.profile = &FullProfile{}
+	}
+	if c.listOutput == nil {
+		c.listOutput = output.Yaml
+	}
+	if c.staticConfig == nil {
+		c.staticConfig = &config.StaticConfig{
+			ReadOnly:           false,
+			DisableDestructive: false,
+		}
+	}
+	if c.before != nil {
+		c.before(c)
+	}
+	// Set up logging
+	c.klogState = klog.CaptureState()
+	flags := flag.NewFlagSet("test", flag.ContinueOnError)
+	klog.InitFlags(flags)
+	_ = flags.Set("v", strconv.Itoa(c.logLevel))
+	klog.SetLogger(textlogger.NewLogger(textlogger.NewConfig(textlogger.Verbosity(c.logLevel), textlogger.Output(&c.logBuffer))))
+	// MCP Server
+	if c.mcpServer, err = NewServer(Configuration{
+		Profile:      c.profile,
+		ListOutput:   c.listOutput,
+		StaticConfig: c.staticConfig,
+	}); err != nil {
 		t.Fatal(err)
 		return
 	}
-	c.mcpHttpServer = server.NewTestServer(c.mcpServer.server)
-	if c.mcpClient, err = client.NewSSEMCPClient(c.mcpHttpServer.URL + "/sse"); err != nil {
+	c.mcpHttpServer = server.NewTestServer(c.mcpServer.server, server.WithSSEContextFunc(contextFunc))
+	if c.mcpClient, err = client.NewSSEMCPClient(c.mcpHttpServer.URL+"/sse", c.clientOptions...); err != nil {
 		t.Fatal(err)
 		return
 	}
+	// MCP Client
 	if err = c.mcpClient.Start(c.ctx); err != nil {
 		t.Fatal(err)
 		return
@@ -129,14 +177,21 @@ func (c *mcpContext) beforeEach(t *testing.T) {
 }
 
 func (c *mcpContext) afterEach() {
+	if c.after != nil {
+		c.after(c)
+	}
 	c.cancel()
 	c.mcpServer.Close()
 	_ = c.mcpClient.Close()
 	c.mcpHttpServer.Close()
+	c.klogState.Restore()
 }
 
 func testCase(t *testing.T, test func(c *mcpContext)) {
-	mcpCtx := &mcpContext{}
+	testCaseWithContext(t, &mcpContext{profile: &FullProfile{}}, test)
+}
+
+func testCaseWithContext(t *testing.T, mcpCtx *mcpContext, test func(c *mcpContext)) {
 	mcpCtx.beforeEach(t)
 	defer mcpCtx.afterEach()
 	test(mcpCtx)
@@ -146,15 +201,15 @@ func testCase(t *testing.T, test func(c *mcpContext)) {
 func (c *mcpContext) withKubeConfig(rc *rest.Config) *api.Config {
 	fakeConfig := api.NewConfig()
 	fakeConfig.Clusters["fake"] = api.NewCluster()
-	fakeConfig.Clusters["fake"].Server = "https://example.com"
+	fakeConfig.Clusters["fake"].Server = "https://127.0.0.1:6443"
 	fakeConfig.Clusters["additional-cluster"] = api.NewCluster()
 	fakeConfig.AuthInfos["fake"] = api.NewAuthInfo()
 	fakeConfig.AuthInfos["additional-auth"] = api.NewAuthInfo()
 	if rc != nil {
 		fakeConfig.Clusters["fake"].Server = rc.Host
-		fakeConfig.Clusters["fake"].CertificateAuthorityData = rc.TLSClientConfig.CAData
-		fakeConfig.AuthInfos["fake"].ClientKeyData = rc.TLSClientConfig.KeyData
-		fakeConfig.AuthInfos["fake"].ClientCertificateData = rc.TLSClientConfig.CertData
+		fakeConfig.Clusters["fake"].CertificateAuthorityData = rc.CAData
+		fakeConfig.AuthInfos["fake"].ClientKeyData = rc.KeyData
+		fakeConfig.AuthInfos["fake"].ClientCertificateData = rc.CertData
 	}
 	fakeConfig.Contexts["fake-context"] = api.NewContext()
 	fakeConfig.Contexts["fake-context"].Cluster = "fake"
@@ -180,8 +235,8 @@ func (c *mcpContext) withEnvTest() {
 }
 
 // inOpenShift sets up the kubernetes environment to seem to be running OpenShift
-func (c *mcpContext) inOpenShift() func() {
-	c.withKubeConfig(envTestRestConfig)
+func inOpenShift(c *mcpContext) {
+	c.withEnvTest()
 	crdTemplate := `
           {
             "apiVersion": "apiextensions.k8s.io/v1",
@@ -197,13 +252,27 @@ func (c *mcpContext) inOpenShift() func() {
               "names": {"plural": "%s","singular": "%s","kind": "%s"}
             }
           }`
-	removeProjects := c.crdApply(fmt.Sprintf(crdTemplate, "projects.project.openshift.io", "project.openshift.io",
-		"Cluster", "projects", "project", "Project"))
-	removeRoutes := c.crdApply(fmt.Sprintf(crdTemplate, "routes.route.openshift.io", "route.openshift.io",
-		"Namespaced", "routes", "route", "Route"))
-	return func() {
-		removeProjects()
-		removeRoutes()
+	tasks, _ := errgroup.WithContext(c.ctx)
+	tasks.Go(func() error {
+		return c.crdApply(fmt.Sprintf(crdTemplate, "projects.project.openshift.io", "project.openshift.io",
+			"Cluster", "projects", "project", "Project"))
+	})
+	tasks.Go(func() error {
+		return c.crdApply(fmt.Sprintf(crdTemplate, "routes.route.openshift.io", "route.openshift.io",
+			"Namespaced", "routes", "route", "Route"))
+	})
+	if err := tasks.Wait(); err != nil {
+		panic(err)
+	}
+}
+
+// inOpenShiftClear clears the kubernetes environment so it no longer seems to be running OpenShift
+func inOpenShiftClear(c *mcpContext) {
+	tasks, _ := errgroup.WithContext(c.ctx)
+	tasks.Go(func() error { return c.crdDelete("projects.project.openshift.io") })
+	tasks.Go(func() error { return c.crdDelete("routes.route.openshift.io") })
+	if err := tasks.Wait(); err != nil {
+		panic(err)
 	}
 }
 
@@ -212,49 +281,45 @@ func (c *mcpContext) newKubernetesClient() *kubernetes.Clientset {
 	return kubernetes.NewForConfigOrDie(envTestRestConfig)
 }
 
-func (c *mcpContext) newRestClient(groupVersion *schema.GroupVersion) *rest.RESTClient {
-	config := *envTestRestConfig
-	config.GroupVersion = groupVersion
-	config.APIPath = "/api"
-	config.NegotiatedSerializer = serializer.NewCodecFactory(scale.NewScaleConverter().Scheme()).WithoutConversion()
-	rc, err := rest.RESTClientFor(&config)
-	if err != nil {
-		panic(err)
-	}
-	return rc
-}
-
 // newApiExtensionsClient creates a new ApiExtensions client with the envTest kubeconfig
 func (c *mcpContext) newApiExtensionsClient() *apiextensionsv1.ApiextensionsV1Client {
 	return apiextensionsv1.NewForConfigOrDie(envTestRestConfig)
 }
 
-// crdApply creates a CRD from the provided resource string and waits for it to be established, returns a cleanup function
-func (c *mcpContext) crdApply(resource string) func() {
+// crdApply creates a CRD from the provided resource string and waits for it to be established
+func (c *mcpContext) crdApply(resource string) error {
 	apiExtensionsV1Client := c.newApiExtensionsClient()
 	var crd = &apiextensionsv1spec.CustomResourceDefinition{}
 	err := json.Unmarshal([]byte(resource), crd)
+	if err != nil {
+		return fmt.Errorf("failed to create CRD %v", err)
+	}
 	_, err = apiExtensionsV1Client.CustomResourceDefinitions().Create(c.ctx, crd, metav1.CreateOptions{})
 	if err != nil {
-		panic(fmt.Errorf("failed to create CRD %v", err))
+		return fmt.Errorf("failed to create CRD %v", err)
 	}
 	c.crdWaitUntilReady(crd.Name)
-	return func() {
-		err = apiExtensionsV1Client.CustomResourceDefinitions().Delete(c.ctx, crd.Name, metav1.DeleteOptions{
-			GracePeriodSeconds: ptr.To(int64(0)),
-		})
-		iteration := 0
-		for iteration < 10 {
-			if _, derr := apiExtensionsV1Client.CustomResourceDefinitions().Get(c.ctx, crd.Name, metav1.GetOptions{}); derr != nil {
-				break
-			}
-			time.Sleep(50 * time.Millisecond)
-			iteration++
+	return nil
+}
+
+// crdDelete deletes a CRD by name and waits for it to be removed
+func (c *mcpContext) crdDelete(name string) error {
+	apiExtensionsV1Client := c.newApiExtensionsClient()
+	err := apiExtensionsV1Client.CustomResourceDefinitions().Delete(c.ctx, name, metav1.DeleteOptions{
+		GracePeriodSeconds: ptr.To(int64(0)),
+	})
+	iteration := 0
+	for iteration < 100 {
+		if _, derr := apiExtensionsV1Client.CustomResourceDefinitions().Get(c.ctx, name, metav1.GetOptions{}); derr != nil {
+			break
 		}
-		if err != nil {
-			panic(fmt.Errorf("failed to delete CRD %v", err))
-		}
+		time.Sleep(5 * time.Millisecond)
+		iteration++
 	}
+	if err != nil {
+		return errors.Wrap(err, "failed to delete CRD")
+	}
+	return nil
 }
 
 // crdWaitUntilReady waits for a CRD to be established
@@ -262,6 +327,9 @@ func (c *mcpContext) crdWaitUntilReady(name string) {
 	watcher, err := c.newApiExtensionsClient().CustomResourceDefinitions().Watch(c.ctx, metav1.ListOptions{
 		FieldSelector: "metadata.name=" + name,
 	})
+	if err != nil {
+		panic(fmt.Errorf("failed to watch CRD %v", err))
+	}
 	_, err = toolswatch.UntilWithoutRetry(c.ctx, watcher, func(event watch.Event) (bool, error) {
 		for _, c := range event.Object.(*apiextensionsv1spec.CustomResourceDefinition).Status.Conditions {
 			if c.Type == apiextensionsv1spec.Established && c.Status == apiextensionsv1spec.ConditionTrue {
@@ -311,17 +379,45 @@ func createTestData(ctx context.Context) {
 	_, _ = kubernetesAdmin.CoreV1().Namespaces().
 		Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns-to-delete"}}, metav1.CreateOptions{})
 	_, _ = kubernetesAdmin.CoreV1().Pods("default").Create(ctx, &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "a-pod-in-default"},
-		Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "nginx", Image: "nginx"}}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "a-pod-in-default",
+			Labels: map[string]string{"app": "nginx"},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "nginx",
+					Image: "nginx",
+				},
+			},
+		},
 	}, metav1.CreateOptions{})
 	// Pods for listing
 	_, _ = kubernetesAdmin.CoreV1().Pods("ns-1").Create(ctx, &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "a-pod-in-ns-1"},
-		Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "nginx", Image: "nginx"}}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "a-pod-in-ns-1",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "nginx",
+					Image: "nginx",
+				},
+			},
+		},
 	}, metav1.CreateOptions{})
 	_, _ = kubernetesAdmin.CoreV1().Pods("ns-2").Create(ctx, &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "a-pod-in-ns-2"},
-		Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "nginx", Image: "nginx"}}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "a-pod-in-ns-2",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "nginx",
+					Image: "nginx",
+				},
+			},
+		},
 	}, metav1.CreateOptions{})
 	_, _ = kubernetesAdmin.CoreV1().ConfigMaps("default").
 		Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "a-configmap-to-delete"}}, metav1.CreateOptions{})
