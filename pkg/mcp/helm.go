@@ -17,8 +17,6 @@ func (s *Server) initHelm() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("helm_add_repository",
 			mcp.WithDescription("Add a Helm chart repository"),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
 				mcp.Description("Repository name"),
 				mcp.Required(),
@@ -34,8 +32,6 @@ func (s *Server) initHelm() []server.ServerTool {
 
 		{Tool: mcp.NewTool("helm_list_repositories",
 			mcp.WithDescription("List all configured Helm repositories"),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("random_string",
 				mcp.Description("Dummy parameter for no-parameter tools"),
 				mcp.Required(),
@@ -44,8 +40,6 @@ func (s *Server) initHelm() []server.ServerTool {
 
 		{Tool: mcp.NewTool("helm_update_repositories",
 			mcp.WithDescription("Update Helm repositories to get the latest charts"),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("repo_name",
 				mcp.Description("Optional name of the repository to update. If not provided, all repositories will be updated"),
 			),
@@ -58,8 +52,6 @@ func (s *Server) initHelm() []server.ServerTool {
 				"manifest (download the manifest for a named release. The manifest is a YAML-formatted file containing the complete state of the release.), "+
 				"notes (download the notes for a named release. The notes are a text document that contains information about the release.), "+
 				"values (download the values for a named release. The values are a YAML-formatted file containing the values for the release.)"),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
 				mcp.Description("The name of the release"),
 				mcp.Required(),
@@ -80,8 +72,6 @@ func (s *Server) initHelm() []server.ServerTool {
 				"Usage: helm list --filter 'ara[a-z]+' "+
 				"NAME                UPDATED                                  CHART "+
 				"maudlin-arachnid    2020-06-18 14:17:46.125134977 +0000 UTC  alpine-0.1.0"),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("namespace",
 				mcp.Description("The namespace to list the helm charts from (optional)"),
 			),
@@ -118,8 +108,6 @@ func (s *Server) initHelm() []server.ServerTool {
 			mcp.WithDescription("Install a Helm chart. The chart argument can be either: a chart reference('example/mariadb'), "+
 				"a path to a chart directory, a packaged chart, or a fully qualified URL. "+
 				"For chart references, the latest version will be specified unless the '--version' flag is set."),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
 				mcp.Description("The name of the release"),
 				mcp.Required(),
@@ -167,8 +155,6 @@ func (s *Server) initHelm() []server.ServerTool {
 				"Use the '--dry-run' flag to see which releases will be uninstalled without actually "+
 				"uninstalling them. "+
 				"Usage: helm uninstall RELEASE_NAME [...] [flags]"),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
 				mcp.Description("The name of the release"),
 				mcp.Required(),
@@ -190,8 +176,6 @@ func (s *Server) initHelm() []server.ServerTool {
 				"argument can be either: a chart reference('example/mariadb'), a path to a chart directory, "+
 				"a packaged chart, or a fully qualified URL. For chart references, the latest "+
 				"version will be specified unless the '--version' flag is set."),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("name",
 				mcp.Description("The name of the release"),
 				mcp.Required(),
