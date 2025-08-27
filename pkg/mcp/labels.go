@@ -18,8 +18,6 @@ func (s *Server) initLabels() []server.ServerTool {
 		{Tool: mcp.NewTool("label_resource",
 			mcp.WithDescription("Apply labels to a Kubernetes resource\n"+
 				commonApiVersion),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -44,8 +42,6 @@ func (s *Server) initLabels() []server.ServerTool {
 		{Tool: mcp.NewTool("remove_label",
 			mcp.WithDescription("Remove a label from a Kubernetes resource\n"+
 				commonApiVersion),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -70,8 +66,6 @@ func (s *Server) initLabels() []server.ServerTool {
 		{Tool: mcp.NewTool("annotate_resource",
 			mcp.WithDescription("Apply annotations to a Kubernetes resource\n"+
 				commonApiVersion),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),
@@ -96,8 +90,6 @@ func (s *Server) initLabels() []server.ServerTool {
 		{Tool: mcp.NewTool("remove_annotation",
 			mcp.WithDescription("Remove an annotation from a Kubernetes resource\n"+
 				commonApiVersion),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 			mcp.WithString("apiVersion",
 				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 				mcp.Required(),

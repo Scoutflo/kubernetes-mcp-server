@@ -15,14 +15,10 @@ func (s *Server) initNodes() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("nodes_list",
 			mcp.WithDescription("List all Kubernetes nodes in the current cluster"),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.nodesList},
 		{Tool: mcp.NewTool("nodes_get",
 			mcp.WithDescription("Get detailed information about a specific Kubernetes node"),
 			mcp.WithString("name", mcp.Description("Name of the node"), mcp.Required()),
-			mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-			mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 		), Handler: s.nodesGet},
 	}
 }

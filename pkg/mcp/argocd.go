@@ -19,8 +19,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_list_applications",
 				mcp.WithDescription("List applications in ArgoCD with filtering options"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("project",
 					mcp.Description("Filter applications by project name (optional)"),
 				),
@@ -39,8 +37,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_application",
 				mcp.WithDescription("Get detailed information about a specific ArgoCD application"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the application"),
 					mcp.Required(),
@@ -57,8 +53,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_application_events",
 				mcp.WithDescription("Returns events for an application"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -69,8 +63,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_sync_application",
 				mcp.WithDescription("Sync an ArgoCD application to its desired state"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("Name of the application"),
 					mcp.Required(),
@@ -90,8 +82,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_create_application",
 				mcp.WithDescription("Create a new application in ArgoCD"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -140,8 +130,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_update_application",
 				mcp.WithDescription("Update an existing application in ArgoCD"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The application name to update"),
 					mcp.Required(),
@@ -182,8 +170,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_delete_application",
 				mcp.WithDescription("Delete an application from ArgoCD"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application to delete"),
 					mcp.Required(),
@@ -200,8 +186,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_application_resource_tree",
 				mcp.WithDescription("Returns resource tree for application by application name"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -212,8 +196,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_application_managed_resources",
 				mcp.WithDescription("Returns managed resources for application by application name"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -224,8 +206,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_application_workload_logs",
 				mcp.WithDescription("Returns logs for application workload (Deployment, StatefulSet, Pod, etc.) by application name and resource details"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -246,8 +226,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_resource_events",
 				mcp.WithDescription("Returns events for a resource that is managed by an application"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -262,8 +240,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_get_resource_actions",
 				mcp.WithDescription("Returns actions for a resource that is managed by an application"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
@@ -278,8 +254,6 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: mcp.NewTool("argocd_run_resource_action",
 				mcp.WithDescription("Runs an action on a resource"),
-				mcp.WithString("k8surl", mcp.Description("Kubernetes API server URL"), mcp.Required()),
-				mcp.WithString("k8stoken", mcp.Description("Kubernetes API server authentication token"), mcp.Required()),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
