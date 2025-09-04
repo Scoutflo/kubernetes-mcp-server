@@ -991,13 +991,10 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 	}
 
 	// Extract group_limit parameter (number) using GetFloat
-	groupLimit := ""
-	if limitVal := ctr.GetFloat("group_limit", 0); limitVal > 0 {
-		groupLimit = fmt.Sprintf("%d", int(limitVal))
-	}
+	groupLimit := int(ctr.GetFloat("group_limit", 0))
 
 	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: prometheus_get_rules - rule_names_count=%d, rule_groups_count=%d, files_count=%d, exclude_alerts=%t, match_labels_count=%d, group_limit=%s - got called by session id: %s",
+	klog.V(1).Infof("Tool: prometheus_get_rules - rule_names_count=%d, rule_groups_count=%d, files_count=%d, exclude_alerts=%t, match_labels_count=%d, group_limit=%d - got called by session id: %s",
 		len(ruleNames), len(ruleGroups), len(files), excludeAlerts, len(matchLabels), groupLimit, sessionID)
 
 	// Call the Kubernetes function
