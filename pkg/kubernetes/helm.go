@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 )
 
 // AddRepository adds a Helm chart repository via API call
@@ -216,8 +217,13 @@ type InstallOptions struct {
 	Namespace string
 	Set       []string
 	Values    []string
+	ValuesMap map[string]interface{}
 	RepoURL   string
+	RepoName  string
 	Version   string
+	CreateNS  bool
+	Wait      bool
+	Timeout   string
 }
 
 // InstallRelease installs a Helm chart via API call
@@ -230,16 +236,40 @@ func (k *Kubernetes) InstallRelease(ctx context.Context, name, chart string, opt
 	}
 
 	if opts.RepoURL != "" {
-		requestPayload["repoURL"] = opts.RepoURL
+		requestPayload["repoUrl"] = opts.RepoURL 
+	}
+	if opts.RepoName != "" {
+		requestPayload["repoName"] = opts.RepoName
 	}
 	if opts.Version != "" {
-		requestPayload["version"] = opts.Version
+		requestPayload["chartVersion"] = opts.Version 
 	}
-	if len(opts.Set) > 0 {
-		requestPayload["set"] = opts.Set
+	if opts.CreateNS {
+		requestPayload["createNamespace"] = opts.CreateNS
 	}
-	if len(opts.Values) > 0 {
-		requestPayload["values"] = opts.Values
+	if opts.Wait {
+		requestPayload["wait"] = opts.Wait
+	}
+	if opts.Timeout != "" {
+		requestPayload["timeout"] = opts.Timeout
+	}
+
+	// Handle values - prefer ValuesMap over Values files
+	if opts.ValuesMap != nil && len(opts.ValuesMap) > 0 {
+		requestPayload["values"] = opts.ValuesMap
+	} else if len(opts.Values) > 0 {
+		// Convert set values to a map for the API
+		valuesMap := make(map[string]interface{})
+		for _, setValue := range opts.Set {
+			// Parse key=value format
+			parts := strings.SplitN(setValue, "=", 2)
+			if len(parts) == 2 {
+				valuesMap[parts[0]] = parts[1]
+			}
+		}
+		if len(valuesMap) > 0 {
+			requestPayload["values"] = valuesMap
+		}
 	}
 
 	// Make API call to K8s Dashboard
