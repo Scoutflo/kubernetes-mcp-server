@@ -236,13 +236,13 @@ func (k *Kubernetes) InstallRelease(ctx context.Context, name, chart string, opt
 	}
 
 	if opts.RepoURL != "" {
-		requestPayload["repoUrl"] = opts.RepoURL // Fixed: was "repoURL", should be "repoUrl"
+		requestPayload["repoUrl"] = opts.RepoURL 
 	}
 	if opts.RepoName != "" {
 		requestPayload["repoName"] = opts.RepoName
 	}
 	if opts.Version != "" {
-		requestPayload["chartVersion"] = opts.Version // Fixed: was "version", should be "chartVersion"
+		requestPayload["chartVersion"] = opts.Version 
 	}
 	if opts.CreateNS {
 		requestPayload["createNamespace"] = opts.CreateNS
