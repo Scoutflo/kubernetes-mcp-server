@@ -28,9 +28,10 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		{Tool: mcp.NewTool("prometheus_metrics_query_range",
 			mcp.WithDescription("Obtain historical metric data using range queries to analyze trends and performance patterns"),
 			mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
-			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format"), mcp.Required()),
-			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format"), mcp.Required()),
-			mcp.WithString("step", mcp.Description("Query resolution step width (e.g., '15s', '1m', '1h')"), mcp.Required()),
+			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format")),
+			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format")),
+			mcp.WithString("step", mcp.Description("Query resolution step width (e.g., '15s', '1m', '1h')")),
+			mcp.WithString("range", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start/end")),
 			mcp.WithString("timeout", mcp.Description("Evaluation timeout (optional)")),
 		), Handler: s.prometheusMetricsRange},
 		{Tool: mcp.NewTool("prometheus_list_metrics",
@@ -248,11 +249,12 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 	startArg := ctr.GetString("start", "")
 	endArg := ctr.GetString("end", "")
 	stepArg := ctr.GetString("step", "")
+	rangeArg := ctr.GetString("range", "")
 	timeout := ctr.GetString("timeout", "")
 
 	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool call: prometheus_metrics_query_range - query=%s, start=%s, end=%s, step=%s, timeout=%s - got called by session id: %s",
-		queryArg, startArg, endArg, stepArg, timeout, sessionID)
+	klog.V(1).Infof("Tool call: prometheus_metrics_query_range - query=%s, start=%s, end=%s, step=%s, range=%s, timeout=%s - got called by session id: %s",
+		queryArg, startArg, endArg, stepArg, rangeArg, timeout, sessionID)
 
 	// Validate required parameters
 	if queryArg == "" {
@@ -260,20 +262,97 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: query by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: query")), nil
 	}
+
+	// using range parameter as alternative to start/end/step
+	if rangeArg != "" {
+		// Parse range duration
+		rangeDuration, err := time.ParseDuration(rangeArg)
+		if err != nil {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid range format: %s by session id: %s", duration, rangeArg, sessionID)
+			return NewTextResult("", fmt.Errorf("invalid range format '%s': %v", rangeArg, err)), nil
+		}
+
+		// Set default values based on range
+		endTime := time.Now()
+		startTime := endTime.Add(-rangeDuration)
+
+		// Auto-determine step based on range duration
+		step := "1m" // default
+		if rangeDuration <= time.Hour {
+			step = "30s"
+		} else if rangeDuration <= 24*time.Hour {
+			step = "5m"
+		} else if rangeDuration <= 7*24*time.Hour {
+			step = "1h"
+		} else {
+			step = "6h"
+		}
+
+		// Override with provided values if specified
+		if startArg != "" {
+			startTime = parseTime(startArg, startTime)
+			if startTime.IsZero() {
+				duration := time.Since(start)
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid start time format: %s by session id: %s", duration, startArg, sessionID)
+				return NewTextResult("", errors.New("invalid start time format")), nil
+			}
+		}
+		if endArg != "" {
+			endTime = parseTime(endArg, endTime)
+			if endTime.IsZero() {
+				duration := time.Since(start)
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid end time format: %s by session id: %s", duration, endArg, sessionID)
+				return NewTextResult("", errors.New("invalid end time format")), nil
+			}
+		}
+		if stepArg != "" {
+			step = stepArg
+		}
+
+		ret, err := k.QueryPrometheusRange(queryArg, startTime, endTime, step, timeout)
+		if err != nil {
+			duration := time.Since(start)
+			errMsg := err.Error()
+			if strings.Contains(errMsg, "unknown by name") || strings.Contains(errMsg, "metrics not found") {
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: metric not found: %s by session id: %s", duration, queryArg, sessionID)
+				return NewTextResult("", fmt.Errorf("ERROR: Metric not found. The specified metric '%s' does not exist in Prometheus. Please check the metric name and ensure it's correctly spelled.", queryArg)), nil
+			} else if strings.Contains(errMsg, "parse error") {
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid PromQL syntax: %s by session id: %s", duration, queryArg, sessionID)
+				return NewTextResult("", fmt.Errorf("ERROR: Invalid PromQL query syntax in '%s'. Please check your query format.", queryArg)), nil
+			} else if strings.Contains(errMsg, "failed to discover Prometheus") {
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: cannot connect to Prometheus server by session id: %s", duration, sessionID)
+				return NewTextResult("", fmt.Errorf("ERROR: Cannot connect to Prometheus server. The server may be unavailable or misconfigured.")), nil
+			}
+			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: %v by session id: %s", duration, err, sessionID)
+			return NewTextResult("", fmt.Errorf("ERROR: Failed to execute Prometheus range query: %v", err)), nil
+		}
+
+		// Check if the response contains an ERROR_TYPE that indicates a conclusive empty result
+		if strings.Contains(ret, "ERROR_TYPE") && (strings.Contains(ret, "NO_DATA_POINTS") || strings.Contains(ret, "NO_MATCHING_SERIES") || strings.Contains(ret, "METRIC_NOT_FOUND")) {
+			ret = "IMPORTANT - CONCLUSIVE RESULT: " + ret
+		}
+
+		duration := time.Since(start)
+		klog.V(1).Infof("Tool call: prometheus_metrics_query_range completed successfully in %v by session id: %s", duration, sessionID)
+		return NewTextResult(ret, nil), nil
+	}
+
+	// validation for start/end/step when range is not provided
 	if startArg == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: start by session id: %s", duration, sessionID)
-		return NewTextResult("", errors.New("missing required parameter: start")), nil
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: start (or use range parameter) by session id: %s", duration, sessionID)
+		return NewTextResult("", errors.New("missing required parameter: start (or use range parameter)")), nil
 	}
 	if endArg == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: end by session id: %s", duration, sessionID)
-		return NewTextResult("", errors.New("missing required parameter: end")), nil
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: end (or use range parameter) by session id: %s", duration, sessionID)
+		return NewTextResult("", errors.New("missing required parameter: end (or use range parameter)")), nil
 	}
 	if stepArg == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: step by session id: %s", duration, sessionID)
-		return NewTextResult("", errors.New("missing required parameter: step")), nil
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: step (or use range parameter) by session id: %s", duration, sessionID)
+		return NewTextResult("", errors.New("missing required parameter: step (or use range parameter)")), nil
 	}
 
 	// Parse query
