@@ -16,33 +16,34 @@ import (
 func (s *Server) initPrometheus() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("prometheus_generate_query",
-			mcp.WithDescription("Tool for generating a PromQL query from a natural language description. Use this tool when you need to create a PromQL expression based on a natural language description of the metric you want to query."),
+			mcp.WithDescription("Convert natural language descriptions into valid PromQL queries for efficient metric investigation"),
 			mcp.WithString("description", mcp.Description("Natural language description of the metric you want to query"), mcp.Required()),
 		), Handler: s.prometheusGenerateQuery},
 		{Tool: mcp.NewTool("prometheus_metrics_query",
-			mcp.WithDescription("Tool for executing instant Prometheus queries. Executes instant queries against Prometheus to retrieve current metric values. Use this tool when you need to get the latest values of metrics or perform calculations on current data. The query must be a valid PromQL expression."),
+			mcp.WithDescription("Retrieve current metric values through instant queries to monitor real-time system performance"),
 			mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
 			mcp.WithString("time", mcp.Description("Evaluation timestamp in RFC3339 or unix timestamp format (optional)")),
 			mcp.WithString("timeout", mcp.Description("Evaluation timeout (optional)")),
 		), Handler: s.prometheusMetrics},
 		{Tool: mcp.NewTool("prometheus_metrics_query_range",
-			mcp.WithDescription("Tool for executing range queries in Prometheus. Executes time series queries over a specified time range in Prometheus. Use this tool for analyzing metric patterns, trends, and historical data. You can specify the time range, resolution (step), and timeout for the query."),
+			mcp.WithDescription("Obtain historical metric data using range queries to analyze trends and performance patterns"),
 			mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
-			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format"), mcp.Required()),
-			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format"), mcp.Required()),
-			mcp.WithString("step", mcp.Description("Query resolution step width (e.g., '15s', '1m', '1h')"), mcp.Required()),
+			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format")),
+			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format")),
+			mcp.WithString("step", mcp.Description("Query resolution step width (e.g., '15s', '1m', '1h')")),
+			mcp.WithString("range", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start/end")),
 			mcp.WithString("timeout", mcp.Description("Evaluation timeout (optional)")),
 		), Handler: s.prometheusMetricsRange},
 		{Tool: mcp.NewTool("prometheus_list_metrics",
-			mcp.WithDescription("Tool for listing all available Prometheus metrics with their metadata. Use this tool to discover all metrics available in Prometheus and their associated information."),
+			mcp.WithDescription("List all available metric names to verify monitoring coverage and discoverability"),
 		), Handler: s.prometheusListMetrics},
 		{Tool: mcp.NewTool("prometheus_metric_info",
-			mcp.WithDescription("Tool for getting detailed information about a specific Prometheus metric. Use this tool to discover more about a particular metric and its associated statistics. You can include count, min, max, and avg statistics for the metric if needed."),
+			mcp.WithDescription("Retrieve metadata and statistics for specific metrics to understand their characteristics"),
 			mcp.WithString("metric", mcp.Description("Name of the metric to get information about"), mcp.Required()),
 			mcp.WithBoolean("include_statistics", mcp.Description("Include count, min, max, and avg statistics for this metric. May be slower for metrics with many time series.")),
 		), Handler: s.prometheusMetricInfo},
 		{Tool: mcp.NewTool("prometheus_series_query",
-			mcp.WithDescription("Tool for querying Prometheus series. Finds time series that match certain label selectors in Prometheus. Use this tool to discover which metrics exist and their label combinations. You can specify time ranges to limit the search scope and set a maximum number of results."),
+			mcp.WithDescription("Find time series matching label selectors to isolate relevant metrics for analysis"),
 			mcp.WithArray("match", mcp.Description("Series selector arguments"),
 				func(schema map[string]interface{}) {
 					schema["type"] = "array"
@@ -56,18 +57,18 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			mcp.WithNumber("limit", mcp.Description("Maximum number of returned items (optional)")),
 		), Handler: s.prometheusSeries},
 		{Tool: mcp.NewTool("prometheus_targets",
-			mcp.WithDescription("Tool for getting Prometheus target discovery state. Provides information about all Prometheus scrape targets and their current state. Use this tool to monitor which targets are being scraped successfully and which are failing. You can filter targets by state (active/dropped) and scrape pool."),
+			mcp.WithDescription("List active scrape targets with health status to verify data collection integrity"),
 			mcp.WithString("state", mcp.Description("Target state filter, must be one of: active, dropped, any (optional)")),
 			mcp.WithString("scrape_pool", mcp.Description("Scrape pool name (optional)")),
 		), Handler: s.prometheusTargets},
 		{Tool: mcp.NewTool("prometheus_targets_metadata",
-			mcp.WithDescription("Tool for getting Prometheus target metadata. Retrieves metadata about metrics exposed by specific Prometheus targets. Use this tool to understand metric types, help texts, and units. You can filter by target labels and specific metric names."),
+			mcp.WithDescription("Retrieve metric metadata from specific targets to validate exposure consistency"),
 			mcp.WithString("match_target", mcp.Description("Target label selectors (optional)")),
 			mcp.WithString("metric", mcp.Description("Metric name (optional)")),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of targets (optional)")),
 		), Handler: s.prometheusTargetMetadata},
 		{Tool: mcp.NewTool("prometheus_list_label_names",
-			mcp.WithDescription("List label names in a Prometheus datasource. Allows filtering by series selectors and time range."),
+			mcp.WithDescription("List all label names across metrics to understand dimensional structure"),
 			mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the time range to filter the results by")),
 			mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the time range to filter the results by")),
 			mcp.WithNumber("limit", mcp.Description("Optionally, the maximum number of results to return")),
@@ -81,7 +82,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			),
 		), Handler: s.prometheusListLabelNames},
 		{Tool: mcp.NewTool("prometheus_list_label_values",
-			mcp.WithDescription("Get the values for a specific label name in Prometheus. Allows filtering by series selectors and time range."),
+			mcp.WithDescription("List values for specific labels to identify monitored instances and dimensions"),
 			mcp.WithString("labelName", mcp.Description("The name of the label to query"), mcp.Required()),
 			mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the query")),
 			mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the query")),
@@ -96,10 +97,10 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			),
 		), Handler: s.prometheusListLabelValues},
 		{Tool: mcp.NewTool("prometheus_get_alerts",
-			mcp.WithDescription("Tool for getting active Prometheus alerts. Retrieves all currently firing alerts in the Prometheus server. Use this tool to monitor the current alert state and identify ongoing issues. Returns details about alert names, labels, and when they started firing."),
+			mcp.WithDescription("List currently firing alerts to identify active issues requiring attention"),
 		), Handler: s.prometheusGetAlerts},
 		{Tool: mcp.NewTool("prometheus_get_rules",
-			mcp.WithDescription("Tool for getting Prometheus alerting and recording rules. Retrieves information about configured alerting and recording rules in Prometheus. Use this tool to understand what alerts are defined and what metrics are being pre-computed. You can filter rules by type, name, group, and other criteria."),
+			mcp.WithDescription("Retrieve configured alerting and recording rules to verify their definitions"),
 			mcp.WithArray("rule_name", mcp.Description("Rule names filter"),
 				func(schema map[string]interface{}) {
 					schema["type"] = "array"
@@ -136,7 +137,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			mcp.WithNumber("group_limit", mcp.Description("Group limit")),
 		), Handler: s.prometheusGetRules},
 		{Tool: mcp.NewTool("prometheus_create_alert",
-			mcp.WithDescription("Tool for creating a new Prometheus alert rule. This tool allows you to define alerting rules that will trigger notifications when specific conditions are met. You can customize the alert with annotations, labels, and evaluation intervals."),
+			mcp.WithDescription("Define new alert rules to monitor specific metric conditions and thresholds"),
 			mcp.WithString("alertname", mcp.Description("Name of the alert to create"), mcp.Required()),
 			mcp.WithString("expression", mcp.Description("PromQL expression that defines the alert condition, If not provided, please generate a query using prometheus_generate_query tool"), mcp.Required()),
 			mcp.WithString("applabel", mcp.Description("Application label used to identify the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
@@ -147,7 +148,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			mcp.WithObject("alertlabels", mcp.Description("Map of labels to attach to the alert")),
 		), Handler: s.prometheusCreateAlert},
 		{Tool: mcp.NewTool("prometheus_update_alert",
-			mcp.WithDescription("Tool for updating an existing Prometheus alert rule. This tool allows you to modify the properties of an existing alert without having to delete and recreate it. You can update the condition, annotations, labels, and other attributes."),
+			mcp.WithDescription("Modify existing alert rules to refine conditions, thresholds, or notification settings"),
 			mcp.WithString("alertname", mcp.Description("Name of the alert to update"), mcp.Required()),
 			mcp.WithString("applabel", mcp.Description("Application label that identifies the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
 			mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert"), mcp.Required()),
@@ -158,16 +159,16 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			mcp.WithObject("alertlabels", mcp.Description("New or updated labels for the alert")),
 		), Handler: s.prometheusUpdateAlert},
 		{Tool: mcp.NewTool("prometheus_delete_alert",
-			mcp.WithDescription("Tool for deleting a Prometheus alert rule. This tool removes an existing alert rule from the system. You can either delete a specific alert within a rule group or the entire PrometheusRule resource."),
+			mcp.WithDescription("Remove alert rules to deactivate notifications and simplify monitoring"),
 			mcp.WithString("applabel", mcp.Description("Application label that identifies the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
 			mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert"), mcp.Required()),
 			mcp.WithString("alertname", mcp.Description("Name of the specific alert to delete within the rule group (optional)")),
 		), Handler: s.prometheusDeleteAlert},
 		{Tool: mcp.NewTool("prometheus_runtimeinfo",
-			mcp.WithDescription("Tool for getting Prometheus runtime information. Provides detailed information about the Prometheus server's runtime state. Use this tool to monitor server health and performance through details about garbage collection, memory usage, and other runtime metrics."),
+			mcp.WithDescription("Retrieve server performance metrics to monitor Prometheus instance health"),
 		), Handler: s.prometheusRuntimeInfo},
 		{Tool: mcp.NewTool("prometheus_TSDB_status",
-			mcp.WithDescription("Tool for getting Prometheus TSDB status. Provides information about the time series database (TSDB) status in Prometheus. Use this tool to monitor database health through details about data storage, head blocks, WAL status, and other TSDB metrics."),
+			mcp.WithDescription("Obtain database status information to verify storage integrity and performance"),
 			mcp.WithNumber("limit", mcp.Description("Number of items limit")),
 		), Handler: s.prometheusTSDBStatus},
 	}
@@ -248,11 +249,12 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 	startArg := ctr.GetString("start", "")
 	endArg := ctr.GetString("end", "")
 	stepArg := ctr.GetString("step", "")
+	rangeArg := ctr.GetString("range", "")
 	timeout := ctr.GetString("timeout", "")
 
 	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool call: prometheus_metrics_query_range - query=%s, start=%s, end=%s, step=%s, timeout=%s - got called by session id: %s",
-		queryArg, startArg, endArg, stepArg, timeout, sessionID)
+	klog.V(1).Infof("Tool call: prometheus_metrics_query_range - query=%s, start=%s, end=%s, step=%s, range=%s, timeout=%s - got called by session id: %s",
+		queryArg, startArg, endArg, stepArg, rangeArg, timeout, sessionID)
 
 	// Validate required parameters
 	if queryArg == "" {
@@ -260,20 +262,97 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: query by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: query")), nil
 	}
+
+	// using range parameter as alternative to start/end/step
+	if rangeArg != "" {
+		// Parse range duration
+		rangeDuration, err := time.ParseDuration(rangeArg)
+		if err != nil {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid range format: %s by session id: %s", duration, rangeArg, sessionID)
+			return NewTextResult("", fmt.Errorf("invalid range format '%s': %v", rangeArg, err)), nil
+		}
+
+		// Set default values based on range
+		endTime := time.Now()
+		startTime := endTime.Add(-rangeDuration)
+
+		// Auto-determine step based on range duration
+		step := "1m" // default
+		if rangeDuration <= time.Hour {
+			step = "30s"
+		} else if rangeDuration <= 24*time.Hour {
+			step = "5m"
+		} else if rangeDuration <= 7*24*time.Hour {
+			step = "1h"
+		} else {
+			step = "6h"
+		}
+
+		// Override with provided values if specified
+		if startArg != "" {
+			startTime = parseTime(startArg, startTime)
+			if startTime.IsZero() {
+				duration := time.Since(start)
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid start time format: %s by session id: %s", duration, startArg, sessionID)
+				return NewTextResult("", errors.New("invalid start time format")), nil
+			}
+		}
+		if endArg != "" {
+			endTime = parseTime(endArg, endTime)
+			if endTime.IsZero() {
+				duration := time.Since(start)
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid end time format: %s by session id: %s", duration, endArg, sessionID)
+				return NewTextResult("", errors.New("invalid end time format")), nil
+			}
+		}
+		if stepArg != "" {
+			step = stepArg
+		}
+
+		ret, err := k.QueryPrometheusRange(queryArg, startTime, endTime, step, timeout)
+		if err != nil {
+			duration := time.Since(start)
+			errMsg := err.Error()
+			if strings.Contains(errMsg, "unknown by name") || strings.Contains(errMsg, "metrics not found") {
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: metric not found: %s by session id: %s", duration, queryArg, sessionID)
+				return NewTextResult("", fmt.Errorf("ERROR: Metric not found. The specified metric '%s' does not exist in Prometheus. Please check the metric name and ensure it's correctly spelled.", queryArg)), nil
+			} else if strings.Contains(errMsg, "parse error") {
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid PromQL syntax: %s by session id: %s", duration, queryArg, sessionID)
+				return NewTextResult("", fmt.Errorf("ERROR: Invalid PromQL query syntax in '%s'. Please check your query format.", queryArg)), nil
+			} else if strings.Contains(errMsg, "failed to discover Prometheus") {
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: cannot connect to Prometheus server by session id: %s", duration, sessionID)
+				return NewTextResult("", fmt.Errorf("ERROR: Cannot connect to Prometheus server. The server may be unavailable or misconfigured.")), nil
+			}
+			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: %v by session id: %s", duration, err, sessionID)
+			return NewTextResult("", fmt.Errorf("ERROR: Failed to execute Prometheus range query: %v", err)), nil
+		}
+
+		// Check if the response contains an ERROR_TYPE that indicates a conclusive empty result
+		if strings.Contains(ret, "ERROR_TYPE") && (strings.Contains(ret, "NO_DATA_POINTS") || strings.Contains(ret, "NO_MATCHING_SERIES") || strings.Contains(ret, "METRIC_NOT_FOUND")) {
+			ret = "IMPORTANT - CONCLUSIVE RESULT: " + ret
+		}
+
+		duration := time.Since(start)
+		klog.V(1).Infof("Tool call: prometheus_metrics_query_range completed successfully in %v by session id: %s", duration, sessionID)
+		return NewTextResult(ret, nil), nil
+	}
+
+	// validation for start/end/step when range is not provided
 	if startArg == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: start by session id: %s", duration, sessionID)
-		return NewTextResult("", errors.New("missing required parameter: start")), nil
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: start (or use range parameter) by session id: %s", duration, sessionID)
+		return NewTextResult("", errors.New("missing required parameter: start (or use range parameter)")), nil
 	}
 	if endArg == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: end by session id: %s", duration, sessionID)
-		return NewTextResult("", errors.New("missing required parameter: end")), nil
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: end (or use range parameter) by session id: %s", duration, sessionID)
+		return NewTextResult("", errors.New("missing required parameter: end (or use range parameter)")), nil
 	}
 	if stepArg == "" {
 		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: step by session id: %s", duration, sessionID)
-		return NewTextResult("", errors.New("missing required parameter: step")), nil
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: step (or use range parameter) by session id: %s", duration, sessionID)
+		return NewTextResult("", errors.New("missing required parameter: step (or use range parameter)")), nil
 	}
 
 	// Parse query
@@ -991,13 +1070,10 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 	}
 
 	// Extract group_limit parameter (number) using GetFloat
-	groupLimit := ""
-	if limitVal := ctr.GetFloat("group_limit", 0); limitVal > 0 {
-		groupLimit = fmt.Sprintf("%d", int(limitVal))
-	}
+	groupLimit := int(ctr.GetFloat("group_limit", 0))
 
 	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: prometheus_get_rules - rule_names_count=%d, rule_groups_count=%d, files_count=%d, exclude_alerts=%t, match_labels_count=%d, group_limit=%s - got called by session id: %s",
+	klog.V(1).Infof("Tool: prometheus_get_rules - rule_names_count=%d, rule_groups_count=%d, files_count=%d, exclude_alerts=%t, match_labels_count=%d, group_limit=%d - got called by session id: %s",
 		len(ruleNames), len(ruleGroups), len(files), excludeAlerts, len(matchLabels), groupLimit, sessionID)
 
 	// Call the Kubernetes function

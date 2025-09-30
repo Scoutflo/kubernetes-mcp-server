@@ -16,7 +16,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 	return []server.ServerTool{
 		{
 			Tool: mcp.NewTool("create_argo_rollout_config",
-				mcp.WithDescription("Generate a YAML configuration for Argo Rollouts with specified deployment strategy"),
+				mcp.WithDescription("Generate rollout configuration manifests with progressive delivery strategies for controlled deployments"),
 				// Required parameters
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout"),
@@ -98,7 +98,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("promote_argo_rollout",
-				mcp.WithDescription("Promote an Argo Rollout to advance it to the next step"),
+				mcp.WithDescription("Advance rollout progression to subsequent stages after verifying current phase stability"),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout to promote"),
 					mcp.Required(),
@@ -115,7 +115,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("abort_argo_rollout",
-				mcp.WithDescription("Abort an in-progress Argo Rollout and revert to the stable version"),
+				mcp.WithDescription("Terminate active rollouts and revert to previous stable versions upon detecting issues"),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout to abort"),
 					mcp.Required(),
@@ -129,7 +129,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("get_argo_rollout",
-				mcp.WithDescription("Get the status of an Argo Rollout"),
+				mcp.WithDescription("Retrieve rollout status including current phase, progress metrics, and verification results"),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout"),
 					mcp.Required(),
@@ -146,7 +146,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("set_argo_rollout_weight",
-				mcp.WithDescription("Set the canary weight for an Argo Rollout"),
+				mcp.WithDescription("Adjust traffic distribution percentages between canary and stable deployment versions"),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout"),
 					mcp.Required(),
@@ -164,7 +164,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("pause_argo_rollout",
-				mcp.WithDescription("Pause an Argo Rollout to temporarily halt progression"),
+				mcp.WithDescription("Temporarily suspend rollout progression for configuration verification or manual checks"),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout to pause"),
 					mcp.Required(),
@@ -178,7 +178,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("set_argo_rollout_image",
-				mcp.WithDescription("Set the image for a container in an Argo Rollouts deployment"),
+				mcp.WithDescription("Update container image versions within rollouts to deploy new application releases"),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout"),
 					mcp.Required(),

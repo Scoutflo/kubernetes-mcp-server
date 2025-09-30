@@ -207,7 +207,7 @@ func (k *Kubernetes) GetPrometheusAlerts() (string, error) {
 }
 
 // GetPrometheusRules retrieves information about configured alerting and recording rules
-func (k *Kubernetes) GetPrometheusRules(groupLimit string, ruleNames, ruleGroups, files []string, excludeAlerts bool, matchLabels []string) (string, error) {
+func (k *Kubernetes) GetPrometheusRules(groupLimit int, ruleNames, ruleGroups, files []string, excludeAlerts bool, matchLabels []string) (string, error) {
 	// Build request body for POST request
 	reqBody := map[string]interface{}{}
 
@@ -232,8 +232,8 @@ func (k *Kubernetes) GetPrometheusRules(groupLimit string, ruleNames, ruleGroups
 	}
 
 	// Add group limit if provided
-	if groupLimit != "" {
-		reqBody["group_limit"] = groupLimit
+	if groupLimit > 0 {
+		reqBody["group_limit"] = groupLimit // Send as integer
 	}
 
 	// Make API request to K8s Dashboard
