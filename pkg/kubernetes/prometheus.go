@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
-	"strconv"	
 
 	"github.com/scoutflo/kubernetes-mcp-server/pkg/llm"
 )
@@ -208,7 +207,7 @@ func (k *Kubernetes) GetPrometheusAlerts() (string, error) {
 }
 
 // GetPrometheusRules retrieves information about configured alerting and recording rules
-func (k *Kubernetes) GetPrometheusRules(groupLimit string, ruleNames, ruleGroups, files []string, excludeAlerts bool, matchLabels []string) (string, error) {
+func (k *Kubernetes) GetPrometheusRules(groupLimit int, ruleNames, ruleGroups, files []string, excludeAlerts bool, matchLabels []string) (string, error) {
 	// Build request body for POST request
 	reqBody := map[string]interface{}{}
 
@@ -233,10 +232,8 @@ func (k *Kubernetes) GetPrometheusRules(groupLimit string, ruleNames, ruleGroups
 	}
 
 	// Add group limit if provided
-	if groupLimit != "" {
-		if groupLimitInt, err := strconv.Atoi(groupLimit); err == nil && groupLimitInt > 0 {
-			reqBody["group_limit"] = groupLimitInt // Send as integer, not string
-		}
+	if groupLimit > 0 {
+		reqBody["group_limit"] = groupLimit // Send as integer
 	}
 
 	// Make API request to K8s Dashboard
