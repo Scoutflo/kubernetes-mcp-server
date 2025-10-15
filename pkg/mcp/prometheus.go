@@ -785,22 +785,62 @@ func (s *Server) prometheusCreateAlert(ctx context.Context, ctr mcp.CallToolRequ
 		return NewTextResult("", errors.New("missing required parameter: namespace")), nil
 	}
 
-	// Extract optional parameters with defaults
+	// Validate alert name format
+	if !isValidAlertName(alertName) {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_create_alert failed after %v: invalid alertname format: %s by session id: %s", duration, alertName, sessionID)
+		return NewTextResult("", fmt.Errorf("invalid alert name '%s': alert names can only contain letters, numbers, hyphens, underscores, and dots", alertName)), nil
+	}
+
+	// Validate alert name length
+	if len(alertName) > 253 {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_create_alert failed after %v: alertname too long: %d characters by session id: %s", duration, len(alertName), sessionID)
+		return NewTextResult("", fmt.Errorf("alert name '%s' is too long (%d characters): maximum allowed is 253 characters", alertName, len(alertName))), nil
+	}
+
+	// Validate expression is not empty or whitespace
+	expression = strings.TrimSpace(expression)
+	if expression == "" {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_create_alert failed after %v: empty expression provided by session id: %s", duration, sessionID)
+		return NewTextResult("", errors.New("expression cannot be empty or whitespace only")), nil
+	}
+
+	// Extract optional parameters with defaults and validation
 	if interval == "" {
 		interval = "1m" // Default to 1 minute
+	} else {
+		if !isValidDuration(interval) {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_create_alert failed after %v: invalid interval format: %s by session id: %s", duration, interval, sessionID)
+			return NewTextResult("", fmt.Errorf("invalid interval '%s': must be a valid duration (e.g., '30s', '1m', '5m')", interval)), nil
+		}
 	}
 
 	if forDuration == "" {
 		forDuration = "5m" // Default to 5 minutes
+	} else {
+		if !isValidDuration(forDuration) {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_create_alert failed after %v: invalid for duration format: %s by session id: %s", duration, forDuration, sessionID)
+			return NewTextResult("", fmt.Errorf("invalid for duration '%s': must be a valid duration (e.g., '5m', '10m', '1h')", forDuration)), nil
+		}
 	}
 
-	// Convert annotations from interface{} to map[string]string using new API
+	// Convert annotations from interface{} to map[string]string using new API with validation
 	var annotations map[string]string
 	if argsMap, ok := args.(map[string]interface{}); ok {
 		if annotationsRaw, exists := argsMap["annotations"]; exists && annotationsRaw != nil {
 			annotations = make(map[string]string)
 			if annotationsMap, ok := annotationsRaw.(map[string]interface{}); ok {
 				for k, v := range annotationsMap {
+					// Validate annotation key format
+					if !isValidLabelKey(k) {
+						duration := time.Since(start)
+						klog.Errorf("Tool call: prometheus_create_alert failed after %v: invalid annotation key format: %s by session id: %s", duration, k, sessionID)
+						return NewTextResult("", fmt.Errorf("invalid annotation key '%s': keys must start and end with alphanumeric characters and can only contain letters, numbers, hyphens, underscores, and dots (max 63 chars)", k)), nil
+					}
 					if str, ok := v.(string); ok {
 						annotations[k] = str
 					}
@@ -808,12 +848,18 @@ func (s *Server) prometheusCreateAlert(ctx context.Context, ctr mcp.CallToolRequ
 			}
 		}
 
-		// Convert alertlabels from interface{} to map[string]string using new API
+		// Convert alertlabels from interface{} to map[string]string using new API with validation
 		var alertLabels map[string]string
 		if alertLabelsRaw, exists := argsMap["alertlabels"]; exists && alertLabelsRaw != nil {
 			alertLabels = make(map[string]string)
 			if alertLabelsMap, ok := alertLabelsRaw.(map[string]interface{}); ok {
 				for k, v := range alertLabelsMap {
+					// Validate label key format
+					if !isValidLabelKey(k) {
+						duration := time.Since(start)
+						klog.Errorf("Tool call: prometheus_create_alert failed after %v: invalid alert label key format: %s by session id: %s", duration, k, sessionID)
+						return NewTextResult("", fmt.Errorf("invalid alert label key '%s': keys must start and end with alphanumeric characters and can only contain letters, numbers, hyphens, underscores, and dots (max 63 chars)", k)), nil
+					}
 					if str, ok := v.(string); ok {
 						alertLabels[k] = str
 					}
@@ -838,6 +884,69 @@ func (s *Server) prometheusCreateAlert(ctx context.Context, ctr mcp.CallToolRequ
 	klog.Errorf("Tool call: prometheus_create_alert failed after %v: failed to get arguments by session id: %s", duration, sessionID)
 	return NewTextResult("", errors.New("failed to get arguments")), nil
 }
+
+func isValidAlertName(name string) bool {
+	if name == "" {
+		return false
+	}
+
+	// Check if name contains only allowed characters: letters, numbers, underscores, hyphens, dots
+	for _, char := range name {
+		if !((char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '_' || char == '-' || char == '.') {
+			return false
+		}
+	}
+
+	// Alert names should not start with a number or special character
+	firstChar := rune(name[0])
+	if firstChar >= '0' && firstChar <= '9' {
+		return false
+	}
+
+	return true
+}
+
+func isValidLabelKey(key string) bool {
+	if key == "" || len(key) > 63 {
+		return false
+	}
+
+	// Must start and end with alphanumeric character
+	if len(key) > 0 {
+		first := rune(key[0])
+		last := rune(key[len(key)-1])
+		if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || (first >= '0' && first <= '9')) ||
+			!((last >= 'a' && last <= 'z') || (last >= 'A' && last <= 'Z') || (last >= '0' && last <= '9')) {
+			return false
+		}
+	}
+
+	// Can only contain alphanumeric characters, hyphens, underscores, and dots
+	for _, char := range key {
+		if !((char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '_' || char == '-' || char == '.') {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isValidDuration validates duration format (e.g., "30s", "1m", "5m", "1h")
+func isValidDuration(duration string) bool {
+	if duration == "" {
+		return false
+	}
+
+	// time.ParseDuration to validate the format
+	_, err := time.ParseDuration(duration)
+	return err == nil
+} 
 
 // Handler for updating Prometheus alerts
 func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -892,7 +1001,57 @@ func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequ
 		return NewTextResult("", errors.New("missing required parameter: namespace")), nil
 	}
 
-	// Convert annotations and alertlabels using new API
+	// Validate alert name format - allow alphanumeric, hyphens, underscores, dots
+	if !isValidAlertName(alertName) {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_update_alert failed after %v: invalid alertname format: %s by session id: %s", duration, alertName, sessionID)
+		return NewTextResult("", fmt.Errorf("invalid alert name '%s': alert names can only contain letters, numbers, hyphens, underscores, and dots", alertName)), nil
+	}
+
+	// Validate alert name length (max 253 characters, following Kubernetes label naming rules)
+	if len(alertName) > 253 {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_update_alert failed after %v: alertname too long: %d characters by session id: %s", duration, len(alertName), sessionID)
+		return NewTextResult("", fmt.Errorf("alert name '%s' is too long (%d characters): maximum allowed is 253 characters", alertName, len(alertName))), nil
+	}
+
+	// Validate that at least one updatable field is provided (not just alertname, applabel, namespace)
+	hasUpdatableField := expression != "" || interval != "" || forDuration != "" || annotationsCount > 0 || alertLabelsCount > 0
+	if !hasUpdatableField {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_update_alert failed after %v: no updatable fields provided by session id: %s", duration, sessionID)
+		return NewTextResult("", errors.New("at least one updatable field must be provided: expression, interval, for, annotations, or alertlabels")), nil
+	}
+
+	// Validate expression if provided (must not be empty)
+	if expression != "" {
+		expression = strings.TrimSpace(expression)
+		if expression == "" {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_update_alert failed after %v: empty expression provided by session id: %s", duration, sessionID)
+			return NewTextResult("", errors.New("expression cannot be empty or whitespace only")), nil
+		}
+	}
+
+	// Validate interval format if provided
+	if interval != "" {
+		if !isValidDuration(interval) {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_update_alert failed after %v: invalid interval format: %s by session id: %s", duration, interval, sessionID)
+			return NewTextResult("", fmt.Errorf("invalid interval '%s': must be a valid duration (e.g., '30s', '1m', '5m')", interval)), nil
+		}
+	}
+
+	// Validate for duration format if provided
+	if forDuration != "" {
+		if !isValidDuration(forDuration) {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_update_alert failed after %v: invalid for duration format: %s by session id: %s", duration, forDuration, sessionID)
+			return NewTextResult("", fmt.Errorf("invalid for duration '%s': must be a valid duration (e.g., '5m', '10m', '1h')", forDuration)), nil
+		}
+	}
+
+	// Convert annotations and alertlabels using new API with validation
 	var annotations map[string]string
 	var alertLabels map[string]string
 
@@ -902,6 +1061,12 @@ func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequ
 			annotations = make(map[string]string)
 			if annotationsMap, ok := annotationsRaw.(map[string]interface{}); ok {
 				for k, v := range annotationsMap {
+					// Validate annotation key format
+					if !isValidLabelKey(k) {
+						duration := time.Since(start)
+						klog.Errorf("Tool call: prometheus_update_alert failed after %v: invalid annotation key format: %s by session id: %s", duration, k, sessionID)
+						return NewTextResult("", fmt.Errorf("invalid annotation key '%s': keys must start and end with alphanumeric characters and can only contain letters, numbers, hyphens, underscores, and dots (max 63 chars)", k)), nil
+					}
 					if str, ok := v.(string); ok {
 						annotations[k] = str
 					}
@@ -914,6 +1079,12 @@ func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequ
 			alertLabels = make(map[string]string)
 			if alertLabelsMap, ok := alertLabelsRaw.(map[string]interface{}); ok {
 				for k, v := range alertLabelsMap {
+					// Validate label key format
+					if !isValidLabelKey(k) {
+						duration := time.Since(start)
+						klog.Errorf("Tool call: prometheus_update_alert failed after %v: invalid alert label key format: %s by session id: %s", duration, k, sessionID)
+						return NewTextResult("", fmt.Errorf("invalid alert label key '%s': keys must start and end with alphanumeric characters and can only contain letters, numbers, hyphens, underscores, and dots (max 63 chars)", k)), nil
+					}
 					if str, ok := v.(string); ok {
 						alertLabels[k] = str
 					}
@@ -922,10 +1093,18 @@ func (s *Server) prometheusUpdateAlert(ctx context.Context, ctr mcp.CallToolRequ
 		}
 	}
 
-	// Call the Kubernetes function (remove type casting since these are already strings)
+	// Call the Kubernetes function
 	result, err := k.UpdatePrometheusAlert(alertName, expression, appLabel, namespace, interval, forDuration, annotations, alertLabels)
 	if err != nil {
 		duration := time.Since(start)
+		errMsg := err.Error()
+
+		// Check for specific error patterns to provide better user guidance
+		if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "does not exist") {
+			klog.Errorf("Tool call: prometheus_update_alert failed after %v: alert not found: %v by session id: %s", duration, err, sessionID)
+			return NewTextResult("", fmt.Errorf("alert '%s' not found in namespace '%s' with app label '%s': %v. Use prometheus_create_alert to create a new alert instead", alertName, namespace, appLabel, err)), nil
+		}
+
 		klog.Errorf("Tool call: prometheus_update_alert failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to update Prometheus alert: %v", err)), nil
 	}
@@ -964,10 +1143,105 @@ func (s *Server) prometheusDeleteAlert(ctx context.Context, ctr mcp.CallToolRequ
 		return NewTextResult("", errors.New("missing required parameter: namespace")), nil
 	}
 
+	// Validate appLabel format and length
+	appLabel = strings.TrimSpace(appLabel)
+	if appLabel == "" {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_delete_alert failed after %v: applabel cannot be empty or whitespace by session id: %s", duration, sessionID)
+		return NewTextResult("", errors.New("applabel cannot be empty or whitespace only")), nil
+	}
+	if !isValidLabelKey(appLabel) {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_delete_alert failed after %v: invalid applabel format: %s by session id: %s", duration, appLabel, sessionID)
+		return NewTextResult("", fmt.Errorf("invalid app label '%s': labels must start and end with alphanumeric characters and can only contain letters, numbers, hyphens, underscores, and dots (max 63 chars)", appLabel)), nil
+	}
+
+	// Validate namespace format and length
+	namespace = strings.TrimSpace(namespace)
+	if namespace == "" {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_delete_alert failed after %v: namespace cannot be empty or whitespace by session id: %s", duration, sessionID)
+		return NewTextResult("", errors.New("namespace cannot be empty or whitespace only")), nil
+	}
+	if !isValidLabelKey(namespace) {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_delete_alert failed after %v: invalid namespace format: %s by session id: %s", duration, namespace, sessionID)
+		return NewTextResult("", fmt.Errorf("invalid namespace '%s': namespaces must start and end with alphanumeric characters and can only contain letters, numbers, hyphens (max 63 chars)", namespace)), nil
+	}
+
+	// Validate alertName format if provided (optional parameter)
+	if alertName != "" {
+		alertName = strings.TrimSpace(alertName)
+		if alertName == "" {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_delete_alert failed after %v: alertname cannot be empty or whitespace by session id: %s", duration, sessionID)
+			return NewTextResult("", errors.New("alertname cannot be empty or whitespace only")), nil
+		}
+		if !isValidAlertName(alertName) {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_delete_alert failed after %v: invalid alertname format: %s by session id: %s", duration, alertName, sessionID)
+			return NewTextResult("", fmt.Errorf("invalid alert name '%s': alert names can only contain letters, numbers, hyphens, underscores, and dots", alertName)), nil
+		}
+	}
+
+	// First, check if the alert/rule group exists by querying existing rules
+	// This helps distinguish between "delete non-existent alert" and successful deletion
+	rulesResult, rulesErr := k.GetPrometheusRules(0, nil, nil, nil, false, nil)
+	if rulesErr != nil {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_delete_alert failed after %v: unable to verify existing rules: %v by session id: %s", duration, rulesErr, sessionID)
+		return NewTextResult("", fmt.Errorf("unable to verify existing alerts before deletion: %v", rulesErr)), nil
+	}
+
+	// Check if the specific alert or rule group exists
+	alertExists := false
+	if alertName != "" {
+		// Checking for specific alert
+		if strings.Contains(rulesResult, fmt.Sprintf(`"alert":"%s"`, alertName)) &&
+			strings.Contains(rulesResult, fmt.Sprintf(`"namespace":"%s"`, namespace)) {
+			alertExists = true
+		}
+	} else {
+		// Checking for rule group with app label
+		if strings.Contains(rulesResult, fmt.Sprintf(`"namespace":"%s"`, namespace)) &&
+			strings.Contains(rulesResult, appLabel) {
+			alertExists = true
+		}
+	}
+
+	if !alertExists {
+		duration := time.Since(start)
+		if alertName != "" {
+			klog.Errorf("Tool call: prometheus_delete_alert failed after %v: alert '%s' does not exist by session id: %s", duration, alertName, sessionID)
+			return NewTextResult("", fmt.Errorf("alert '%s' does not exist in namespace '%s' with app label '%s'", alertName, namespace, appLabel)), nil
+		} else {
+			klog.Errorf("Tool call: prometheus_delete_alert failed after %v: no alerts found with app label '%s' by session id: %s", duration, appLabel, sessionID)
+			return NewTextResult("", fmt.Errorf("no alerts found with app label '%s' in namespace '%s'", appLabel, namespace)), nil
+		}
+	}
+
 	// Call the Kubernetes function
 	result, err := k.DeletePrometheusAlert(appLabel, namespace, alertName)
 	if err != nil {
 		duration := time.Since(start)
+		errMsg := err.Error()
+
+		// Enhanced error handling for specific scenarios
+		if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "does not exist") {
+			// Check if it's a namespace issue vs alert issue
+			if strings.Contains(errMsg, "namespace") {
+				klog.Errorf("Tool call: prometheus_delete_alert failed after %v: namespace not found: %v by session id: %s", duration, err, sessionID)
+				return NewTextResult("", fmt.Errorf("namespace '%s' not found or not accessible: %v", namespace, err)), nil
+			} else {
+				klog.Errorf("Tool call: prometheus_delete_alert failed after %v: alert not found: %v by session id: %s", duration, err, sessionID)
+				if alertName != "" {
+					return NewTextResult("", fmt.Errorf("alert '%s' not found in namespace '%s' with app label '%s': %v", alertName, namespace, appLabel, err)), nil
+				} else {
+					return NewTextResult("", fmt.Errorf("no alerts found with app label '%s' in namespace '%s': %v", appLabel, namespace, err)), nil
+				}
+			}
+		}
+
 		klog.Errorf("Tool call: prometheus_delete_alert failed after %v: %v by session id: %s", duration, err, sessionID)
 		return NewTextResult("", fmt.Errorf("failed to delete Prometheus alert: %v", err)), nil
 	}
