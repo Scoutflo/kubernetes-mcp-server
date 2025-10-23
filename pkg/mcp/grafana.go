@@ -214,36 +214,43 @@ func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolReq
 	}
 
 	// Extract parameters using GetRawArguments
-	args := ctr.GetRawArguments().(map[string]interface{})
+	rawArgs := ctr.GetRawArguments()
+	klog.Infof("[grafana_update_dashboard] Raw arguments: %#v", rawArgs)
 
-	// Extract required dashboard parameter
+	args, ok := rawArgs.(map[string]interface{})
+	if !ok {
+		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: arguments could not be cast to map[string]interface{} by session id: %s. Raw: %#v", time.Since(start), sessionID, rawArgs)
+		return NewTextResult("", errors.New("arguments could not be cast to map[string]interface{}")), nil
+	}
+
 	dashboardArg, exists := args["dashboard"]
+	klog.Infof("[grafana_update_dashboard] dashboard argument: %#v", dashboardArg)
 	if !exists {
-		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: missing required parameter: dashboard by session id: %s", time.Since(start), sessionID)
+		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: missing required parameter: dashboard by session id: %s. Args: %#v", time.Since(start), sessionID, args)
 		return NewTextResult("", errors.New("missing required parameter: dashboard")), nil
 	}
 
 	dashboard, ok := dashboardArg.(map[string]interface{})
 	if !ok {
-		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard parameter must be a JSON object by session id: %s", time.Since(start), sessionID)
+		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard parameter must be a JSON object by session id: %s. dashboardArg: %#v", time.Since(start), sessionID, dashboardArg)
 		return NewTextResult("", errors.New("dashboard parameter must be a JSON object")), nil
 	}
 
 	// Validate that dashboard is not empty
 	if len(dashboard) == 0 {
-		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard parameter cannot be empty by session id: %s", time.Since(start), sessionID)
+		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard parameter cannot be empty by session id: %s. dashboardArg: %#v", time.Since(start), sessionID, dashboardArg)
 		return NewTextResult("", errors.New("dashboard parameter cannot be empty - must contain valid dashboard configuration with at least 'title' and 'panels' fields")), nil
 	}
 
 	// Validate required dashboard fields
 	if _, hasTitle := dashboard["title"]; !hasTitle {
-		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard missing required 'title' field by session id: %s", time.Since(start), sessionID)
+		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard missing required 'title' field by session id: %s. dashboard: %#v", time.Since(start), sessionID, dashboard)
 		return NewTextResult("", errors.New("dashboard parameter must contain a 'title' field")), nil
 	}
 
 	// Validate that panels field exists (can be empty array but must be present)
 	if _, hasPanels := dashboard["panels"]; !hasPanels {
-		klog.Warningf("Tool call: grafana_update_dashboard - dashboard missing 'panels' field, adding empty panels array by session id: %s", sessionID)
+		klog.Warningf("Tool call: grafana_update_dashboard - dashboard missing 'panels' field, adding empty panels array by session id: %s. dashboard: %#v", sessionID, dashboard)
 		dashboard["panels"] = []interface{}{}
 	}
 
