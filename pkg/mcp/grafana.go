@@ -26,20 +26,31 @@ func (s *Server) initGrafana() []server.ServerTool {
 			mcp.WithString("query", mcp.Description("The query to search for")),
 		), Handler: s.grafanaSearchDashboards},
 		{Tool: mcp.NewTool("grafana_update_dashboard",
-			mcp.WithDescription(`Create or update Grafana dashboards. Constructs the complete dashboard payload and sends it to Grafana API.`),
+			mcp.WithDescription(`Create or update Grafana dashboards via API. Returns dashboard URL and UID.`),
 
 			mcp.WithObject("dashboard",
-				mcp.Description(`Dashboard configuration object. Must include: "title" (string), "panels" (array), "version" (number), "schemaVersion" (number). Example: {"title":"My Dashboard","panels":[],"version":0,"schemaVersion":38}`),
-				mcp.Required()),
+				mcp.Description(`Dashboard configuration. Example: {"title":"My Dashboard","uid":"my-dash","panels":[],"version":0,"schemaVersion":38}`),
+				mcp.Required(),
+				func(schema map[string]interface{}) {
+					schema["properties"] = map[string]interface{}{
+						"title":         map[string]interface{}{"type": "string"},
+						"uid":           map[string]interface{}{"type": "string"},
+						"panels":        map[string]interface{}{"type": "array"},
+						"version":       map[string]interface{}{"type": "number"},
+						"schemaVersion": map[string]interface{}{"type": "number"},
+					}
+					schema["required"] = []string{"title", "panels", "version", "schemaVersion"}
+					schema["additionalProperties"] = true
+				}),
 
 			mcp.WithString("folderUid",
-				mcp.Description("Folder UID where dashboard will be placed")),
+				mcp.Description("Folder UID (use 'general' for General folder)")),
 
 			mcp.WithString("message",
 				mcp.Description("Commit message for version history")),
 
 			mcp.WithBoolean("overwrite",
-				mcp.Description("Set true to update existing dashboard, false to create new (default: false)")),
+				mcp.Description("Update existing dashboard (true) or create new (false)")),
 
 			mcp.WithNumber("userId",
 				mcp.Description("User ID for audit trail")),
