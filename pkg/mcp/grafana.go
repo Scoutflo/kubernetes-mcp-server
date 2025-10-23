@@ -26,62 +26,23 @@ func (s *Server) initGrafana() []server.ServerTool {
 			mcp.WithString("query", mcp.Description("The query to search for")),
 		), Handler: s.grafanaSearchDashboards},
 		{Tool: mcp.NewTool("grafana_update_dashboard",
-			mcp.WithDescription(`Create or modify Grafana dashboard configurations.
-            CRITICAL: The 'dashboard' parameter must NEVER be empty {}. Always provide a complete dashboard object.
-			Required fields:
-			• title (string) - Dashboard name
-			• panels (array) - Panel configurations, use [] for empty dashboard
-			• version (number) - Dashboard version (0 for new, increment for updates)
-			• schemaVersion (number) - Grafana schema version (use 38)
-
-			Recommended fields:
-			• uid (string) - Unique identifier for the dashboard
-
-			Minimal example:
-			{
-			"dashboard": {
-				"title": "My Dashboard",
-				"panels": [],
-				"version": 0,
-				"schemaVersion": 38
-			}
-			}
-
-			With panel example:
-			{
-			"dashboard": {
-				"title": "System Metrics",
-				"uid": "system-metrics",
-				"version": 0,
-				"schemaVersion": 38,
-				"panels": [{
-				"id": 1,
-				"type": "graph",
-				"title": "CPU Usage",
-				"gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
-				"targets": [{"expr": "rate(cpu_usage[5m])", "refId": "A"}]
-				}]
-			},
-			"overwrite": true
-			}
-
-			To modify existing dashboards: retrieve current config first, modify needed fields, increment version, set overwrite=true.`),
+			mcp.WithDescription(`Create or update Grafana dashboards. Constructs the complete dashboard payload and sends it to Grafana API.`),
 
 			mcp.WithObject("dashboard",
-				mcp.Description(`Full dashboard configuration. Required keys: title, panels, version, schemaVersion. Cannot be empty {}.`),
+				mcp.Description(`Dashboard configuration object. Must include: "title" (string), "panels" (array), "version" (number), "schemaVersion" (number). Example: {"title":"My Dashboard","panels":[],"version":0,"schemaVersion":38}`),
 				mcp.Required()),
 
 			mcp.WithString("folderUid",
-				mcp.Description("Folder UID for dashboard placement")),
+				mcp.Description("Folder UID where dashboard will be placed")),
 
 			mcp.WithString("message",
-				mcp.Description("Version history commit message")),
+				mcp.Description("Commit message for version history")),
 
 			mcp.WithBoolean("overwrite",
-				mcp.Description("Overwrite existing dashboard with same UID (default: false)")),
+				mcp.Description("Set true to update existing dashboard, false to create new (default: false)")),
 
 			mcp.WithNumber("userId",
-				mcp.Description("User ID for audit logging")),
+				mcp.Description("User ID for audit trail")),
 		), Handler: s.grafanaUpdateDashboard},
 		{Tool: mcp.NewTool("grafana_get_dashboard_panel_queries",
 			mcp.WithDescription("Inspect data source queries and configurations for specific dashboard panels to analyze data pipelines"),
