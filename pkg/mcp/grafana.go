@@ -38,9 +38,6 @@ func (s *Server) initGrafana() []server.ServerTool {
 			mcp.WithString("message",
 				mcp.Description("Commit message for version history")),
 
-			mcp.WithBoolean("overwrite",
-				mcp.Description("Update existing dashboard (true) or create new (false)")),
-
 			mcp.WithNumber("userId",
 				mcp.Description("User ID for audit trail")),
 		), Handler: s.grafanaUpdateDashboard},
@@ -218,7 +215,7 @@ func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolReq
 	// Extract optional parameters
 	folderUID := ctr.GetString("folderUid", "")
 	message := ctr.GetString("message", "")
-	overwrite := ctr.GetBool("overwrite", false)
+	overwrite := ctr.GetBool("overwrite", true)
 
 	// Extract userID as number
 	var userID int64
