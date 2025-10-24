@@ -30,18 +30,7 @@ func (s *Server) initGrafana() []server.ServerTool {
 
 			mcp.WithObject("dashboard",
 				mcp.Description(`Dashboard configuration. Example: {"title":"My Dashboard","uid":"my-dash","panels":[],"version":0,"schemaVersion":38}`),
-				mcp.Required(),
-				func(schema map[string]interface{}) {
-					schema["properties"] = map[string]interface{}{
-						"title":         map[string]interface{}{"type": "string"},
-						"uid":           map[string]interface{}{"type": "string"},
-						"panels":        map[string]interface{}{"type": "array"},
-						"version":       map[string]interface{}{"type": "number"},
-						"schemaVersion": map[string]interface{}{"type": "number"},
-					}
-					schema["required"] = []string{"title", "panels", "version", "schemaVersion"}
-					schema["additionalProperties"] = true
-				}),
+				mcp.Required()),
 
 			mcp.WithString("folderUid",
 				mcp.Description("Folder UID (use 'general' for General folder)")),
