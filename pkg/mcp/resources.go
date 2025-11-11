@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -89,15 +88,15 @@ func (s *Server) initResources() []server.ServerTool {
 			),
 			mcp.WithString("name", mcp.Description("The name of the resource to get the YAML definition for. If not provided, all resources of the given type will be returned")),
 		), Handler: s.resourcesYaml},
-		{Tool: mcp.NewTool("apply_manifest",
-			mcp.WithDescription("Apply a YAML resource file to the Kubernetes cluster"),
-			mcp.WithString("manifest_path",
-				mcp.Description("The path to the manifest file to apply (either this or yaml_content must be provided)"),
-			),
-			mcp.WithString("yaml_content",
-				mcp.Description("The raw YAML content to apply (either this or manifest_path must be provided)"),
-			),
-		), Handler: s.applyManifest},
+		// {Tool: mcp.NewTool("apply_manifest",
+		// 	mcp.WithDescription("Apply a YAML resource file to the Kubernetes cluster"),
+		// 	mcp.WithString("manifest_path",
+		// 		mcp.Description("The path to the manifest file to apply (either this or yaml_content must be provided)"),
+		// 	),
+		// 	mcp.WithString("yaml_content",
+		// 		mcp.Description("The raw YAML content to apply (either this or manifest_path must be provided)"),
+		// 	),
+		// ), Handler: s.applyManifest},
 		{Tool: mcp.NewTool("resources_patch",
 			mcp.WithDescription("Patch a resource in Kubernetes\n"+
 				commonApiVersion),
@@ -322,52 +321,52 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	}
 }
 
-func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	start := time.Now()
-	k, err := s.getKubernetesClient(ctr)
-	if err != nil {
-		klog.Errorf("Tool call: apply_manifest failed to get Kubernetes client after %v: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
-	}
-	manifestPath := ctr.GetString("manifest_path", "")
-	yamlContent := ctr.GetString("yaml_content", "")
+// func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// 	start := time.Now()
+// 	k, err := s.getKubernetesClient(ctr)
+// 	if err != nil {
+// 		klog.Errorf("Tool call: apply_manifest failed to get Kubernetes client after %v: %v", time.Since(start), err)
+// 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+// 	}
+// 	manifestPath := ctr.GetString("manifest_path", "")
+// 	yamlContent := ctr.GetString("yaml_content", "")
 
-	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: apply_manifest - manifest_path: %s, yaml_content_length: %d - got called by session id: %s", manifestPath, len(yamlContent), sessionID)
+// 	sessionID := getSessionID(ctx)
+// 	klog.V(1).Infof("Tool: apply_manifest - manifest_path: %s, yaml_content_length: %d - got called by session id: %s", manifestPath, len(yamlContent), sessionID)
 
-	// Ensure at least one of manifest_path or yaml_content is provided
-	if manifestPath == "" && yamlContent == "" {
-		klog.Errorf("Tool call: apply_manifest failed after %v: neither manifest_path nor yaml_content provided", time.Since(start))
-		return NewTextResult("", errors.New("failed to apply manifest, either manifest_path or yaml_content must be provided")), nil
-	}
+// 	// Ensure at least one of manifest_path or yaml_content is provided
+// 	if manifestPath == "" && yamlContent == "" {
+// 		klog.Errorf("Tool call: apply_manifest failed after %v: neither manifest_path nor yaml_content provided", time.Since(start))
+// 		return NewTextResult("", errors.New("failed to apply manifest, either manifest_path or yaml_content must be provided")), nil
+// 	}
 
-	var content string
+// 	var content string
 
-	// If manifest_path is provided, read the file
-	if manifestPath != "" {
-		contentBytes, err := os.ReadFile(manifestPath)
-		if err != nil {
-			klog.Errorf("Tool call: apply_manifest failed after %v: failed to read file %s: %v", time.Since(start), manifestPath, err)
-			return NewTextResult("", fmt.Errorf("failed to read manifest file: %v", err)), nil
-		}
-		content = string(contentBytes)
-	} else {
-		// Otherwise use the provided yaml_content
-		content = yamlContent
-	}
+// 	// If manifest_path is provided, read the file
+// 	if manifestPath != "" {
+// 		contentBytes, err := os.ReadFile(manifestPath)
+// 		if err != nil {
+// 			klog.Errorf("Tool call: apply_manifest failed after %v: failed to read file %s: %v", time.Since(start), manifestPath, err)
+// 			return NewTextResult("", fmt.Errorf("failed to read manifest file: %v", err)), nil
+// 		}
+// 		content = string(contentBytes)
+// 	} else {
+// 		// Otherwise use the provided yaml_content
+// 		content = yamlContent
+// 	}
 
-	// Apply the manifest content
-	ret, err := k.ResourcesCreateOrUpdate(ctx, content)
-	duration := time.Since(start)
+// 	// Apply the manifest content
+// 	ret, err := k.ResourcesCreateOrUpdate(ctx, content)
+// 	duration := time.Since(start)
 
-	if err != nil {
-		klog.Errorf("Tool call: apply_manifest failed after %v: %v", duration, err)
-		return NewTextResult("", fmt.Errorf("failed to apply manifest: %v", err)), nil
-	}
+// 	if err != nil {
+// 		klog.Errorf("Tool call: apply_manifest failed after %v: %v", duration, err)
+// 		return NewTextResult("", fmt.Errorf("failed to apply manifest: %v", err)), nil
+// 	}
 
-	klog.V(1).Infof("Tool call: apply_manifest completed successfully in %v by session id: %s", duration, sessionID)
-	return NewTextResult(ret, nil), nil
-}
+// 	klog.V(1).Infof("Tool call: apply_manifest completed successfully in %v by session id: %s", duration, sessionID)
+// 	return NewTextResult(ret, nil), nil
+// }
 
 func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
