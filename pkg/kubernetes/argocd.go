@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 )
 
 // ArgoCD API paths
@@ -381,20 +382,14 @@ func (k *Kubernetes) SyncApplication(ctx context.Context, name, revision string,
 }
 
 // CreateApplicationRequest represents the request body for creating an application
+// This matches ArgoCD's native Application format (nested structure)
 type CreateApplicationRequest struct {
-	Name          string `json:"name"`
-	Project       string `json:"project"`
-	RepoURL       string `json:"repo_url"`
-	Path          string `json:"path"`
-	DestServer    string `json:"dest_server"`
-	DestNamespace string `json:"dest_namespace"`
-	Revision      string `json:"revision,omitempty"`
-	AutomatedSync string `json:"automated_sync,omitempty"`
-	Prune         string `json:"prune,omitempty"`
-	SelfHeal      string `json:"self_heal,omitempty"`
-	Namespace     string `json:"namespace,omitempty"`
-	Validate      string `json:"validate,omitempty"`
-	Upsert        string `json:"upsert,omitempty"`
+	Kind       string            `json:"kind"`
+	APIVersion string            `json:"apiVersion"`
+	Metadata   Metadata          `json:"metadata"`
+	Spec       ApplicationSpec   `json:"spec"`
+	Validate   bool              `json:"validate,omitempty"`
+	Upsert     bool              `json:"upsert,omitempty"`
 }
 
 // CreateApplication creates a new ArgoCD application
@@ -408,19 +403,49 @@ func (k *Kubernetes) CreateApplication(ctx context.Context, name, project, repoU
 
 	endpoint := "/apis/v1/argocd/create-application"
 
+	automatedSyncBool, _ := strconv.ParseBool(automatedSync)
+	pruneBool, _ := strconv.ParseBool(prune)
+	selfHealBool, _ := strconv.ParseBool(selfHeal)
+	validateBool, _ := strconv.ParseBool(validate)
+	upsertBool, _ := strconv.ParseBool(upsert)
+
+	if revision == "" {
+		revision = "HEAD"
+	}
+
+	var syncPolicy *SyncPolicy
+	if automatedSyncBool || pruneBool || selfHealBool {
+		syncPolicy = &SyncPolicy{}
+		if automatedSyncBool {
+			syncPolicy.Automated = &Automated{
+				Prune:    pruneBool,
+				SelfHeal: selfHealBool,
+			}
+		}
+	}
+
 	requestBody := CreateApplicationRequest{
-		Name:          name,
-		Project:       project,
-		RepoURL:       repoURL,
-		Path:          path,
-		DestServer:    destServer,
-		DestNamespace: destNamespace,
-		Revision:      revision,
-		AutomatedSync: automatedSync,
-		Prune:         prune,
-		SelfHeal:      selfHeal,
-		Validate:      validate,
-		Upsert:        upsert,
+		Kind:       "Application",
+		APIVersion: "argoproj.io/v1alpha1",
+		Metadata: Metadata{
+			Name:      name,
+			Namespace: "argocd",
+		},
+		Spec: ApplicationSpec{
+			Project: project,
+			Source: ApplicationSource{
+				RepoURL:        repoURL,
+				Path:           path,
+				TargetRevision: revision,
+			},
+			Destination: ApplicationDestination{
+				Server:    destServer,
+				Namespace: destNamespace,
+			},
+			SyncPolicy: syncPolicy,
+		},
+		Validate: validateBool,
+		Upsert:   upsertBool,
 	}
 
 	response, err := k.MakeAPIRequest("POST", endpoint, requestBody)
@@ -431,18 +456,13 @@ func (k *Kubernetes) CreateApplication(ctx context.Context, name, project, repoU
 }
 
 // UpdateApplicationRequest represents the request body for updating an application
+// This matches ArgoCD's native Application format (nested structure)
 type UpdateApplicationRequest struct {
-	Name          string `json:"name"`
-	Project       string `json:"project,omitempty"`
-	RepoURL       string `json:"repo_url,omitempty"`
-	Path          string `json:"path,omitempty"`
-	DestServer    string `json:"dest_server,omitempty"`
-	DestNamespace string `json:"dest_namespace,omitempty"`
-	Revision      string `json:"revision,omitempty"`
-	AutomatedSync string `json:"automated_sync,omitempty"`
-	Prune         string `json:"prune,omitempty"`
-	SelfHeal      string `json:"self_heal,omitempty"`
-	Validate      string `json:"validate,omitempty"`
+	Kind       string            `json:"kind,omitempty"`
+	APIVersion string            `json:"apiVersion,omitempty"`
+	Metadata   Metadata          `json:"metadata,omitempty"`
+	Spec       *ApplicationSpec  `json:"spec,omitempty"`
+	Validate   bool              `json:"validate,omitempty"`
 }
 
 // UpdateApplication updates an existing ArgoCD application
@@ -453,18 +473,85 @@ func (k *Kubernetes) UpdateApplication(ctx context.Context, name, project, repoU
 
 	endpoint := "/apis/v1/argocd/update-application"
 
+	var automatedSyncBool *bool
+	if automatedSync != "" {
+		val, _ := strconv.ParseBool(automatedSync)
+		automatedSyncBool = &val
+	}
+
+	var pruneBool *bool
+	if prune != "" {
+		val, _ := strconv.ParseBool(prune)
+		pruneBool = &val
+	}
+
+	var selfHealBool *bool
+	if selfHeal != "" {
+		val, _ := strconv.ParseBool(selfHeal)
+		selfHealBool = &val
+	}
+
+	validateBool := true
+	if validate != "" {
+		validateBool, _ = strconv.ParseBool(validate)
+	}
+
 	requestBody := UpdateApplicationRequest{
-		Name:          name,
-		Project:       project,
-		RepoURL:       repoURL,
-		Path:          path,
-		DestServer:    destServer,
-		DestNamespace: destNamespace,
-		Revision:      revision,
-		AutomatedSync: automatedSync,
-		Prune:         prune,
-		SelfHeal:      selfHeal,
-		Validate:      validate,
+		Kind:       "Application",
+		APIVersion: "argoproj.io/v1alpha1",
+		Metadata: Metadata{
+			Name:      name,
+			Namespace: "argocd",
+		},
+		Validate: validateBool,
+	}
+
+	hasUpdates := project != "" || repoURL != "" || path != "" || revision != "" ||
+		destServer != "" || destNamespace != "" ||
+		automatedSyncBool != nil || pruneBool != nil || selfHealBool != nil
+
+	if hasUpdates {
+		requestBody.Spec = &ApplicationSpec{}
+
+		if project != "" {
+			requestBody.Spec.Project = project
+		}
+
+		if repoURL != "" || path != "" || revision != "" {
+			requestBody.Spec.Source = ApplicationSource{}
+			if repoURL != "" {
+				requestBody.Spec.Source.RepoURL = repoURL
+			}
+			if path != "" {
+				requestBody.Spec.Source.Path = path
+			}
+			if revision != "" {
+				requestBody.Spec.Source.TargetRevision = revision
+			}
+		}
+
+		if destServer != "" || destNamespace != "" {
+			requestBody.Spec.Destination = ApplicationDestination{}
+			if destServer != "" {
+				requestBody.Spec.Destination.Server = destServer
+			}
+			if destNamespace != "" {
+				requestBody.Spec.Destination.Namespace = destNamespace
+			}
+		}
+
+		if automatedSyncBool != nil || pruneBool != nil || selfHealBool != nil {
+			requestBody.Spec.SyncPolicy = &SyncPolicy{}
+			if automatedSyncBool != nil && *automatedSyncBool {
+				requestBody.Spec.SyncPolicy.Automated = &Automated{}
+				if pruneBool != nil {
+					requestBody.Spec.SyncPolicy.Automated.Prune = *pruneBool
+				}
+				if selfHealBool != nil {
+					requestBody.Spec.SyncPolicy.Automated.SelfHeal = *selfHealBool
+				}
+			}
+		}
 	}
 
 	response, err := k.MakeAPIRequest("POST", endpoint, requestBody)
@@ -477,7 +564,7 @@ func (k *Kubernetes) UpdateApplication(ctx context.Context, name, project, repoU
 // DeleteApplicationRequest represents the request body for deleting an application
 type DeleteApplicationRequest struct {
 	Name              string `json:"name"`
-	Cascade           string `json:"cascade,omitempty"`
+	Cascade           bool   `json:"cascade,omitempty"`
 	PropagationPolicy string `json:"propagation_policy,omitempty"`
 }
 
@@ -489,9 +576,11 @@ func (k *Kubernetes) DeleteApplication(ctx context.Context, name, cascade, propa
 
 	endpoint := "/apis/v1/argocd/delete-application"
 
+	cascadeBool, _ := strconv.ParseBool(cascade)
+
 	requestBody := DeleteApplicationRequest{
 		Name:              name,
-		Cascade:           cascade,
+		Cascade:           cascadeBool,
 		PropagationPolicy: propagationPolicy,
 	}
 

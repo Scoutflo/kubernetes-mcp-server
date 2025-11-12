@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -25,12 +26,20 @@ func (s *Server) initGrafana() []server.ServerTool {
 			mcp.WithString("query", mcp.Description("The query to search for")),
 		), Handler: s.grafanaSearchDashboards},
 		{Tool: mcp.NewTool("grafana_update_dashboard",
-			mcp.WithDescription("Create or modify dashboard configurations to implement visualization changes or metric updates"),
-			mcp.WithObject("dashboard", mcp.Description("The full dashboard JSON object containing all dashboard configuration"), mcp.Required()),
-			mcp.WithString("folderUid", mcp.Description("The UID of the dashboard's folder (optional)")),
-			mcp.WithString("message", mcp.Description("Set a commit message for the version history (optional)")),
-			mcp.WithBoolean("overwrite", mcp.Description("Overwrite the dashboard if it exists. Otherwise create one (optional, default: false)")),
-			mcp.WithNumber("userId", mcp.Description("ID of the user making the change (optional)")),
+			mcp.WithDescription(`Create or update Grafana dashboards via API. Returns dashboard URL and UID.`),
+
+			mcp.WithObject("dashboard",
+				mcp.Description(`Dashboard configuration. Example: {"title":"My Dashboard","uid":"my-dash","panels":[],"version":0,"schemaVersion":38}`),
+				mcp.Required()),
+
+			mcp.WithString("folderUid",
+				mcp.Description("Folder UID (use 'general' for General folder)")),
+
+			mcp.WithString("message",
+				mcp.Description("Commit message for version history")),
+
+			mcp.WithNumber("userId",
+				mcp.Description("User ID for audit trail")),
 		), Handler: s.grafanaUpdateDashboard},
 		{Tool: mcp.NewTool("grafana_get_dashboard_panel_queries",
 			mcp.WithDescription("Inspect data source queries and configurations for specific dashboard panels to analyze data pipelines"),
@@ -163,25 +172,50 @@ func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolReq
 	}
 
 	// Extract parameters using GetRawArguments
-	args := ctr.GetRawArguments().(map[string]interface{})
+	rawArgs := ctr.GetRawArguments()
+	klog.Infof("[grafana_update_dashboard] Raw arguments: %#v", rawArgs)
 
-	// Extract required dashboard parameter
+	args, ok := rawArgs.(map[string]interface{})
+	if !ok {
+		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: arguments could not be cast to map[string]interface{} by session id: %s. Raw: %#v", time.Since(start), sessionID, rawArgs)
+		return NewTextResult("", errors.New("arguments could not be cast to map[string]interface{}")), nil
+	}
+
 	dashboardArg, exists := args["dashboard"]
+	klog.Infof("[grafana_update_dashboard] dashboard argument: %#v", dashboardArg)
 	if !exists {
-		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: missing required parameter: dashboard by session id: %s", time.Since(start), sessionID)
+		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: missing required parameter: dashboard by session id: %s. Args: %#v", time.Since(start), sessionID, args)
 		return NewTextResult("", errors.New("missing required parameter: dashboard")), nil
 	}
 
 	dashboard, ok := dashboardArg.(map[string]interface{})
 	if !ok {
-		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard parameter must be a JSON object by session id: %s", time.Since(start), sessionID)
+		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard parameter must be a JSON object by session id: %s. dashboardArg: %#v", time.Since(start), sessionID, dashboardArg)
 		return NewTextResult("", errors.New("dashboard parameter must be a JSON object")), nil
+	}
+
+	// Validate that dashboard is not empty
+	if len(dashboard) == 0 {
+		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard parameter cannot be empty by session id: %s. dashboardArg: %#v", time.Since(start), sessionID, dashboardArg)
+		return NewTextResult("", errors.New("dashboard parameter cannot be empty - must contain valid dashboard configuration with at least 'title' and 'panels' fields")), nil
+	}
+
+	// Validate required dashboard fields
+	if _, hasTitle := dashboard["title"]; !hasTitle {
+		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard missing required 'title' field by session id: %s. dashboard: %#v", time.Since(start), sessionID, dashboard)
+		return NewTextResult("", errors.New("dashboard parameter must contain a 'title' field")), nil
+	}
+
+	// Validate that panels field exists (can be empty array but must be present)
+	if _, hasPanels := dashboard["panels"]; !hasPanels {
+		klog.Warningf("Tool call: grafana_update_dashboard - dashboard missing 'panels' field, adding empty panels array by session id: %s. dashboard: %#v", sessionID, dashboard)
+		dashboard["panels"] = []interface{}{}
 	}
 
 	// Extract optional parameters
 	folderUID := ctr.GetString("folderUid", "")
 	message := ctr.GetString("message", "")
-	overwrite := ctr.GetBool("overwrite", false)
+	overwrite := ctr.GetBool("overwrite", true)
 
 	// Extract userID as number
 	var userID int64
@@ -191,8 +225,10 @@ func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolReq
 		}
 	}
 
-	klog.V(1).Infof("Tool: grafana_update_dashboard - folderUID: %s, message: %s, overwrite: %t, userID: %d, dashboard_fields: %d - got called by session id: %s",
-		folderUID, message, overwrite, userID, len(dashboard), sessionID)
+	// Log the dashboard structure for debugging
+	dashboardJSON, _ := json.Marshal(dashboard)
+	klog.V(1).Infof("Tool: grafana_update_dashboard - folderUID: %s, message: %s, overwrite: %t, userID: %d, dashboard_fields: %d, dashboard_json: %s - got called by session id: %s",
+		folderUID, message, overwrite, userID, len(dashboard), string(dashboardJSON), sessionID)
 
 	// Call the Kubernetes client to update the dashboard
 	result, err := k.UpdateDashboard(ctx, dashboard, folderUID, message, overwrite, userID)

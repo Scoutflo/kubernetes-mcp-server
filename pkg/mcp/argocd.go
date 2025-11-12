@@ -81,88 +81,88 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		},
 		{
 			Tool: mcp.NewTool("argocd_create_application",
-				mcp.WithDescription("Define new applications in ArgoCD to establish GitOps workflows for deployment management"),
+				mcp.WithDescription("Define new applications in ArgoCD to establish GitOps workflows for deployment management. Provide parameters as simple strings - the tool automatically constructs the proper ArgoCD nested structure (metadata, spec.source, spec.destination, spec.syncPolicy). Example: name='my-app', repo_url='https://github.com/user/repo.git', path='k8s/', dest_server='https://kubernetes.default.svc', dest_namespace='production'"),
 				mcp.WithString("name",
-					mcp.Description("The name of the application"),
+					mcp.Description("The name of the application (string, required). Example: 'my-application'"),
 					mcp.Required(),
 				),
 				mcp.WithString("project",
-					mcp.Description("The project name"),
+					mcp.Description("The ArgoCD project name (string, required). Example: 'default'"),
 					mcp.Required(),
 				),
 				mcp.WithString("repo_url",
-					mcp.Description("The Git repository URL"),
+					mcp.Description("The Git repository URL (string, required). Full HTTPS or SSH URL. Example: 'https://github.com/user/repo.git' or 'git@github.com:user/repo.git'"),
 					mcp.Required(),
 				),
 				mcp.WithString("path",
-					mcp.Description("Path within the repository"),
+					mcp.Description("Path within the repository where Kubernetes manifests are located (string, required). Example: 'k8s/' or '.' for root directory"),
 					mcp.Required(),
 				),
 				mcp.WithString("dest_server",
-					mcp.Description("Destination K8s API server URL"),
+					mcp.Description("Destination Kubernetes API server URL (string, required). Use 'https://kubernetes.default.svc' for in-cluster, or full URL for external clusters. Example: 'https://kubernetes.default.svc'"),
 					mcp.Required(),
 				),
 				mcp.WithString("dest_namespace",
-					mcp.Description("Destination namespace"),
+					mcp.Description("Destination Kubernetes namespace where resources will be deployed (string, required). Example: 'production' or 'default'"),
 					mcp.Required(),
 				),
 				mcp.WithString("revision",
-					mcp.Description("Git revision (default: HEAD)"),
+					mcp.Description("Git revision to sync (string, optional). Can be branch name, tag, or commit SHA. Default: 'HEAD'. Example: 'main', 'v1.0.0', or 'abc123def'"),
 				),
 				mcp.WithString("automated_sync",
-					mcp.Description("Enable automated sync (accepted values: 'true', 'false', default: 'false')"),
+					mcp.Description("Enable automated sync policy (string, optional). Accepted values: 'true' or 'false'. Default: 'false'. When 'true', ArgoCD will automatically sync when Git changes are detected"),
 				),
 				mcp.WithString("prune",
-					mcp.Description("Auto-prune resources (accepted values: 'true', 'false', default: 'false')"),
+					mcp.Description("Enable auto-prune for resources (string, optional). Accepted values: 'true' or 'false'. Default: 'false'. When 'true', resources removed from Git will be automatically deleted from cluster"),
 				),
 				mcp.WithString("self_heal",
-					mcp.Description("Enable self-healing (accepted values: 'true', 'false', default: 'false')"),
+					mcp.Description("Enable self-healing (string, optional). Accepted values: 'true' or 'false'. Default: 'false'. When 'true', ArgoCD will automatically revert manual changes to match Git state"),
 				),
 				mcp.WithString("validate",
-					mcp.Description("Whether to validate the application before creation (accepted values: 'true', 'false', default: 'true')"),
+					mcp.Description("Whether to validate the application before creation (string, optional). Accepted values: 'true' or 'false'. Default: 'true'"),
 				),
 				mcp.WithString("upsert",
-					mcp.Description("Whether to update the application if it already exists (accepted values: 'true', 'false', default: 'false')"),
+					mcp.Description("Whether to update the application if it already exists (string, optional). Accepted values: 'true' or 'false'. Default: 'false'"),
 				),
 			),
 			Handler: s.argocdCreateApplication,
 		},
 		{
 			Tool: mcp.NewTool("argocd_update_application",
-				mcp.WithDescription("Modify application configurations to adjust source repositories, target clusters, or sync policies"),
+				mcp.WithDescription("Modify application configurations to adjust source repositories, target clusters, or sync policies. Provide only the parameters you want to update as simple strings - the tool automatically constructs the proper ArgoCD nested structure. All parameters except 'name' are optional - only provide the ones you want to change"),
 				mcp.WithString("name",
-					mcp.Description("The application name to update"),
+					mcp.Description("The application name to update (string, required). Example: 'my-application'"),
 					mcp.Required(),
 				),
 				mcp.WithString("project",
-					mcp.Description("New project name (optional)"),
+					mcp.Description("New ArgoCD project name (string, optional). Example: 'production'"),
 				),
 				mcp.WithString("repo_url",
-					mcp.Description("New Git repository URL (optional)"),
+					mcp.Description("New Git repository URL (string, optional). Full HTTPS or SSH URL. Example: 'https://github.com/user/new-repo.git'"),
 				),
 				mcp.WithString("path",
-					mcp.Description("New path within the repository (optional)"),
+					mcp.Description("New path within the repository (string, optional). Example: 'k8s/manifests/'"),
 				),
 				mcp.WithString("dest_server",
-					mcp.Description("New destination K8s API server URL (optional)"),
+					mcp.Description("New destination Kubernetes API server URL (string, optional). Example: 'https://kubernetes.default.svc'"),
 				),
 				mcp.WithString("dest_namespace",
-					mcp.Description("New destination namespace (optional)"),
+					mcp.Description("New destination Kubernetes namespace (string, optional). Example: 'staging'"),
 				),
 				mcp.WithString("revision",
-					mcp.Description("New Git revision (optional)"),
+					mcp.Description("New Git revision to sync (string, optional). Can be branch, tag, or commit SHA. Example: 'develop' or 'v2.0.0'"),
 				),
 				mcp.WithString("automated_sync",
-					mcp.Description("Enable/disable automated sync (accepted values: 'true', 'false')"),
+					mcp.Description("Enable/disable automated sync (string, optional). Accepted values: 'true' or 'false'"),
 				),
 				mcp.WithString("prune",
-					mcp.Description("Enable/disable auto-pruning resources (accepted values: 'true', 'false')"),
+					mcp.Description("Enable/disable auto-pruning resources (string, optional). Accepted values: 'true' or 'false'"),
 				),
 				mcp.WithString("self_heal",
-					mcp.Description("Enable/disable self-healing (accepted values: 'true', 'false')"),
+					mcp.Description("Enable/disable self-healing (string, optional). Accepted values: 'true' or 'false'"),
 				),
 				mcp.WithString("validate",
-					mcp.Description("Whether to validate the application (accepted values: 'true', 'false', default: 'true')"),
+					mcp.Description("Whether to validate the application (string, optional). Accepted values: 'true' or 'false'. Default: 'true'"),
 				),
 			),
 			Handler: s.argocdUpdateApplication,
@@ -574,7 +574,7 @@ func (s *Server) argocdDeleteApplication(ctx context.Context, ctr mcp.CallToolRe
 		name, cascade, propagationPolicy)
 
 	// Log the operation for debugging
-	klog.Infof("Deleting ArgoCD application '%s' (cascade=%t, propagationPolicy=%s, namespace=%s)",
+	klog.Infof("Deleting ArgoCD application '%s' (cascade=%t, propagationPolicy=%s)",
 		name, cascade, propagationPolicy)
 
 	// Delete the application using the K8s Dashboard API
@@ -936,19 +936,19 @@ func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRe
 	resourceRef := argsMap["resource_ref"].(map[string]interface{})
 
 	resourceName, ok := resourceRef["name"].(string)
-	if err != nil {
+	if !ok {
 		klog.Errorf("Tool call: argocd_run_resource_action failed after %v: missing resource_ref.name", time.Since(start))
 		return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
 	}
 
 	resourceNamespace, ok := resourceRef["namespace"].(string)
-	if err != nil {
+	if !ok {
 		klog.Errorf("Tool call: argocd_run_resource_action failed after %v: missing resource_ref.namespace", time.Since(start))
 		return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
 	}
 
 	resourceKind, ok := resourceRef["kind"].(string)
-	if err != nil {
+	if !ok {
 		klog.Errorf("Tool call: argocd_run_resource_action failed after %v: missing resource_ref.kind", time.Since(start))
 		return NewTextResult("", fmt.Errorf("resource_ref.kind is required")), nil
 	}
