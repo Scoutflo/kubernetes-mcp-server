@@ -574,7 +574,7 @@ func (s *Server) argocdDeleteApplication(ctx context.Context, ctr mcp.CallToolRe
 		name, cascade, propagationPolicy)
 
 	// Log the operation for debugging
-	klog.Infof("Deleting ArgoCD application '%s' (cascade=%t, propagationPolicy=%s, namespace=%s)",
+	klog.Infof("Deleting ArgoCD application '%s' (cascade=%t, propagationPolicy=%s)",
 		name, cascade, propagationPolicy)
 
 	// Delete the application using the K8s Dashboard API
@@ -936,19 +936,19 @@ func (s *Server) argocdRunResourceAction(ctx context.Context, ctr mcp.CallToolRe
 	resourceRef := argsMap["resource_ref"].(map[string]interface{})
 
 	resourceName, ok := resourceRef["name"].(string)
-	if err != nil {
+	if !ok {
 		klog.Errorf("Tool call: argocd_run_resource_action failed after %v: missing resource_ref.name", time.Since(start))
 		return NewTextResult("", fmt.Errorf("resource_ref.name is required")), nil
 	}
 
 	resourceNamespace, ok := resourceRef["namespace"].(string)
-	if err != nil {
+	if !ok {
 		klog.Errorf("Tool call: argocd_run_resource_action failed after %v: missing resource_ref.namespace", time.Since(start))
 		return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
 	}
 
 	resourceKind, ok := resourceRef["kind"].(string)
-	if err != nil {
+	if !ok {
 		klog.Errorf("Tool call: argocd_run_resource_action failed after %v: missing resource_ref.kind", time.Since(start))
 		return NewTextResult("", fmt.Errorf("resource_ref.kind is required")), nil
 	}
