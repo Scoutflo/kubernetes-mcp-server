@@ -17,6 +17,3 @@ COPY --from=builder /kubernetes-mcp-server /kubernetes-mcp-server
 EXPOSE 8081
 
 ENTRYPOINT ["/kubernetes-mcp-server", "--sse-port", "8081", "--log-level", "2"]
-
-
-
