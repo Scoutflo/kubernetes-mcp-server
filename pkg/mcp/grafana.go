@@ -33,7 +33,7 @@ func (s *Server) initGrafana() []server.ServerTool {
 				mcp.Required()),
 
 			mcp.WithString("folderUid",
-				mcp.Description("Folder UID (use 'general' for General folder)")),
+				mcp.Description("Folder UID (leave empty for root folder)")),
 
 			mcp.WithString("message",
 				mcp.Description("Commit message for version history")),
