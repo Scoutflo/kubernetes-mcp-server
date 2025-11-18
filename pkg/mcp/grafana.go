@@ -165,13 +165,11 @@ func (s *Server) grafanaSearchDashboards(ctx context.Context, ctr mcp.CallToolRe
 func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: grafana_update_dashboard invoked by session id: %s", sessionID)
 	k, err := s.getKubernetesClient(ctr)
 	if err != nil {
 		klog.Errorf("Tool call: grafana_update_dashboard failed to get Kubernetes client after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
-	klog.V(1).Infof("Tool: grafana_update_dashboard acquired Kubernetes client in %v by session id: %s", time.Since(start), sessionID)
 
 	// Extract parameters using GetRawArguments
 	rawArgs := ctr.GetRawArguments()
@@ -182,7 +180,6 @@ func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolReq
 		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: arguments could not be cast to map[string]interface{} by session id: %s. Raw: %#v", time.Since(start), sessionID, rawArgs)
 		return NewTextResult("", errors.New("arguments could not be cast to map[string]interface{}")), nil
 	}
-	klog.V(1).Infof("Tool: grafana_update_dashboard parsed raw arguments into map with %d keys by session id: %s", len(args), sessionID)
 
 	dashboardArg, exists := args["dashboard"]
 	klog.Infof("[grafana_update_dashboard] dashboard argument: %#v", dashboardArg)
@@ -196,7 +193,6 @@ func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolReq
 		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard parameter must be a JSON object by session id: %s. dashboardArg: %#v", time.Since(start), sessionID, dashboardArg)
 		return NewTextResult("", errors.New("dashboard parameter must be a JSON object")), nil
 	}
-	klog.V(1).Infof("Tool: grafana_update_dashboard dashboard argument converted to map with %d keys by session id: %s", len(dashboard), sessionID)
 
 	// Validate that dashboard is not empty
 	if len(dashboard) == 0 {
@@ -209,14 +205,12 @@ func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolReq
 		klog.Errorf("Tool call: grafana_update_dashboard failed after %v: dashboard missing required 'title' field by session id: %s. dashboard: %#v", time.Since(start), sessionID, dashboard)
 		return NewTextResult("", errors.New("dashboard parameter must contain a 'title' field")), nil
 	}
-	klog.V(1).Infof("Tool: grafana_update_dashboard validated dashboard title field by session id: %s", sessionID)
 
 	// Validate that panels field exists (can be empty array but must be present)
 	if _, hasPanels := dashboard["panels"]; !hasPanels {
 		klog.Warningf("Tool call: grafana_update_dashboard - dashboard missing 'panels' field, adding empty panels array by session id: %s. dashboard: %#v", sessionID, dashboard)
 		dashboard["panels"] = []interface{}{}
 	}
-	klog.V(1).Infof("Tool: grafana_update_dashboard ensured panels field exists by session id: %s", sessionID)
 
 	// Extract optional parameters
 	folderUID := ctr.GetString("folderUid", "")
@@ -230,7 +224,6 @@ func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolReq
 			userID = int64(userIDFloat)
 		}
 	}
-	klog.V(1).Infof("Tool: grafana_update_dashboard extracted optional params folderUID=%s message_len=%d overwrite=%t userID=%d by session id: %s", folderUID, len(message), overwrite, userID, sessionID)
 
 	// Log the dashboard structure for debugging
 	dashboardJSON, _ := json.Marshal(dashboard)
@@ -238,7 +231,6 @@ func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolReq
 		folderUID, message, overwrite, userID, len(dashboard), string(dashboardJSON), sessionID)
 
 	// Call the Kubernetes client to update the dashboard
-	klog.V(1).Infof("Tool: grafana_update_dashboard invoking Kubernetes client UpdateDashboard by session id: %s", sessionID)
 	result, err := k.UpdateDashboard(ctx, dashboard, folderUID, message, overwrite, userID)
 	duration := time.Since(start)
 
@@ -248,7 +240,6 @@ func (s *Server) grafanaUpdateDashboard(ctx context.Context, ctr mcp.CallToolReq
 	}
 
 	klog.V(1).Infof("Tool call: grafana_update_dashboard completed successfully in %v, result_length: %d by session id: %s", duration, len(result), sessionID)
-	klog.V(1).Infof("Tool: grafana_update_dashboard response snippet: %.200s by session id: %s", result, sessionID)
 	return NewTextResult(result, nil), nil
 }
 
