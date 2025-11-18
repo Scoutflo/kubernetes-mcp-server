@@ -42,10 +42,7 @@ func (k *Kubernetes) UpdateDashboard(ctx context.Context, dashboard map[string]i
 	payload := map[string]interface{}{
 		"dashboard": dashboard,
 		"overwrite": overwrite,
-	}
-
-	if folderUID != "" {
-		payload["folderUid"] = folderUID
+		"folderUid": folderUID,
 	}
 
 	if message != "" {
