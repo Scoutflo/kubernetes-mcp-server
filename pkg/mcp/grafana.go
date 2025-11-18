@@ -29,41 +29,7 @@ func (s *Server) initGrafana() []server.ServerTool {
 			mcp.WithDescription(`Create or update Grafana dashboards via API. Returns dashboard URL and UID.`),
 
 			mcp.WithObject("dashboard",
-				mcp.Description(`Dashboard configuration. It should be a valid JSON object.
-				<EXAMPLE> 
-				{
-  "uid": "team-latency",
-  "title": "Team Latency",
-  "panels": [
-    {
-      "id": 1,
-      "type": "graph",
-      "title": "P99 Latency",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prom-main"
-      },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.99, sum(rate(latency_bucket[5m])) by (le))",
-          "legendFormat": "{{service}}"
-        }
-      ]
-    }
-  ],
-  "time": {
-    "from": "now-6h",
-    "to": "now"
-  },
-  "tags": [
-    "latency",
-    "sre"
-  ],
-  "schemaVersion": 38,
-  "version": 1
-}
-  <EXAMPLE>
-  `),
+				mcp.Description(`Dashboard configuration. It should be a valid JSON object.`),
 				mcp.Required()),
 
 			mcp.WithString("folderUid",
