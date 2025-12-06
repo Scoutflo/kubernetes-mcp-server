@@ -4,7 +4,7 @@ go 1.24.1
 
 require (
 	github.com/argoproj/argo-rollouts v1.8.2
-	github.com/mark3labs/mcp-go v0.38.0
+	github.com/mark3labs/mcp-go v0.43.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
