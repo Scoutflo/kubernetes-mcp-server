@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -27,13 +28,37 @@ func (s *Server) initPods() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("pods_list",
 			mcp.WithDescription("List all the Kubernetes pods in the current cluster from all namespaces"),
+			mcp.WithNumber("limit",
+				mcp.DefaultNumber(10),
+				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
+				mcp.Required(),
+			),
+			mcp.WithNumber("continue",
+				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
+			),
 		), Handler: s.podsListInAllNamespaces},
 		{Tool: mcp.NewTool("pods_list_in_namespace",
 			mcp.WithDescription("List all the Kubernetes pods in the specified namespace in the current cluster"),
+			mcp.WithNumber("limit",
+				mcp.DefaultNumber(10),
+				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
+				mcp.Required(),
+			),
+			mcp.WithNumber("continue",
+				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
+			),
 			mcp.WithString("namespace", mcp.Description("Namespace to list pods from"), mcp.Required()),
 		), Handler: s.podsListInNamespace},
 		{Tool: mcp.NewTool("pods_get",
 			mcp.WithDescription("Get a Kubernetes Pod in the current or provided namespace with the provided name"),
+			mcp.WithNumber("limit",
+				mcp.DefaultNumber(10),
+				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
+				mcp.Required(),
+			),
+			mcp.WithNumber("continue",
+				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
+			),
 			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
 			mcp.WithString("name", mcp.Description("Name of the Pod"), mcp.Required()),
 		), Handler: s.podsGet},
@@ -86,7 +111,20 @@ func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 
-	ret, err := k.PodsListInAllNamespaces(ctx)
+	limitStr, limitErr := ctr.RequireString("limit")
+	var limit int64 = 0
+	if limitErr == nil && limitStr != "" {
+		parsedLimit, parseErr := strconv.ParseInt(limitStr, 10, 64)
+		if parseErr == nil {
+			limit = parsedLimit
+		}
+	}
+	continueToken, continueErr := ctr.RequireString("continue")
+	if continueErr != nil {
+		continueToken = ""
+	}
+
+	ret, err := k.PodsListInAllNamespaces(ctx, limit, continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -118,7 +156,20 @@ func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolReques
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 
-	ret, err := k.PodsListInNamespace(ctx, ns)
+	limitStr, limitErr := ctr.RequireString("limit")
+	var limit int64 = 0
+	if limitErr == nil && limitStr != "" {
+		parsedLimit, parseErr := strconv.ParseInt(limitStr, 10, 64)
+		if parseErr == nil {
+			limit = parsedLimit
+		}
+	}
+	continueToken, continueErr := ctr.RequireString("continue")
+	if continueErr != nil {
+		continueToken = ""
+	}
+
+	ret, err := k.PodsListInNamespace(ctx, ns, limit, continueToken)
 	duration := time.Since(start)
 
 	if err != nil {

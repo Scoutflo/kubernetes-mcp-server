@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -15,6 +16,14 @@ func (s *Server) initNamespaces() []server.ServerTool {
 	ret = append(ret, server.ServerTool{
 		Tool: mcp.NewTool("namespaces_list",
 			mcp.WithDescription("List all the Kubernetes namespaces in the current cluster"),
+			mcp.WithNumber("limit",
+				mcp.DefaultNumber(10),
+				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
+				mcp.Required(),
+			),
+			mcp.WithNumber("continue",
+				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
+			),
 		), Handler: s.namespacesList,
 	})
 	return ret
@@ -30,7 +39,20 @@ func (s *Server) namespacesList(ctx context.Context, ctr mcp.CallToolRequest) (*
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: namespaces_list - listing all namespaces - got called by session id: %s", sessionID)
 
-	ret, err := k.NamespacesList(ctx)
+	limitStr, limitErr := ctr.RequireString("limit")
+	var limit int64 = 0
+	if limitErr == nil && limitStr != "" {
+		parsedLimit, parseErr := strconv.ParseInt(limitStr, 10, 64)
+		if parseErr == nil {
+			limit = parsedLimit
+		}
+	}
+	continueToken, continueErr := ctr.RequireString("continue")
+	if continueErr != nil {
+		continueToken = ""
+	}
+
+	ret, err := k.NamespacesList(ctx, limit, continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
