@@ -63,16 +63,20 @@ func (s *Server) namespacesList(ctx context.Context, ctr mcp.CallToolRequest) (*
 		klog.V(1).Infof("Tool call: namespaces_list completed successfully in %v by session id: %s", duration, sessionID)
 	}
 
-	// Compose response with results and continue token
+	var data interface{}
+	if err := json.Unmarshal(ret, &data); err != nil {
+		klog.Errorf("Tool call: namespaces_list failed to unmarshal response after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to unmarshal namespace list: %v", err)), nil
+	}
+
 	response := struct {
 		Data          interface{} `json:"data"`
 		ContinueToken string      `json:"continueToken,omitempty"`
 	}{
-		Data:          ret,
+		Data:          data,
 		ContinueToken: freshContinueToken,
 	}
 
-	// Marshal the response to JSON
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
 		klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)

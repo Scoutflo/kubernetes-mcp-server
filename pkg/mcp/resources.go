@@ -185,16 +185,20 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		return NewTextResult("", fmt.Errorf("failed to list resources: %v", err)), nil
 	}
 
-	// Compose response with results and continue token
+	var data interface{}
+	if err := json.Unmarshal(ret, &data); err != nil {
+		klog.Errorf("Tool call: resources_list failed to unmarshal response after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to unmarshal resource list: %v", err)), nil
+	}
+
 	response := struct {
 		Data          interface{} `json:"data"`
 		ContinueToken string      `json:"continueToken,omitempty"`
 	}{
-		Data:          ret,
+		Data:          data,
 		ContinueToken: freshContinueToken,
 	}
 
-	// Marshal the response to JSON
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
 		klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
@@ -378,16 +382,20 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 			return NewTextResult("", fmt.Errorf("failed to list resources YAML: %v", err)), nil
 		}
 
-		// Compose response with results and continue token
+		var data interface{}
+		if err := json.Unmarshal(ret, &data); err != nil {
+			klog.Errorf("Tool call: get_resources_yaml failed to unmarshal response after %v: %v", duration, err)
+			return NewTextResult("", fmt.Errorf("failed to unmarshal resource list: %v", err)), nil
+		}
+
 		response := struct {
 			Data          interface{} `json:"data"`
 			ContinueToken string      `json:"continueToken,omitempty"`
 		}{
-			Data:          ret,
+			Data:          data,
 			ContinueToken: freshContinueToken,
 		}
 
-		// Marshal the response to JSON
 		jsonBytes, err := json.Marshal(response)
 		if err != nil {
 			klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
