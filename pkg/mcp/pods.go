@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -124,7 +125,7 @@ func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRe
 		continueToken = ""
 	}
 
-	ret, err := k.PodsListInAllNamespaces(ctx, limit, continueToken)
+	ret, freshContinueToken, err := k.PodsListInAllNamespaces(ctx, limit, continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -132,8 +133,24 @@ func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("failed to list pods in all namespaces: %v", err)), nil
 	}
 
+	// Compose response with results and continue token
+	response := struct {
+		Data          interface{} `json:"data"`
+		ContinueToken string      `json:"continueToken,omitempty"`
+	}{
+		Data:          ret,
+		ContinueToken: freshContinueToken,
+	}
+
+	// Marshal the response to JSON
+	jsonBytes, err := json.Marshal(response)
+	if err != nil {
+		klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to marshal resource list: %v", err)), nil
+	}
+
 	klog.V(1).Infof("Tool call: pods_list completed successfully in %v by session id: %s", duration, sessionID)
-	return NewTextResult(ret, err), nil
+	return NewTextResult(string(jsonBytes), err), nil
 }
 
 func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -169,7 +186,7 @@ func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolReques
 		continueToken = ""
 	}
 
-	ret, err := k.PodsListInNamespace(ctx, ns, limit, continueToken)
+	ret, freshContinueToken, err := k.PodsListInNamespace(ctx, ns, limit, continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -177,8 +194,24 @@ func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolReques
 		return NewTextResult("", fmt.Errorf("failed to list pods in namespace %s: %v", ns, err)), nil
 	}
 
+	// Compose response with results and continue token
+	response := struct {
+		Data          interface{} `json:"data"`
+		ContinueToken string      `json:"continueToken,omitempty"`
+	}{
+		Data:          ret,
+		ContinueToken: freshContinueToken,
+	}
+
+	// Marshal the response to JSON
+	jsonBytes, err := json.Marshal(response)
+	if err != nil {
+		klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to marshal resource list: %v", err)), nil
+	}
+
 	klog.V(1).Infof("Tool call: pods_list_in_namespace completed successfully in %v by session id: %s", duration, sessionID)
-	return NewTextResult(ret, err), nil
+	return NewTextResult(string(jsonBytes), err), nil
 }
 
 func (s *Server) podsGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {

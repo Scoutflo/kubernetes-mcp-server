@@ -54,7 +54,7 @@ func getResourceTypeFromGVK(gvk *schema.GroupVersionKind) string {
 	return strings.ToLower(gvk.Kind) + "." + gvk.Group
 }
 
-func (k *Kubernetes) ResourcesList(ctx context.Context, gvk *schema.GroupVersionKind, namespace string, limit int64, continueToken string) (string, error) {
+func (k *Kubernetes) ResourcesList(ctx context.Context, gvk *schema.GroupVersionKind, namespace string, limit int64, continueToken string) ([]byte, string, error) {
 	// Create a JSON payload for the list-resources endpoint
 	requestBody := map[string]interface{}{
 		"apiVersion": gvk.GroupVersion().String(),
@@ -69,12 +69,16 @@ func (k *Kubernetes) ResourcesList(ctx context.Context, gvk *schema.GroupVersion
 	}
 
 	// Make API request to the dedicated MCP endpoint
-	response, err := k.MakeAPIRequest("POST", "/apis/v1/list-resources", requestBody)
+	apiResponse, err := k.MakeAPIRequestWithHeaders("POST", "/apis/v1/list-resources", requestBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to list resources: %v", err)
+		fmt.Errorf("failed to list resources: %v", err)
+		return nil, "", err
 	}
 
-	return string(response), nil
+	data := apiResponse.Body
+	freshContinueToken := apiResponse.Headers.Get("x-continue-key")
+
+	return data, freshContinueToken, nil
 }
 
 func (k *Kubernetes) ResourcesGet(ctx context.Context, gvk *schema.GroupVersionKind, namespace, name string) (string, error) {

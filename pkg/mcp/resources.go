@@ -177,7 +177,7 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: resources_list - apiVersion: %s, kind: %s, namespace: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, sessionID)
 
-	ret, err := k.ResourcesList(ctx, gvk, namespace, limit, continueToken)
+	ret, freshContinueToken, err := k.ResourcesList(ctx, gvk, namespace, limit, continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -185,8 +185,24 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		return NewTextResult("", fmt.Errorf("failed to list resources: %v", err)), nil
 	}
 
+	// Compose response with results and continue token
+	response := struct {
+		Data          interface{} `json:"data"`
+		ContinueToken string      `json:"continueToken,omitempty"`
+	}{
+		Data:          ret,
+		ContinueToken: freshContinueToken,
+	}
+
+	// Marshal the response to JSON
+	jsonBytes, err := json.Marshal(response)
+	if err != nil {
+		klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to marshal resource list: %v", err)), nil
+	}
+
 	klog.V(1).Infof("Tool call: resources_list completed successfully in %v by session id: %s", duration, sessionID)
-	return NewTextResult(ret, err), nil
+	return NewTextResult(string(jsonBytes), nil), nil
 }
 
 func (s *Server) resourcesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -355,14 +371,31 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		return NewTextResult(ret, err), nil
 	} else {
 		// Get all resources of this type in the namespace
-		ret, err := k.ResourcesList(ctx, gvk, namespace, limit, continueToken)
+		ret, freshContinueToken, err := k.ResourcesList(ctx, gvk, namespace, limit, continueToken)
 		duration := time.Since(start)
 		if err != nil {
 			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
 			return NewTextResult("", fmt.Errorf("failed to list resources YAML: %v", err)), nil
 		}
+
+		// Compose response with results and continue token
+		response := struct {
+			Data          interface{} `json:"data"`
+			ContinueToken string      `json:"continueToken,omitempty"`
+		}{
+			Data:          ret,
+			ContinueToken: freshContinueToken,
+		}
+
+		// Marshal the response to JSON
+		jsonBytes, err := json.Marshal(response)
+		if err != nil {
+			klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
+			return NewTextResult("", fmt.Errorf("failed to marshal resource list: %v", err)), nil
+		}
+
 		klog.V(1).Infof("Tool call: get_resources_yaml completed successfully in %v by session id: %s", duration, sessionID)
-		return NewTextResult(ret, err), nil
+		return NewTextResult(string(jsonBytes), err), nil
 	}
 }
 

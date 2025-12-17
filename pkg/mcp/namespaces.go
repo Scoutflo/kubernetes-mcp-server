@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -52,7 +53,7 @@ func (s *Server) namespacesList(ctx context.Context, ctr mcp.CallToolRequest) (*
 		continueToken = ""
 	}
 
-	ret, err := k.NamespacesList(ctx, limit, continueToken)
+	ret, freshContinueToken, err := k.NamespacesList(ctx, limit, continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -62,5 +63,21 @@ func (s *Server) namespacesList(ctx context.Context, ctr mcp.CallToolRequest) (*
 		klog.V(1).Infof("Tool call: namespaces_list completed successfully in %v by session id: %s", duration, sessionID)
 	}
 
-	return NewTextResult(ret, err), nil
+	// Compose response with results and continue token
+	response := struct {
+		Data          interface{} `json:"data"`
+		ContinueToken string      `json:"continueToken,omitempty"`
+	}{
+		Data:          ret,
+		ContinueToken: freshContinueToken,
+	}
+
+	// Marshal the response to JSON
+	jsonBytes, err := json.Marshal(response)
+	if err != nil {
+		klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to marshal resource list: %v", err)), nil
+	}
+
+	return NewTextResult(string(jsonBytes), err), nil
 }
