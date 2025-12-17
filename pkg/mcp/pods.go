@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -40,18 +39,18 @@ func (s *Server) initPods() []server.ServerTool {
 				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
 				mcp.Required(),
 			),
-			mcp.WithNumber("continue",
+			mcp.WithString("continue",
 				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
 			),
 		), Handler: s.podsListInAllNamespaces},
 		{Tool: mcp.NewTool("pods_list_in_namespace",
 			mcp.WithDescription("List all the Kubernetes pods in the specified namespace in the current cluster"),
 			mcp.WithNumber("limit",
-				mcp.DefaultNumber(10),
+				mcp.DefaultNumber(5),
 				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
 				mcp.Required(),
 			),
-			mcp.WithNumber("continue",
+			mcp.WithString("continue",
 				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
 			),
 			mcp.WithString("namespace", mcp.Description("Namespace to list pods from"), mcp.Required()),
@@ -59,11 +58,11 @@ func (s *Server) initPods() []server.ServerTool {
 		{Tool: mcp.NewTool("pods_get",
 			mcp.WithDescription("Get a Kubernetes Pod in the current or provided namespace with the provided name"),
 			mcp.WithNumber("limit",
-				mcp.DefaultNumber(10),
+				mcp.DefaultNumber(5),
 				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
 				mcp.Required(),
 			),
-			mcp.WithNumber("continue",
+			mcp.WithString("continue",
 				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
 			),
 			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
@@ -118,24 +117,12 @@ func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 
-	limitStr, limitErr := ctr.RequireString("limit")
-	if limitErr != nil {
-		klog.Errorf("Tool call: pods_list failed after %v", err)
-	}
-	var limit int64 = 5
-	if limitErr == nil && limitStr != "" {
-		parsedLimit, parseErr := strconv.ParseInt(limitStr, 5, 64)
-		if parseErr == nil {
-			limit = parsedLimit
-		}
-	}
-	continueToken, continueErr := ctr.RequireString("continue")
-	if continueErr != nil {
-		continueToken = ""
-	}
+	limit := ctr.GetInt("limit", 10)
+
+	continueToken := ctr.GetString("continue", "")
 
 	klog.V(1).Infof("Limit number %v", limit)
-	ret, freshContinueToken, err := k.PodsListInAllNamespaces(ctx, limit, continueToken)
+	ret, freshContinueToken, err := k.PodsListInAllNamespaces(ctx, int64(limit), continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -186,20 +173,11 @@ func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolReques
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 
-	limitStr, limitErr := ctr.RequireString("limit")
-	var limit int64 = 0
-	if limitErr == nil && limitStr != "" {
-		parsedLimit, parseErr := strconv.ParseInt(limitStr, 10, 64)
-		if parseErr == nil {
-			limit = parsedLimit
-		}
-	}
-	continueToken, continueErr := ctr.RequireString("continue")
-	if continueErr != nil {
-		continueToken = ""
-	}
+	limit := ctr.GetInt("limit", 10)
 
-	ret, freshContinueToken, err := k.PodsListInNamespace(ctx, ns, limit, continueToken)
+	continueToken := ctr.GetString("continue", "")
+
+	ret, freshContinueToken, err := k.PodsListInNamespace(ctx, ns, int64(limit), continueToken)
 	duration := time.Since(start)
 
 	if err != nil {

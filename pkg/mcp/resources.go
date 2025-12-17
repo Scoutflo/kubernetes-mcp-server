@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -30,11 +29,11 @@ func (s *Server) initResources() []server.ServerTool {
 				mcp.Required(),
 			),
 			mcp.WithNumber("limit",
-				mcp.DefaultNumber(10),
+				mcp.DefaultNumber(5),
 				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
 				mcp.Required(),
 			),
-			mcp.WithNumber("continue",
+			mcp.WithString("continue",
 				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
 			),
 			mcp.WithString("namespace",
@@ -93,11 +92,11 @@ func (s *Server) initResources() []server.ServerTool {
 				mcp.Required(),
 			),
 			mcp.WithNumber("limit",
-				mcp.DefaultNumber(10),
+				mcp.DefaultNumber(5),
 				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
 				mcp.Required(),
 			),
-			mcp.WithNumber("continue",
+			mcp.WithString("continue",
 				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
 			),
 			mcp.WithString("namespace",
@@ -155,18 +154,9 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		namespace = ""
 	}
 
-	limitStr, limitErr := ctr.RequireString("limit")
-	var limit int64 = 0
-	if limitErr == nil && limitStr != "" {
-		parsedLimit, parseErr := strconv.ParseInt(limitStr, 10, 64)
-		if parseErr == nil {
-			limit = parsedLimit
-		}
-	}
-	continueToken, continueErr := ctr.RequireString("continue")
-	if continueErr != nil {
-		continueToken = ""
-	}
+	limit := ctr.GetInt("limit", 10)
+
+	continueToken := ctr.GetString("continue", "")
 
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
@@ -177,7 +167,7 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: resources_list - apiVersion: %s, kind: %s, namespace: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, sessionID)
 
-	ret, freshContinueToken, err := k.ResourcesList(ctx, gvk, namespace, limit, continueToken)
+	ret, freshContinueToken, err := k.ResourcesList(ctx, gvk, namespace, int64(limit), continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -339,18 +329,9 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		namespace = ""
 	}
 
-	limitStr, limitErr := ctr.RequireString("limit")
-	var limit int64 = 0
-	if limitErr == nil && limitStr != "" {
-		parsedLimit, parseErr := strconv.ParseInt(limitStr, 10, 64)
-		if parseErr == nil {
-			limit = parsedLimit
-		}
-	}
-	continueToken, continueErr := ctr.RequireString("continue")
-	if continueErr != nil {
-		continueToken = ""
-	}
+	limit := ctr.GetInt("limit", 10)
+
+	continueToken := ctr.GetString("continue", "")
 
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
@@ -375,7 +356,7 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		return NewTextResult(ret, err), nil
 	} else {
 		// Get all resources of this type in the namespace
-		ret, freshContinueToken, err := k.ResourcesList(ctx, gvk, namespace, limit, continueToken)
+		ret, freshContinueToken, err := k.ResourcesList(ctx, gvk, namespace, int64(limit), continueToken)
 		duration := time.Since(start)
 		if err != nil {
 			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
