@@ -114,7 +114,10 @@ func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRe
 	}
 
 	limitStr, limitErr := ctr.RequireString("limit")
-	var limit int64 = 0
+	if limitErr != nil {
+		klog.Errorf("Tool call: pods_list failed after %v", err)
+	}
+	var limit int64 = 5
 	if limitErr == nil && limitStr != "" {
 		parsedLimit, parseErr := strconv.ParseInt(limitStr, 5, 64)
 		if parseErr == nil {
