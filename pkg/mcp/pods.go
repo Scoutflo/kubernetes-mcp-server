@@ -25,6 +25,11 @@ import (
 //   }
 // }
 
+type ListResourceToolOutput struct {
+	Data          interface{} `json:"data"`
+	ContinueToken string      `json:"continueToken,omitempty"`
+}
+
 func (s *Server) initPods() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("pods_list",
@@ -138,24 +143,27 @@ func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("failed to list pods in all namespaces: %v", err)), nil
 	}
 
-	// Compose response with results and continue token
-	response := struct {
-		Data          interface{} `json:"data"`
-		ContinueToken string      `json:"continueToken,omitempty"`
-	}{
-		Data:          ret,
+	var data interface{}
+	if err := json.Unmarshal(ret, &data); err != nil {
+		klog.Errorf("Tool call: pods_list failed to unmarshal response after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to unmarshal pod list: %v", err)), nil
+	}
+
+	response := ListResourceToolOutput{
+		Data:          data,
 		ContinueToken: freshContinueToken,
 	}
 
-	// Marshal the response to JSON
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
 		klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
 		return NewTextResult("", fmt.Errorf("failed to marshal resource list: %v", err)), nil
 	}
 
+	jsonString := string(jsonBytes)
+
 	klog.V(1).Infof("Tool call: pods_list completed successfully in %v by session id: %s", duration, sessionID)
-	return NewTextResult(string(jsonBytes), err), nil
+	return NewTextResult(jsonString, err), nil
 }
 
 func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -199,16 +207,20 @@ func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolReques
 		return NewTextResult("", fmt.Errorf("failed to list pods in namespace %s: %v", ns, err)), nil
 	}
 
-	// Compose response with results and continue token
+	var data interface{}
+	if err := json.Unmarshal(ret, &data); err != nil {
+		klog.Errorf("Tool call: pods_list_in_namespace failed to unmarshal response after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to unmarshal pod list: %v", err)), nil
+	}
+
 	response := struct {
 		Data          interface{} `json:"data"`
 		ContinueToken string      `json:"continueToken,omitempty"`
 	}{
-		Data:          ret,
+		Data:          data,
 		ContinueToken: freshContinueToken,
 	}
 
-	// Marshal the response to JSON
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
 		klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
@@ -216,7 +228,7 @@ func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolReques
 	}
 
 	klog.V(1).Infof("Tool call: pods_list_in_namespace completed successfully in %v by session id: %s", duration, sessionID)
-	return NewTextResult(string(jsonBytes), err), nil
+	return mcp.NewToolResultStructured(jsonBytes, ""), nil
 }
 
 func (s *Server) podsGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
