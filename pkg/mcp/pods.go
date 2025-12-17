@@ -30,7 +30,8 @@ func (s *Server) initPods() []server.ServerTool {
 		{Tool: mcp.NewTool("pods_list",
 			mcp.WithDescription("List all the Kubernetes pods in the current cluster from all namespaces"),
 			mcp.WithNumber("limit",
-				mcp.DefaultNumber(10),
+				mcp.DefaultNumber(5),
+				mcp.Max(5),
 				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
 				mcp.Required(),
 			),
@@ -115,7 +116,7 @@ func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRe
 	limitStr, limitErr := ctr.RequireString("limit")
 	var limit int64 = 0
 	if limitErr == nil && limitStr != "" {
-		parsedLimit, parseErr := strconv.ParseInt(limitStr, 10, 64)
+		parsedLimit, parseErr := strconv.ParseInt(limitStr, 5, 64)
 		if parseErr == nil {
 			limit = parsedLimit
 		}
@@ -125,6 +126,7 @@ func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRe
 		continueToken = ""
 	}
 
+	klog.V(1).Infof("Limit number %v", limit)
 	ret, freshContinueToken, err := k.PodsListInAllNamespaces(ctx, limit, continueToken)
 	duration := time.Since(start)
 
