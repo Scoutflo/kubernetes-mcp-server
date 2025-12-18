@@ -25,8 +25,9 @@ import (
 // }
 
 type ListResourceToolOutput struct {
-	Data          interface{} `json:"data"`
-	ContinueToken string      `json:"continueToken,omitempty"`
+	Data                interface{} `json:"data"`
+	ContinueToken       string      `json:"continueToken,omitempty"`
+	RemainingItemsCount int64       `json:"remainingItemsCount,omitempty"`
 }
 
 func (s *Server) initPods() []server.ServerTool {
@@ -35,8 +36,7 @@ func (s *Server) initPods() []server.ServerTool {
 			mcp.WithDescription("List all the Kubernetes pods in the current cluster from all namespaces"),
 			mcp.WithNumber("limit",
 				mcp.DefaultNumber(5),
-				mcp.Max(5),
-				mcp.Description("Count of the resources that needs to be listed (max value=5), this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
+				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
 				mcp.Required(),
 			),
 			mcp.WithString("continue",
@@ -47,8 +47,7 @@ func (s *Server) initPods() []server.ServerTool {
 			mcp.WithDescription("List all the Kubernetes pods in the specified namespace in the current cluster"),
 			mcp.WithNumber("limit",
 				mcp.DefaultNumber(5),
-				mcp.Max(5),
-				mcp.Description("Count of the resources that needs to be listed (max value=5), this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
+				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
 				mcp.Required(),
 			),
 			mcp.WithString("continue",
@@ -60,8 +59,7 @@ func (s *Server) initPods() []server.ServerTool {
 			mcp.WithDescription("Get a Kubernetes Pod in the current or provided namespace with the provided name"),
 			mcp.WithNumber("limit",
 				mcp.DefaultNumber(5),
-				mcp.Max(5),
-				mcp.Description("Count of the resources that needs to be listed (max value=5), this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
+				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
 				mcp.Required(),
 			),
 			mcp.WithString("continue",
@@ -124,7 +122,7 @@ func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRe
 	continueToken := ctr.GetString("continue", "")
 
 	klog.V(1).Infof("Limit number %v", limit)
-	ret, freshContinueToken, err := k.PodsListInAllNamespaces(ctx, int64(limit), continueToken)
+	ret, freshContinueToken, remainingCount, err := k.PodsListInAllNamespaces(ctx, int64(limit), continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -139,8 +137,9 @@ func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRe
 	}
 
 	response := ListResourceToolOutput{
-		Data:          data,
-		ContinueToken: freshContinueToken,
+		Data:                data,
+		ContinueToken:       freshContinueToken,
+		RemainingItemsCount: remainingCount,
 	}
 
 	jsonBytes, err := json.Marshal(response)
@@ -179,7 +178,7 @@ func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolReques
 
 	continueToken := ctr.GetString("continue", "")
 
-	ret, freshContinueToken, err := k.PodsListInNamespace(ctx, ns, int64(limit), continueToken)
+	ret, freshContinueToken, remainingCount, err := k.PodsListInNamespace(ctx, ns, int64(limit), continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -193,12 +192,10 @@ func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolReques
 		return NewTextResult("", fmt.Errorf("failed to unmarshal pod list: %v", err)), nil
 	}
 
-	response := struct {
-		Data          interface{} `json:"data"`
-		ContinueToken string      `json:"continueToken,omitempty"`
-	}{
-		Data:          data,
-		ContinueToken: freshContinueToken,
+	response := ListResourceToolOutput{
+		Data:                data,
+		ContinueToken:       freshContinueToken,
+		RemainingItemsCount: remainingCount,
 	}
 
 	jsonBytes, err := json.Marshal(response)
