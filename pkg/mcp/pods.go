@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -17,7 +16,7 @@ import (
 //
 // Example usage:
 // {
-//   "name": "pods_list",
+//   "name": "pods_get",
 //   "arguments": {
 //     "k8surl": "https://your-k8s-api-server:6443",
 //     "k8stoken": "your-auth-token"
@@ -32,29 +31,6 @@ type ListResourceToolOutput struct {
 
 func (s *Server) initPods() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("pods_list",
-			mcp.WithDescription("List all the Kubernetes pods in the current cluster from all namespaces"),
-			mcp.WithNumber("limit",
-				mcp.DefaultNumber(5),
-				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
-				mcp.Required(),
-			),
-			mcp.WithString("continue",
-				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
-			),
-		), Handler: s.podsListInAllNamespaces},
-		{Tool: mcp.NewTool("pods_list_in_namespace",
-			mcp.WithDescription("List all the Kubernetes pods in the specified namespace in the current cluster"),
-			mcp.WithNumber("limit",
-				mcp.DefaultNumber(5),
-				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
-				mcp.Required(),
-			),
-			mcp.WithString("continue",
-				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
-			),
-			mcp.WithString("namespace", mcp.Description("Namespace to list pods from"), mcp.Required()),
-		), Handler: s.podsListInNamespace},
 		{Tool: mcp.NewTool("pods_get",
 			mcp.WithDescription("Get a Kubernetes Pod in the current or provided namespace with the provided name"),
 			mcp.WithNumber("limit",
@@ -103,109 +79,6 @@ func (s *Server) initPods() []server.ServerTool {
 			mcp.WithNumber("port", mcp.Description("TCP/IP port to expose from the Pod container (Optional, no port exposed if not provided)")),
 		), Handler: s.podsRun},
 	}
-}
-
-func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	start := time.Now()
-	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: pods_list - listing all pods in all namespaces - got called by session id: %s", sessionID)
-
-	// Get Kubernetes client from request parameters
-	k, err := s.getKubernetesClient(ctr)
-	if err != nil {
-		klog.Errorf("Tool call: pods_list failed to get Kubernetes client after %v: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
-	}
-
-	limit := ctr.GetInt("limit", 10)
-
-	continueToken := ctr.GetString("continue", "")
-
-	klog.V(1).Infof("Limit number %v", limit)
-	ret, freshContinueToken, remainingCount, err := k.PodsListInAllNamespaces(ctx, int64(limit), continueToken)
-	duration := time.Since(start)
-
-	if err != nil {
-		klog.Errorf("Tool call: pods_list failed after %v: %v", duration, err)
-		return NewTextResult("", fmt.Errorf("failed to list pods in all namespaces: %v", err)), nil
-	}
-
-	var data interface{}
-	if err := json.Unmarshal(ret, &data); err != nil {
-		klog.Errorf("Tool call: pods_list failed to unmarshal response after %v: %v", duration, err)
-		return NewTextResult("", fmt.Errorf("failed to unmarshal pod list: %v", err)), nil
-	}
-
-	response := ListResourceToolOutput{
-		Data:                data,
-		ContinueToken:       freshContinueToken,
-		RemainingItemsCount: remainingCount,
-	}
-
-	jsonBytes, err := json.Marshal(response)
-	if err != nil {
-		klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
-		return NewTextResult("", fmt.Errorf("failed to marshal resource list: %v", err)), nil
-	}
-
-	jsonString := string(jsonBytes)
-
-	klog.V(1).Infof("Tool call: pods_list completed successfully in %v by session id: %s", duration, sessionID)
-	return NewTextResult(jsonString, err), nil
-}
-
-func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	start := time.Now()
-	ns := ctr.GetString("namespace", "")
-
-	sessionID := getSessionID(ctx)
-
-	klog.V(1).Infof("Tool: pods_list_in_namespace - listing all pods in namespace: %s - got called by session id: %s", ns, sessionID)
-
-	if ns == "" {
-		klog.Errorf("Tool call: pods_list_in_namespace failed after %v: missing namespace parameter", time.Since(start))
-		return NewTextResult("", errors.New("failed to list pods in namespace, missing argument namespace")), nil
-	}
-
-	// Get Kubernetes client from request parameters
-	k, err := s.getKubernetesClient(ctr)
-	if err != nil {
-		klog.Errorf("Tool call: pods_list_in_namespace failed to get Kubernetes client after %v: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
-	}
-
-	limit := ctr.GetInt("limit", 10)
-
-	continueToken := ctr.GetString("continue", "")
-
-	ret, freshContinueToken, remainingCount, err := k.PodsListInNamespace(ctx, ns, int64(limit), continueToken)
-	duration := time.Since(start)
-
-	if err != nil {
-		klog.Errorf("Tool call: pods_list_in_namespace failed after %v: %v", duration, err)
-		return NewTextResult("", fmt.Errorf("failed to list pods in namespace %s: %v", ns, err)), nil
-	}
-
-	var data interface{}
-	if err := json.Unmarshal(ret, &data); err != nil {
-		klog.Errorf("Tool call: pods_list_in_namespace failed to unmarshal response after %v: %v", duration, err)
-		return NewTextResult("", fmt.Errorf("failed to unmarshal pod list: %v", err)), nil
-	}
-
-	response := ListResourceToolOutput{
-		Data:                data,
-		ContinueToken:       freshContinueToken,
-		RemainingItemsCount: remainingCount,
-	}
-
-	jsonBytes, err := json.Marshal(response)
-	if err != nil {
-		klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
-		return NewTextResult("", fmt.Errorf("failed to marshal resource list: %v", err)), nil
-	}
-
-	klog.V(1).Infof("Tool call: pods_list_in_namespace completed successfully in %v by session id: %s", duration, sessionID)
-	return mcp.NewToolResultStructured(jsonBytes, ""), nil
 }
 
 func (s *Server) podsGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
