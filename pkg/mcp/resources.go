@@ -11,6 +11,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/yaml"
 )
 
 func (s *Server) initResources() []server.ServerTool {
@@ -36,9 +37,10 @@ func (s *Server) initResources() []server.ServerTool {
 				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
 			),
 			mcp.WithString("namespace",
-				mcp.Description("Optional Namespace to retrieve the namespaced resources from (ignored in case of cluster scoped resources). If not provided, will list resources from all namespaces"))),
-			Handler: s.resourcesList,
-		},
+				mcp.Description("Optional Namespace to retrieve the namespaced resources from (ignored in case of cluster scoped resources). If not provided, will list resources from all namespaces")),
+			mcp.WithString("view",
+				mcp.Description("Output format: 'json' (default) or 'yaml'. When 'yaml' is specified, the response will be in YAML format instead of JSON.")),
+		), Handler: s.resourcesList},
 		{Tool: mcp.NewTool("resources_get",
 			mcp.WithDescription("Get a Kubernetes resource in the current cluster by providing its apiVersion, kind, optionally the namespace, and its name\n"+
 				commonApiVersion),
@@ -79,29 +81,6 @@ func (s *Server) initResources() []server.ServerTool {
 			),
 			mcp.WithString("name", mcp.Description("Name of the resource"), mcp.Required()),
 		), Handler: s.resourcesDelete},
-		{Tool: mcp.NewTool("get_resources_yaml",
-			mcp.WithDescription("Get the YAML representation of a resource in Kubernetes\n"+
-				commonApiVersion),
-			mcp.WithString("apiVersion",
-				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
-				mcp.Required(),
-			),
-			mcp.WithString("kind",
-				mcp.Description("kind of the resource (examples of valid kind are: Pod, Service, Deployment, Ingress)"),
-				mcp.Required(),
-			),
-			mcp.WithNumber("limit",
-				mcp.DefaultNumber(5),
-				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
-				mcp.Required()),
-			mcp.WithString("continue",
-				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
-			),
-			mcp.WithString("namespace",
-				mcp.Description("The namespace of the resource to get the definition for"),
-			),
-			mcp.WithString("name", mcp.Description("The name of the resource to get the YAML definition for. If not provided, all resources of the given type will be returned")),
-		), Handler: s.resourcesYaml},
 		// {Tool: mcp.NewTool("apply_manifest",
 		// 	mcp.WithDescription("Apply a YAML resource file to the Kubernetes cluster"),
 		// 	mcp.WithString("manifest_path",
@@ -155,6 +134,7 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	limit := ctr.GetInt("limit", 10)
 
 	continueToken := ctr.GetString("continue", "")
+	view := ctr.GetString("view", "json")
 
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
@@ -163,7 +143,7 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	}
 
 	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: resources_list - apiVersion: %s, kind: %s, namespace: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, sessionID)
+	klog.V(1).Infof("Tool: resources_list - apiVersion: %s, kind: %s, namespace: %s, view: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, view, sessionID)
 
 	ret, freshContinueToken, remainingCount, err := k.ResourcesList(ctx, gvk, namespace, int64(limit), continueToken)
 	duration := time.Since(start)
@@ -183,6 +163,16 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		Data:                data,
 		ContinueToken:       freshContinueToken,
 		RemainingItemsCount: remainingCount,
+	}
+
+	if view == "yaml" {
+		yamlBytes, err := yaml.Marshal(response)
+		if err != nil {
+			klog.Errorf("Tool call: resources_list failed to marshal result to YAML after %v: %v", duration, err)
+			return NewTextResult("", fmt.Errorf("failed to marshal resource list to YAML: %v", err)), nil
+		}
+		klog.V(1).Infof("Tool call: resources_list completed successfully in %v by session id: %s", duration, sessionID)
+		return NewTextResult(string(yamlBytes), nil), nil
 	}
 
 	jsonBytes, err := json.Marshal(response)
@@ -311,75 +301,6 @@ func parseGroupVersionKind(arguments map[string]interface{}) (*schema.GroupVersi
 		return nil, errors.New("invalid argument apiVersion")
 	}
 	return &schema.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind.(string)}, nil
-}
-
-func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	start := time.Now()
-	k, err := s.getKubernetesClient(ctr)
-	if err != nil {
-		klog.Errorf("Tool call: get_resources_yaml failed to get Kubernetes client after %v: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
-	}
-	namespace, err := ctr.RequireString("namespace")
-	if err != nil {
-		namespace = ""
-	}
-
-	limit := ctr.GetInt("limit", 10)
-
-	continueToken := ctr.GetString("continue", "")
-
-	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
-	if err != nil {
-		klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to get YAML, %s", err)), nil
-	}
-
-	name := ctr.GetString("name", "")
-
-	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: get_resources_yaml - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, name, sessionID)
-
-	if name != "" {
-		// Get a specific resource
-		ret, err := k.ResourcesGet(ctx, gvk, namespace, name)
-		duration := time.Since(start)
-		if err != nil {
-			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
-			return NewTextResult("", fmt.Errorf("failed to get resource YAML: %v", err)), nil
-		}
-		klog.V(1).Infof("Tool call: get_resources_yaml completed successfully in %v by session id: %s", duration, sessionID)
-		return NewTextResult(ret, err), nil
-	} else {
-		// Get all resources of this type in the namespace
-		ret, freshContinueToken, remainingCount, err := k.ResourcesList(ctx, gvk, namespace, int64(limit), continueToken)
-		duration := time.Since(start)
-		if err != nil {
-			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
-			return NewTextResult("", fmt.Errorf("failed to list resources YAML: %v", err)), nil
-		}
-
-		var data interface{}
-		if err := json.Unmarshal(ret, &data); err != nil {
-			klog.Errorf("Tool call: get_resources_yaml failed to unmarshal response after %v: %v", duration, err)
-			return NewTextResult("", fmt.Errorf("failed to unmarshal resource list: %v", err)), nil
-		}
-
-		response := ListResourceToolOutput{
-			Data:                data,
-			ContinueToken:       freshContinueToken,
-			RemainingItemsCount: remainingCount,
-		}
-
-		jsonBytes, err := json.Marshal(response)
-		if err != nil {
-			klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
-			return NewTextResult("", fmt.Errorf("failed to marshal resource list: %v", err)), nil
-		}
-
-		klog.V(1).Infof("Tool call: get_resources_yaml completed successfully in %v by session id: %s", duration, sessionID)
-		return NewTextResult(string(jsonBytes), err), nil
-	}
 }
 
 // func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
