@@ -196,9 +196,22 @@ func (k *Kubernetes) GetPrometheusTargetMetadata(matchTarget, metric string, lim
 }
 
 // GetPrometheusAlerts retrieves all currently firing alerts from Prometheus
-func (k *Kubernetes) GetPrometheusAlerts() (string, error) {
+func (k *Kubernetes) GetPrometheusAlerts(startTime, endTime *time.Time) (string, error) {
+	endpoint := "/apis/v1/prometheus/alerts"
+	
+	if startTime != nil && !startTime.IsZero() {
+		endpoint = fmt.Sprintf("%s?start_time=%d", endpoint, startTime.Unix())
+	}
+	if endTime != nil && !endTime.IsZero() {
+		if startTime != nil && !startTime.IsZero() {
+			endpoint = fmt.Sprintf("%s&end_time=%d", endpoint, endTime.Unix())
+		} else {
+			endpoint = fmt.Sprintf("%s?end_time=%d", endpoint, endTime.Unix())
+		}
+	}
+	
 	// Make API request to K8s Dashboard
-	response, err := k.MakeAPIRequest("GET", "/apis/v1/prometheus/alerts", nil)
+	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to get Prometheus alerts: %w", err)
 	}
@@ -207,7 +220,7 @@ func (k *Kubernetes) GetPrometheusAlerts() (string, error) {
 }
 
 // GetPrometheusRules retrieves information about configured alerting and recording rules
-func (k *Kubernetes) GetPrometheusRules(groupLimit int, ruleNames, ruleGroups, files []string, excludeAlerts bool, matchLabels []string) (string, error) {
+func (k *Kubernetes) GetPrometheusRules(groupLimit int, ruleNames, ruleGroups, files []string, excludeAlerts bool, matchLabels []string, startTime, endTime *time.Time) (string, error) {
 	// Build request body for POST request
 	reqBody := map[string]interface{}{}
 
@@ -234,6 +247,13 @@ func (k *Kubernetes) GetPrometheusRules(groupLimit int, ruleNames, ruleGroups, f
 	// Add group limit if provided
 	if groupLimit > 0 {
 		reqBody["group_limit"] = groupLimit // Send as integer
+	}
+
+	if startTime != nil && !startTime.IsZero() {
+		reqBody["start_time"] = startTime.Unix()
+	}
+	if endTime != nil && !endTime.IsZero() {
+		reqBody["end_time"] = endTime.Unix()
 	}
 
 	// Make API request to K8s Dashboard

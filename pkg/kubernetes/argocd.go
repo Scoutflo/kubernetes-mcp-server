@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 )
 
 // ArgoCD API paths
@@ -333,7 +334,7 @@ func (k *Kubernetes) GetApplication(ctx context.Context, name, refresh string) (
 }
 
 // GetApplicationEvents returns events for an ArgoCD application
-func (k *Kubernetes) GetApplicationEvents(ctx context.Context, appName string) (string, error) {
+func (k *Kubernetes) GetApplicationEvents(ctx context.Context, appName string, startTime, endTime *time.Time) (string, error) {
 	if appName == "" {
 		return "", fmt.Errorf("application name is required")
 	}
@@ -342,6 +343,13 @@ func (k *Kubernetes) GetApplicationEvents(ctx context.Context, appName string) (
 
 	params := url.Values{}
 	params.Add("name", appName)
+
+	if startTime != nil && !startTime.IsZero() {
+		params.Add("start_time", fmt.Sprintf("%d", startTime.Unix()))
+	}
+	if endTime != nil && !endTime.IsZero() {
+		params.Add("end_time", fmt.Sprintf("%d", endTime.Unix()))
+	}
 
 	endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
 
@@ -632,7 +640,7 @@ func (k *Kubernetes) GetApplicationManagedResources(ctx context.Context, name st
 }
 
 // GetApplicationWorkloadLogs gets logs for application workload
-func (k *Kubernetes) GetApplicationWorkloadLogs(ctx context.Context, appName, resourceRef, tail, follow string) (string, error) {
+func (k *Kubernetes) GetApplicationWorkloadLogs(ctx context.Context, appName, resourceRef, tail, follow string, startTime, endTime *time.Time) (string, error) {
 	if appName == "" {
 		return "", fmt.Errorf("application name is required")
 	}
@@ -651,6 +659,12 @@ func (k *Kubernetes) GetApplicationWorkloadLogs(ctx context.Context, appName, re
 	if follow != "" {
 		params.Add("follow", follow)
 	}
+	if startTime != nil && !startTime.IsZero() {
+		params.Add("start_time", fmt.Sprintf("%d", startTime.Unix()))
+	}
+	if endTime != nil && !endTime.IsZero() {
+		params.Add("end_time", fmt.Sprintf("%d", endTime.Unix()))
+	}
 
 	endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
 
@@ -662,7 +676,7 @@ func (k *Kubernetes) GetApplicationWorkloadLogs(ctx context.Context, appName, re
 }
 
 // GetApplicationResourceEvents gets events for a resource managed by an application
-func (k *Kubernetes) GetApplicationResourceEvents(ctx context.Context, appName, resourceRef string) (string, error) {
+func (k *Kubernetes) GetApplicationResourceEvents(ctx context.Context, appName, resourceRef string, startTime, endTime *time.Time) (string, error) {
 	if appName == "" {
 		return "", fmt.Errorf("application name is required")
 	}
@@ -675,6 +689,13 @@ func (k *Kubernetes) GetApplicationResourceEvents(ctx context.Context, appName, 
 	params := url.Values{}
 	params.Add("application_name", appName)
 	params.Add("resource_ref", resourceRef)
+
+	if startTime != nil && !startTime.IsZero() {
+		params.Add("start_time", fmt.Sprintf("%d", startTime.Unix()))
+	}
+	if endTime != nil && !endTime.IsZero() {
+		params.Add("end_time", fmt.Sprintf("%d", endTime.Unix()))
+	}
 
 	endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
 

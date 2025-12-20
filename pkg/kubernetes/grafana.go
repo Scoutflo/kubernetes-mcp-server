@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // GetDashboardByUID retrieves a dashboard by its UID from Grafana
@@ -68,12 +69,20 @@ func (k *Kubernetes) UpdateDashboard(ctx context.Context, dashboard map[string]i
 }
 
 // GetDashboardPanelQueries extracts panel queries from a dashboard by UID
-func (k *Kubernetes) GetDashboardPanelQueries(ctx context.Context, uid string) (string, error) {
+func (k *Kubernetes) GetDashboardPanelQueries(ctx context.Context, uid string, startTime, endTime *time.Time) (string, error) {
 	if uid == "" {
 		return "", fmt.Errorf("uid parameter is required")
 	}
 
 	endpoint := fmt.Sprintf("/apis/v1/grafana/dashboard-panel-queries?uid=%s", url.QueryEscape(uid))
+	
+	if startTime != nil && !startTime.IsZero() {
+		endpoint = fmt.Sprintf("%s&start_time=%d", endpoint, startTime.Unix())
+	}
+	if endTime != nil && !endTime.IsZero() {
+		endpoint = fmt.Sprintf("%s&end_time=%d", endpoint, endTime.Unix())
+	}
+	
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to get dashboard panel queries: %w", err)
