@@ -70,6 +70,9 @@ func (s *Server) initPods() []server.ServerTool {
 			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod logs from")),
 			mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
 			mcp.WithNumber("tail_lines", mcp.Description("Number of lines to get from the end of the logs (Optional, default is 256)")),
+			mcp.WithString("start_time", mcp.Description("Start time for log retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
+			mcp.WithString("end_time", mcp.Description("End time for log retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
+			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves logs from (now - time_window) to now.")),
 		), Handler: s.podsLog},
 		{Tool: mcp.NewTool("pods_run",
 			mcp.WithDescription("Run a Kubernetes Pod in the current or provided namespace with the provided container image and optional name"),
@@ -213,12 +216,45 @@ func (s *Server) podsLog(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 	ns := ctr.GetString("namespace", "")
 	name := ctr.GetString("name", "")
 	tailLines := ctr.GetFloat("tail_lines", 256)
+	startTimeStr := ctr.GetString("start_time", "")
+	endTimeStr := ctr.GetString("end_time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: pods_log - getting logs of pod: %s in namespace: %s with tail lines: %.0f - got called by session id: %s", name, ns, tailLines, sessionID)
 
 	if name == "" {
 		klog.Errorf("Tool call: pods_log failed after %v: missing name parameter", time.Since(start))
 		return NewTextResult("", errors.New("failed to get pod log, missing argument name")), nil
+	}
+
+	var startTime, endTime *time.Time
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			klog.Errorf("Tool call: pods_log failed after %v: invalid time_window format: %v", time.Since(start), err)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else if startTimeStr != "" || endTimeStr != "" {
+		if startTimeStr == "" || endTimeStr == "" {
+			klog.Errorf("Tool call: pods_log failed after %v: both start_time and end_time must be provided together", time.Since(start))
+			return NewTextResult("", errors.New("both start_time and end_time must be provided together, or use time_window")), nil
+		}
+		startParsed := parseTime(startTimeStr, time.Time{})
+		if startParsed.IsZero() {
+			klog.Errorf("Tool call: pods_log failed after %v: invalid start_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid start_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		endParsed := parseTime(endTimeStr, time.Time{})
+		if endParsed.IsZero() {
+			klog.Errorf("Tool call: pods_log failed after %v: invalid end_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid end_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		startTime = &startParsed
+		endTime = &endParsed
 	}
 
 	// Get Kubernetes client from request parameters
@@ -228,7 +264,7 @@ func (s *Server) podsLog(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 
-	ret, err := k.PodsLog(ctx, ns, name, int(tailLines))
+	ret, err := k.PodsLog(ctx, ns, name, int(tailLines), startTime, endTime)
 	duration := time.Since(start)
 
 	if err != nil {

@@ -42,8 +42,11 @@ func (s *Server) initGrafana() []server.ServerTool {
 				mcp.Description("User ID for audit trail")),
 		), Handler: s.grafanaUpdateDashboard},
 		{Tool: mcp.NewTool("grafana_get_dashboard_panel_queries",
-			mcp.WithDescription("Inspect data source queries and configurations for specific dashboard panels to analyze data pipelines"),
+			mcp.WithDescription("Inspect data source queries and configurations for specific dashboard panels to analyze data pipelines. If returning query history, time window parameters are required."),
 			mcp.WithString("uid", mcp.Description("The UID of the dashboard"), mcp.Required()),
+			mcp.WithString("start_time", mcp.Description("Start time for query history retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided and tool returns query history.")),
+			mcp.WithString("end_time", mcp.Description("End time for query history retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided and tool returns query history.")),
+			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided and tool returns query history, retrieves queries from (now - time_window) to now.")),
 		), Handler: s.grafanaGetDashboardPanelQueries},
 		{Tool: mcp.NewTool("grafana_list_datasources",
 			mcp.WithDescription("List all configured data sources with their connection status and type information"),
@@ -260,10 +263,44 @@ func (s *Server) grafanaGetDashboardPanelQueries(ctx context.Context, ctr mcp.Ca
 		return NewTextResult("", errors.New("missing required parameter: uid")), nil
 	}
 
+	startTimeStr := ctr.GetString("start_time", "")
+	endTimeStr := ctr.GetString("end_time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
+
+	var startTime, endTime *time.Time
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			klog.Errorf("Tool call: grafana_get_dashboard_panel_queries failed after %v: invalid time_window format: %v", time.Since(start), err)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else if startTimeStr != "" || endTimeStr != "" {
+		if startTimeStr == "" || endTimeStr == "" {
+			klog.Errorf("Tool call: grafana_get_dashboard_panel_queries failed after %v: both start_time and end_time must be provided together", time.Since(start))
+			return NewTextResult("", errors.New("both start_time and end_time must be provided together, or use time_window")), nil
+		}
+		startParsed := parseTime(startTimeStr, time.Time{})
+		if startParsed.IsZero() {
+			klog.Errorf("Tool call: grafana_get_dashboard_panel_queries failed after %v: invalid start_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid start_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		endParsed := parseTime(endTimeStr, time.Time{})
+		if endParsed.IsZero() {
+			klog.Errorf("Tool call: grafana_get_dashboard_panel_queries failed after %v: invalid end_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid end_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		startTime = &startParsed
+		endTime = &endParsed
+	}
+
 	klog.V(1).Infof("Tool: grafana_get_dashboard_panel_queries - uid: %s - got called by session id: %s", uid, sessionID)
 
 	// Call the Kubernetes client to get the dashboard panel queries
-	result, err := k.GetDashboardPanelQueries(ctx, uid)
+	result, err := k.GetDashboardPanelQueries(ctx, uid, startTime, endTime)
 	duration := time.Since(start)
 
 	if err != nil {

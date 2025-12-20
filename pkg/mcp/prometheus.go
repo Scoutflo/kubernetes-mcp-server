@@ -22,16 +22,17 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		{Tool: mcp.NewTool("prometheus_metrics_query",
 			mcp.WithDescription("Retrieve current metric values through instant queries to monitor real-time system performance"),
 			mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
-			mcp.WithString("time", mcp.Description("Evaluation timestamp in RFC3339 or unix timestamp format (optional)")),
+			mcp.WithString("time", mcp.Description("Evaluation timestamp in RFC3339 or unix timestamp format. Required unless time_window is provided.")),
+			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to time. If provided, evaluates query at (now - time_window).")),
 			mcp.WithString("timeout", mcp.Description("Evaluation timeout (optional)")),
 		), Handler: s.prometheusMetrics},
 		{Tool: mcp.NewTool("prometheus_metrics_query_range",
 			mcp.WithDescription("Obtain historical metric data using range queries to analyze trends and performance patterns"),
 			mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
-			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format")),
-			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format")),
-			mcp.WithString("step", mcp.Description("Query resolution step width (e.g., '15s', '1m', '1h')")),
-			mcp.WithString("range", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start/end")),
+			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format. Required unless range is provided.")),
+			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format. Required unless range is provided.")),
+			mcp.WithString("step", mcp.Description("Query resolution step width (e.g., '15s', '1m', '1h'). Required unless range is provided.")),
+			mcp.WithString("range", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start/end/step. If provided, automatically sets start, end, and step.")),
 			mcp.WithString("timeout", mcp.Description("Evaluation timeout (optional)")),
 		), Handler: s.prometheusMetricsRange},
 		{Tool: mcp.NewTool("prometheus_list_metrics",
@@ -52,8 +53,9 @@ func (s *Server) initPrometheus() []server.ServerTool {
 					}
 				},
 				mcp.Required()),
-			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format (optional)")),
-			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format (optional)")),
+			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format. Required unless time_window is provided.")),
+			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format. Required unless time_window is provided.")),
+			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start/end. If provided, queries series from (now - time_window) to now.")),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of returned items (optional)")),
 		), Handler: s.prometheusSeries},
 		{Tool: mcp.NewTool("prometheus_targets",
@@ -98,6 +100,9 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusListLabelValues},
 		{Tool: mcp.NewTool("prometheus_get_alerts",
 			mcp.WithDescription("List currently firing alerts to identify active issues requiring attention"),
+			mcp.WithString("start_time", mcp.Description("Start time for alert retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
+			mcp.WithString("end_time", mcp.Description("End time for alert retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
+			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves alerts from (now - time_window) to now.")),
 		), Handler: s.prometheusGetAlerts},
 		{Tool: mcp.NewTool("prometheus_get_rules",
 			mcp.WithDescription("Retrieve configured alerting and recording rules to verify their definitions"),
@@ -135,6 +140,9 @@ func (s *Server) initPrometheus() []server.ServerTool {
 				},
 			),
 			mcp.WithNumber("group_limit", mcp.Description("Group limit")),
+			mcp.WithString("start_time", mcp.Description("Start time for rule retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
+			mcp.WithString("end_time", mcp.Description("End time for rule retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
+			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves rules from (now - time_window) to now.")),
 		), Handler: s.prometheusGetRules},
 		{Tool: mcp.NewTool("prometheus_create_alert",
 			mcp.WithDescription("Define new alert rules to monitor specific metric conditions and thresholds"),
@@ -185,10 +193,11 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 	}
 	queryArg := ctr.GetString("query", "")
 	timeArg := ctr.GetString("time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
 	timeout := ctr.GetString("timeout", "")
 
 	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool call: prometheus_metrics_query - query=%s, time=%s, timeout=%s - got called by session id: %s", queryArg, timeArg, timeout, sessionID)
+	klog.V(1).Infof("Tool call: prometheus_metrics_query - query=%s, time=%s, time_window=%s, timeout=%s - got called by session id: %s", queryArg, timeArg, timeWindowStr, timeout, sessionID)
 
 	if queryArg == "" {
 		duration := time.Since(start)
@@ -197,13 +206,27 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 	}
 	query := queryArg
 
-	// Extract optional time parameter
+	// Extract time parameter - either time or time_window must be provided
 	var queryTime *time.Time
-	if timeArg != "" {
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_metrics_query failed after %v: invalid time_window format: %v by session id: %s", duration, err, sessionID)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		evalTime := now.Add(-duration)
+		queryTime = &evalTime
+	} else if timeArg != "" {
 		parsedTime := parseTime(timeArg, time.Time{})
 		if !parsedTime.IsZero() {
 			queryTime = &parsedTime
 		}
+	} else {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_metrics_query failed after %v: missing required parameter: time or time_window by session id: %s", duration, sessionID)
+		return NewTextResult("", errors.New("missing required parameter: either time or time_window must be provided")), nil
 	}
 
 	// Execute the instant query with the provided parameters
@@ -588,25 +611,55 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 		}
 	}
 
-	// Extract optional start parameter
-	var startTime *time.Time
-	if startArg, exists := argsMap["start"]; exists && startArg != nil {
-		if startStr, ok := startArg.(string); ok {
-			parsed := parseTime(startStr, time.Time{})
-			if !parsed.IsZero() {
-				startTime = &parsed
+	// Extract time window parameters - either start/end or time_window must be provided
+	timeWindowStr := ctr.GetString("time_window", "")
+	var startTime, endTime *time.Time
+	
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_series_query failed after %v: invalid time_window format: %v by session id: %s", duration, err, sessionID)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else {
+		// Extract start parameter
+		if startArg, exists := argsMap["start"]; exists && startArg != nil {
+			if startStr, ok := startArg.(string); ok && startStr != "" {
+				parsed := parseTime(startStr, time.Time{})
+				if !parsed.IsZero() {
+					startTime = &parsed
+				} else {
+					duration := time.Since(start)
+					klog.Errorf("Tool call: prometheus_series_query failed after %v: invalid start format by session id: %s", duration, sessionID)
+					return NewTextResult("", errors.New("invalid start format, use RFC3339 or Unix timestamp")), nil
+				}
 			}
 		}
-	}
 
-	// Extract optional end parameter
-	var endTime *time.Time
-	if endArg, exists := argsMap["end"]; exists && endArg != nil {
-		if endStr, ok := endArg.(string); ok {
-			parsed := parseTime(endStr, time.Time{})
-			if !parsed.IsZero() {
-				endTime = &parsed
+		// Extract end parameter
+		if endArg, exists := argsMap["end"]; exists && endArg != nil {
+			if endStr, ok := endArg.(string); ok && endStr != "" {
+				parsed := parseTime(endStr, time.Time{})
+				if !parsed.IsZero() {
+					endTime = &parsed
+				} else {
+					duration := time.Since(start)
+					klog.Errorf("Tool call: prometheus_series_query failed after %v: invalid end format by session id: %s", duration, sessionID)
+					return NewTextResult("", errors.New("invalid end format, use RFC3339 or Unix timestamp")), nil
+				}
 			}
+		}
+
+		// Validate that both start and end are provided if neither time_window is used
+		if startTime == nil || endTime == nil {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_series_query failed after %v: both start and end must be provided, or use time_window by session id: %s", duration, sessionID)
+			return NewTextResult("", errors.New("both start and end must be provided, or use time_window")), nil
 		}
 	}
 
@@ -985,11 +1038,46 @@ func (s *Server) prometheusGetAlerts(ctx context.Context, ctr mcp.CallToolReques
 		klog.Errorf("Tool call: prometheus_get_alerts failed to get Kubernetes client after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
+	
+	startTimeStr := ctr.GetString("start_time", "")
+	endTimeStr := ctr.GetString("end_time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
+
+	var startTime, endTime *time.Time
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			klog.Errorf("Tool call: prometheus_get_alerts failed after %v: invalid time_window format: %v", time.Since(start), err)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else if startTimeStr != "" || endTimeStr != "" {
+		if startTimeStr == "" || endTimeStr == "" {
+			klog.Errorf("Tool call: prometheus_get_alerts failed after %v: both start_time and end_time must be provided together", time.Since(start))
+			return NewTextResult("", errors.New("both start_time and end_time must be provided together, or use time_window")), nil
+		}
+		startParsed := parseTime(startTimeStr, time.Time{})
+		if startParsed.IsZero() {
+			klog.Errorf("Tool call: prometheus_get_alerts failed after %v: invalid start_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid start_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		endParsed := parseTime(endTimeStr, time.Time{})
+		if endParsed.IsZero() {
+			klog.Errorf("Tool call: prometheus_get_alerts failed after %v: invalid end_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid end_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		startTime = &startParsed
+		endTime = &endParsed
+	}
+
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: prometheus_get_alerts - got called by session id: %s", sessionID)
 
 	// Call the Kubernetes function
-	ret, err := k.GetPrometheusAlerts()
+	ret, err := k.GetPrometheusAlerts(startTime, endTime)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_get_alerts failed after %v: %v by session id: %s", duration, err, sessionID)
@@ -1072,12 +1160,46 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 	// Extract group_limit parameter (number) using GetFloat
 	groupLimit := int(ctr.GetFloat("group_limit", 0))
 
+	startTimeStr := ctr.GetString("start_time", "")
+	endTimeStr := ctr.GetString("end_time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
+
+	var startTime, endTime *time.Time
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			klog.Errorf("Tool call: prometheus_get_rules failed after %v: invalid time_window format: %v", time.Since(start), err)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else if startTimeStr != "" || endTimeStr != "" {
+		if startTimeStr == "" || endTimeStr == "" {
+			klog.Errorf("Tool call: prometheus_get_rules failed after %v: both start_time and end_time must be provided together", time.Since(start))
+			return NewTextResult("", errors.New("both start_time and end_time must be provided together, or use time_window")), nil
+		}
+		startParsed := parseTime(startTimeStr, time.Time{})
+		if startParsed.IsZero() {
+			klog.Errorf("Tool call: prometheus_get_rules failed after %v: invalid start_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid start_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		endParsed := parseTime(endTimeStr, time.Time{})
+		if endParsed.IsZero() {
+			klog.Errorf("Tool call: prometheus_get_rules failed after %v: invalid end_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid end_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		startTime = &startParsed
+		endTime = &endParsed
+	}
+
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: prometheus_get_rules - rule_names_count=%d, rule_groups_count=%d, files_count=%d, exclude_alerts=%t, match_labels_count=%d, group_limit=%d - got called by session id: %s",
 		len(ruleNames), len(ruleGroups), len(files), excludeAlerts, len(matchLabels), groupLimit, sessionID)
 
 	// Call the Kubernetes function
-	ret, err := k.GetPrometheusRules(groupLimit, ruleNames, ruleGroups, files, excludeAlerts, matchLabels)
+	ret, err := k.GetPrometheusRules(groupLimit, ruleNames, ruleGroups, files, excludeAlerts, matchLabels, startTime, endTime)
 	if err != nil {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_get_rules failed after %v: %v by session id: %s", duration, err, sessionID)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -51,12 +52,19 @@ func (k *Kubernetes) PodsDelete(ctx context.Context, namespace, name string) (st
 	return "Pod deleted successfully", nil
 }
 
-func (k *Kubernetes) PodsLog(ctx context.Context, namespace, name string, tailLines int) (string, error) {
+func (k *Kubernetes) PodsLog(ctx context.Context, namespace, name string, tailLines int, startTime, endTime *time.Time) (string, error) {
 	queryParams := url.Values{}
 	queryParams.Add("namespace", namespace)
 	queryParams.Add("pod_name", name)
 	// Use the provided tailLines parameter
 	queryParams.Add("tail_lines", fmt.Sprintf("%d", tailLines))
+
+	if startTime != nil && !startTime.IsZero() {
+		queryParams.Add("start_time", fmt.Sprintf("%d", startTime.Unix()))
+	}
+	if endTime != nil && !endTime.IsZero() {
+		queryParams.Add("end_time", fmt.Sprintf("%d", endTime.Unix()))
+	}
 
 	endpoint := "/apis/v1/pod-logs?" + queryParams.Encode()
 
