@@ -16,36 +16,36 @@ import (
 func (s *Server) initPrometheus() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: mcp.NewTool("prometheus_generate_query",
-			mcp.WithDescription("Convert natural language descriptions into valid PromQL queries for efficient metric investigation"),
-			mcp.WithString("description", mcp.Description("Natural language description of the metric you want to query"), mcp.Required()),
+			mcp.WithDescription("Convert natural language descriptions into valid PromQL queries for efficient metric investigation. Uses AI to generate syntactically correct PromQL queries from plain English descriptions, making it easier to query metrics without deep PromQL knowledge."),
+			mcp.WithString("description", mcp.Description("Natural language description of the metric you want to query (required). Be as specific as possible. Examples: 'CPU usage above 80% for all nodes', 'HTTP request rate for the last 5 minutes', 'Memory usage by pod in production namespace'"), mcp.Required()),
 		), Handler: s.prometheusGenerateQuery},
 		{Tool: mcp.NewTool("prometheus_metrics_query",
-			mcp.WithDescription("Retrieve current metric values through instant queries to monitor real-time system performance"),
-			mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
-			mcp.WithString("time", mcp.Description("Evaluation timestamp in RFC3339 or unix timestamp format. Required unless time_window is provided.")),
-			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to time. If provided, evaluates query at (now - time_window).")),
-			mcp.WithString("timeout", mcp.Description("Evaluation timeout (optional)")),
+			mcp.WithDescription("Retrieve current metric values through instant queries to monitor real-time system performance. Executes a PromQL query at a specific point in time and returns the current metric values."),
+			mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string (required). Example: 'up{job=\"prometheus\"}', 'rate(http_requests_total[5m])'"), mcp.Required()),
+			mcp.WithString("time", mcp.Description("Evaluation timestamp in RFC3339 (e.g., '2024-01-01T00:00:00Z') or Unix timestamp format. Required unless time_window is provided.")),
+			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to time. If provided, evaluates query at (now - time_window). If neither time nor time_window is provided, defaults to '24h' (evaluates query 24 hours ago).")),
+			mcp.WithString("timeout", mcp.Description("Evaluation timeout as duration string (optional). Examples: '30s', '1m', '5m'. If not specified, uses Prometheus server default timeout.")),
 		), Handler: s.prometheusMetrics},
 		{Tool: mcp.NewTool("prometheus_metrics_query_range",
-			mcp.WithDescription("Obtain historical metric data using range queries to analyze trends and performance patterns"),
-			mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
-			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format. Required unless range is provided.")),
-			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format. Required unless range is provided.")),
-			mcp.WithString("step", mcp.Description("Query resolution step width (e.g., '15s', '1m', '1h'). Required unless range is provided.")),
-			mcp.WithString("range", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start/end/step. If provided, automatically sets start, end, and step.")),
-			mcp.WithString("timeout", mcp.Description("Evaluation timeout (optional)")),
+			mcp.WithDescription("Obtain historical metric data using range queries to analyze trends and performance patterns over time. Returns metric values at regular intervals within the specified time range."),
+			mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string (required). Example: 'up{job=\"prometheus\"}', 'rate(http_requests_total[5m])'"), mcp.Required()),
+			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 (e.g., '2024-01-01T00:00:00Z') or Unix timestamp format. Required unless range is provided.")),
+			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 (e.g., '2024-01-01T23:59:59Z') or Unix timestamp format. Required unless range is provided. Must be after start timestamp.")),
+			mcp.WithString("step", mcp.Description("Query resolution step width as duration string (e.g., '15s', '1m', '1h'). Required unless range is provided. Determines the interval between data points in the result.")),
+			mcp.WithString("range", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start/end/step. If provided, automatically sets start, end, and step. If not provided and start/end/step are not specified, defaults to '24h' (last 24 hours).")),
+			mcp.WithString("timeout", mcp.Description("Evaluation timeout as duration string (optional). Examples: '30s', '1m', '5m'. If not specified, uses Prometheus server default timeout.")),
 		), Handler: s.prometheusMetricsRange},
 		{Tool: mcp.NewTool("prometheus_list_metrics",
-			mcp.WithDescription("List all available metric names to verify monitoring coverage and discoverability"),
+			mcp.WithDescription("List all available metric names from Prometheus to verify monitoring coverage and discoverability. Returns a comprehensive list of all metrics currently stored in Prometheus, useful for exploring what metrics are available before querying them."),
 		), Handler: s.prometheusListMetrics},
 		{Tool: mcp.NewTool("prometheus_metric_info",
-			mcp.WithDescription("Retrieve metadata and statistics for specific metrics to understand their characteristics"),
-			mcp.WithString("metric", mcp.Description("Name of the metric to get information about"), mcp.Required()),
-			mcp.WithBoolean("include_statistics", mcp.Description("Include count, min, max, and avg statistics for this metric. May be slower for metrics with many time series.")),
+			mcp.WithDescription("Retrieve detailed metadata and statistics for a specific metric to understand its characteristics, labels, and data distribution. Provides information about the metric's type, available labels, and optionally statistical summaries."),
+			mcp.WithString("metric", mcp.Description("Name of the metric to get information about (required). Example: 'http_requests_total', 'cpu_usage_percent'"), mcp.Required()),
+			mcp.WithBoolean("include_statistics", mcp.Description("Include count, min, max, and avg statistics for this metric (optional). When true, calculates statistical summaries which may be slower for metrics with many time series.")),
 		), Handler: s.prometheusMetricInfo},
 		{Tool: mcp.NewTool("prometheus_series_query",
-			mcp.WithDescription("Find time series matching label selectors to isolate relevant metrics for analysis"),
-			mcp.WithArray("match", mcp.Description("Series selector arguments"),
+			mcp.WithDescription("Find time series matching label selectors to isolate relevant metrics for analysis. Returns all time series that match the provided label selectors, useful for discovering available series before querying specific metrics."),
+			mcp.WithArray("match", mcp.Description("Series selector arguments (required). Array of label selectors in PromQL format. Example: ['up{job=\"prometheus\"}', 'http_requests_total{method=\"GET\"}']"),
 				func(schema map[string]interface{}) {
 					schema["type"] = "array"
 					schema["items"] = map[string]interface{}{
@@ -53,28 +53,28 @@ func (s *Server) initPrometheus() []server.ServerTool {
 					}
 				},
 				mcp.Required()),
-			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format. Required unless time_window is provided.")),
-			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format. Required unless time_window is provided.")),
-			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start/end. If provided, queries series from (now - time_window) to now.")),
-			mcp.WithNumber("limit", mcp.Description("Maximum number of returned items (optional)")),
+			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 (e.g., '2024-01-01T00:00:00Z') or Unix timestamp format. Required unless time_window is provided.")),
+			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 (e.g., '2024-01-01T23:59:59Z') or Unix timestamp format. Required unless time_window is provided. Must be after start timestamp.")),
+			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start/end. If provided, queries series from (now - time_window) to now. If not provided and start/end are not specified, defaults to '24h'.")),
+			mcp.WithNumber("limit", mcp.Description("Maximum number of returned items (optional). Defaults to 1000 if not specified.")),
 		), Handler: s.prometheusSeries},
 		{Tool: mcp.NewTool("prometheus_targets",
-			mcp.WithDescription("List active scrape targets with health status to verify data collection integrity"),
-			mcp.WithString("state", mcp.Description("Target state filter, must be one of: active, dropped, any (optional)")),
-			mcp.WithString("scrape_pool", mcp.Description("Scrape pool name (optional)")),
+			mcp.WithDescription("List active scrape targets with health status to verify data collection integrity. Shows all targets that Prometheus is configured to scrape, including their current state (active, dropped) and health status."),
+			mcp.WithString("state", mcp.Description("Target state filter (optional). Must be one of: 'active' (currently being scraped), 'dropped' (targets that are no longer scraped), or 'any' (all targets). If not specified, returns all targets.")),
+			mcp.WithString("scrape_pool", mcp.Description("Scrape pool name filter (optional). Filters targets by the scrape pool they belong to. If not specified, returns targets from all scrape pools.")),
 		), Handler: s.prometheusTargets},
 		{Tool: mcp.NewTool("prometheus_targets_metadata",
-			mcp.WithDescription("Retrieve metric metadata from specific targets to validate exposure consistency"),
-			mcp.WithString("match_target", mcp.Description("Target label selectors (optional)")),
-			mcp.WithString("metric", mcp.Description("Metric name (optional)")),
-			mcp.WithNumber("limit", mcp.Description("Maximum number of targets (optional)")),
+			mcp.WithDescription("Retrieve metric metadata from specific targets to validate exposure consistency. Returns metadata about metrics exposed by Prometheus scrape targets, including metric types, help text, and unit information."),
+			mcp.WithString("match_target", mcp.Description("Target label selectors (optional). Filters targets by label selectors. Example: 'job=\"prometheus\"', 'instance=~\".*:9090\"'. If not specified, returns metadata from all targets.")),
+			mcp.WithString("metric", mcp.Description("Metric name filter (optional). Filters results to show metadata only for the specified metric. If not specified, returns metadata for all metrics.")),
+			mcp.WithNumber("limit", mcp.Description("Maximum number of targets to return (optional). If not specified, returns metadata from all matching targets.")),
 		), Handler: s.prometheusTargetMetadata},
 		{Tool: mcp.NewTool("prometheus_list_label_names",
-			mcp.WithDescription("List all label names across metrics to understand dimensional structure"),
-			mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the time range to filter the results by")),
-			mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the time range to filter the results by")),
-			mcp.WithNumber("limit", mcp.Description("Optionally, the maximum number of results to return")),
-			mcp.WithArray("matches", mcp.Description("Optionally, a list of label matchers to filter the results by"),
+			mcp.WithDescription("List all label names across metrics to understand dimensional structure. Returns all available label names that can be used for filtering and querying metrics."),
+			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format (optional). Filters results to labels present during this time range.")),
+			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format (optional). Filters results to labels present during this time range.")),
+			mcp.WithNumber("limit", mcp.Description("Maximum number of label names to return (optional). If not specified, returns all available label names.")),
+			mcp.WithArray("matches", mcp.Description("List of series selectors to filter results (optional). Format: ['metric_name{label=\"value\"}', ...]"),
 				func(schema map[string]interface{}) {
 					schema["type"] = "array"
 					schema["items"] = map[string]interface{}{
@@ -84,12 +84,12 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			),
 		), Handler: s.prometheusListLabelNames},
 		{Tool: mcp.NewTool("prometheus_list_label_values",
-			mcp.WithDescription("List values for specific labels to identify monitored instances and dimensions"),
-			mcp.WithString("labelName", mcp.Description("The name of the label to query"), mcp.Required()),
-			mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the query")),
-			mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the query")),
-			mcp.WithNumber("limit", mcp.Description("Optionally, the maximum number of results to return")),
-			mcp.WithArray("matches", mcp.Description("Optionally, a list of selectors to filter the results by"),
+			mcp.WithDescription("List all values for a specific label name to identify monitored instances and dimensions. Useful for discovering available values for labels like 'instance', 'job', 'namespace', etc."),
+			mcp.WithString("labelName", mcp.Description("The name of the label to query (required). Example: 'instance', 'job', 'namespace', 'pod'"), mcp.Required()),
+			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format (optional). Filters results to label values present during this time range.")),
+			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format (optional). Filters results to label values present during this time range.")),
+			mcp.WithNumber("limit", mcp.Description("Maximum number of label values to return (optional). If not specified, returns all available values for the label.")),
+			mcp.WithArray("matches", mcp.Description("List of series selectors to filter results (optional). Format: ['metric_name{label=\"value\"}', ...]"),
 				func(schema map[string]interface{}) {
 					schema["type"] = "array"
 					schema["items"] = map[string]interface{}{
@@ -99,14 +99,14 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			),
 		), Handler: s.prometheusListLabelValues},
 		{Tool: mcp.NewTool("prometheus_get_alerts",
-			mcp.WithDescription("List currently firing alerts to identify active issues requiring attention"),
+			mcp.WithDescription("List currently firing alerts to identify active issues requiring attention. Returns all alerts that are currently in the 'firing' state, including alert labels, annotations, and active time ranges."),
 			mcp.WithString("start_time", mcp.Description("Start time for alert retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
-			mcp.WithString("end_time", mcp.Description("End time for alert retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
-			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves alerts from (now - time_window) to now.")),
+			mcp.WithString("end_time", mcp.Description("End time for alert retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided. Must be after start_time.")),
+			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves alerts from (now - time_window) to now. If not provided and start_time/end_time are not specified, defaults to '24h'.")),
 		), Handler: s.prometheusGetAlerts},
 		{Tool: mcp.NewTool("prometheus_get_rules",
-			mcp.WithDescription("Retrieve configured alerting and recording rules to verify their definitions"),
-			mcp.WithArray("rule_name", mcp.Description("Rule names filter"),
+			mcp.WithDescription("Retrieve configured alerting and recording rules to verify their definitions. Returns all alerting rules and recording rules configured in Prometheus, including their expressions, labels, annotations, and evaluation states."),
+			mcp.WithArray("rule_name", mcp.Description("Rule names filter (optional). Array of specific rule names to retrieve. Example: ['HighCPUUsage', 'LowMemory']. If not specified, returns all rules."),
 				func(schema map[string]interface{}) {
 					schema["type"] = "array"
 					schema["items"] = map[string]interface{}{
@@ -114,7 +114,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 					}
 				},
 			),
-			mcp.WithArray("rule_group", mcp.Description("Rule group names filter"),
+			mcp.WithArray("rule_group", mcp.Description("Rule group names filter (optional). Array of rule group names to filter by. Example: ['kubernetes', 'node']. If not specified, returns rules from all groups."),
 				func(schema map[string]interface{}) {
 					schema["type"] = "array"
 					schema["items"] = map[string]interface{}{
@@ -122,7 +122,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 					}
 				},
 			),
-			mcp.WithArray("file", mcp.Description("File paths filter"),
+			mcp.WithArray("file", mcp.Description("File paths filter (optional). Array of rule file paths to filter by. Example: ['/etc/prometheus/rules/*.yml']. If not specified, returns rules from all files."),
 				func(schema map[string]interface{}) {
 					schema["type"] = "array"
 					schema["items"] = map[string]interface{}{
@@ -130,8 +130,8 @@ func (s *Server) initPrometheus() []server.ServerTool {
 					}
 				},
 			),
-			mcp.WithBoolean("exclude_alerts", mcp.Description("Exclude alerts flag")),
-			mcp.WithArray("match", mcp.Description("Label selectors"),
+			mcp.WithBoolean("exclude_alerts", mcp.Description("Exclude alerts flag (optional). When true, excludes alerting rules and returns only recording rules. Defaults to false.")),
+			mcp.WithArray("match", mcp.Description("Label selectors (optional). Array of label matchers to filter rules. Example: ['severity=\"critical\"', 'team=\"platform\"']. If not specified, returns all matching rules."),
 				func(schema map[string]interface{}) {
 					schema["type"] = "array"
 					schema["items"] = map[string]interface{}{
@@ -139,45 +139,45 @@ func (s *Server) initPrometheus() []server.ServerTool {
 					}
 				},
 			),
-			mcp.WithNumber("group_limit", mcp.Description("Group limit")),
+			mcp.WithNumber("group_limit", mcp.Description("Group limit (optional). Maximum number of rule groups to return. If not specified, returns all matching rule groups.")),
 			mcp.WithString("start_time", mcp.Description("Start time for rule retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
-			mcp.WithString("end_time", mcp.Description("End time for rule retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
-			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves rules from (now - time_window) to now.")),
+			mcp.WithString("end_time", mcp.Description("End time for rule retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided. Must be after start_time.")),
+			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves rules from (now - time_window) to now. If not provided and start_time/end_time are not specified, defaults to '24h'.")),
 		), Handler: s.prometheusGetRules},
 		{Tool: mcp.NewTool("prometheus_create_alert",
-			mcp.WithDescription("Define new alert rules to monitor specific metric conditions and thresholds"),
-			mcp.WithString("alertname", mcp.Description("Name of the alert to create"), mcp.Required()),
-			mcp.WithString("expression", mcp.Description("PromQL expression that defines the alert condition, If not provided, please generate a query using prometheus_generate_query tool"), mcp.Required()),
-			mcp.WithString("applabel", mcp.Description("Application label used to identify the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
-			mcp.WithString("namespace", mcp.Description("Kubernetes namespace to create the alert in"), mcp.Required()),
-			mcp.WithString("interval", mcp.Description("Evaluation interval for the alert group (e.g., '30s', '1m', '5m')")),
-			mcp.WithString("for", mcp.Description("Duration for which the condition must be true before firing (e.g., '5m')")),
-			mcp.WithObject("annotations", mcp.Description("Map of annotations to add to the alert (description, summary, etc.)")),
-			mcp.WithObject("alertlabels", mcp.Description("Map of labels to attach to the alert")),
+			mcp.WithDescription("Define new alert rules to monitor specific metric conditions and thresholds. Creates a PrometheusRule CRD resource in Kubernetes that Prometheus will use to evaluate and fire alerts based on the provided PromQL expression."),
+			mcp.WithString("alertname", mcp.Description("Name of the alert to create (required). This will be the 'alert' label in the firing alert. Example: 'HighCPUUsage', 'PodCrashLooping'"), mcp.Required()),
+			mcp.WithString("expression", mcp.Description("PromQL expression that defines the alert condition (required). The expression should evaluate to a boolean or numeric value. If you need help generating a query, use the prometheus_generate_query tool first. Example: 'cpu_usage > 0.8', 'rate(http_errors_total[5m]) > 10'"), mcp.Required()),
+			mcp.WithString("applabel", mcp.Description("Application label used to identify the PrometheusRule resource (required). This label is used to group alerts together in the same PrometheusRule resource. If not provided, the alertname will be used as the applabel."), mcp.Required()),
+			mcp.WithString("namespace", mcp.Description("Kubernetes namespace to create the alert in (required). The PrometheusRule resource will be created in this namespace. Example: 'default', 'monitoring', 'production'"), mcp.Required()),
+			mcp.WithString("interval", mcp.Description("Evaluation interval for the alert group (optional). How often Prometheus evaluates this alert. Examples: '30s', '1m', '5m'. Defaults to '1m' if not specified.")),
+			mcp.WithString("for", mcp.Description("Duration for which the condition must be true before firing (optional). Prevents flapping alerts. Examples: '5m', '10m', '1h'. Defaults to '5m' if not specified.")),
+			mcp.WithObject("annotations", mcp.Description("Map of annotations to add to the alert (optional). Annotations provide additional information when the alert fires. Common keys: 'description', 'summary', 'runbook_url'. Example: {'description': 'CPU usage is above 80%', 'summary': 'High CPU detected'}")),
+			mcp.WithObject("alertlabels", mcp.Description("Map of labels to attach to the alert (optional). Labels are used for routing and grouping alerts. Common labels: 'severity', 'team', 'environment'. Example: {'severity': 'critical', 'team': 'platform'}")),
 		), Handler: s.prometheusCreateAlert},
 		{Tool: mcp.NewTool("prometheus_update_alert",
-			mcp.WithDescription("Modify existing alert rules to refine conditions, thresholds, or notification settings"),
-			mcp.WithString("alertname", mcp.Description("Name of the alert to update"), mcp.Required()),
-			mcp.WithString("applabel", mcp.Description("Application label that identifies the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
-			mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert"), mcp.Required()),
-			mcp.WithString("expression", mcp.Description("New PromQL expression for the alert condition")),
-			mcp.WithString("interval", mcp.Description("New evaluation interval for the alert group (e.g., '30s', '1m', '5m')")),
-			mcp.WithString("for", mcp.Description("New duration for which the condition must be true before firing (e.g., '5m')")),
-			mcp.WithObject("annotations", mcp.Description("New or updated annotations for the alert")),
-			mcp.WithObject("alertlabels", mcp.Description("New or updated labels for the alert")),
+			mcp.WithDescription("Modify existing alert rules to refine conditions, thresholds, or notification settings. Updates an existing PrometheusRule CRD resource in Kubernetes, allowing you to change the alert expression, evaluation interval, duration, annotations, or labels."),
+			mcp.WithString("alertname", mcp.Description("Name of the alert to update (required). Must match the existing alert name in the PrometheusRule resource."), mcp.Required()),
+			mcp.WithString("applabel", mcp.Description("Application label that identifies the PrometheusRule resource (required). This is used to locate the correct PrometheusRule resource to update. If not provided, the alertname will be used."), mcp.Required()),
+			mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert (required). The namespace where the PrometheusRule resource exists."), mcp.Required()),
+			mcp.WithString("expression", mcp.Description("New PromQL expression for the alert condition (optional). If provided, replaces the existing expression. Example: 'cpu_usage > 0.9' (updated threshold)")),
+			mcp.WithString("interval", mcp.Description("New evaluation interval for the alert group (optional). Examples: '30s', '1m', '5m'. If provided, updates how often the alert is evaluated.")),
+			mcp.WithString("for", mcp.Description("New duration for which the condition must be true before firing (optional). Examples: '5m', '10m', '1h'. If provided, updates the alert's 'for' duration.")),
+			mcp.WithObject("annotations", mcp.Description("New or updated annotations for the alert (optional). If provided, replaces all existing annotations. Example: {'description': 'Updated description', 'summary': 'New summary'}")),
+			mcp.WithObject("alertlabels", mcp.Description("New or updated labels for the alert (optional). If provided, merges with existing labels. Example: {'severity': 'warning', 'team': 'backend'}")),
 		), Handler: s.prometheusUpdateAlert},
 		{Tool: mcp.NewTool("prometheus_delete_alert",
-			mcp.WithDescription("Remove alert rules to deactivate notifications and simplify monitoring"),
-			mcp.WithString("applabel", mcp.Description("Application label that identifies the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
-			mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert"), mcp.Required()),
-			mcp.WithString("alertname", mcp.Description("Name of the specific alert to delete within the rule group (optional)")),
+			mcp.WithDescription("Remove alert rules to deactivate notifications and simplify monitoring. Deletes either a specific alert from a PrometheusRule resource or the entire PrometheusRule resource if no alertname is specified."),
+			mcp.WithString("applabel", mcp.Description("Application label that identifies the PrometheusRule resource (required). This is used to locate the PrometheusRule resource to delete from. If not provided, the alertname will be used."), mcp.Required()),
+			mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert (required). The namespace where the PrometheusRule resource exists."), mcp.Required()),
+			mcp.WithString("alertname", mcp.Description("Name of the specific alert to delete within the rule group (optional). If provided, only this alert is removed from the PrometheusRule. If not provided, the entire PrometheusRule resource is deleted.")),
 		), Handler: s.prometheusDeleteAlert},
 		{Tool: mcp.NewTool("prometheus_runtimeinfo",
-			mcp.WithDescription("Retrieve server performance metrics to monitor Prometheus instance health"),
+			mcp.WithDescription("Retrieve server performance metrics to monitor Prometheus instance health. Returns detailed runtime information about the Prometheus server including memory usage, goroutine counts, garbage collection statistics, and build information."),
 		), Handler: s.prometheusRuntimeInfo},
 		{Tool: mcp.NewTool("prometheus_TSDB_status",
-			mcp.WithDescription("Obtain database status information to verify storage integrity and performance"),
-			mcp.WithNumber("limit", mcp.Description("Number of items limit")),
+			mcp.WithDescription("Obtain database status information to verify storage integrity and performance. Returns information about the Prometheus Time Series Database (TSDB) including head stats, series counts, chunk counts, and storage details."),
+			mcp.WithNumber("limit", mcp.Description("Number of items limit (optional). Limits the number of results returned. If not specified, returns all available TSDB status information.")),
 		), Handler: s.prometheusTSDBStatus},
 	}
 }
@@ -206,7 +206,16 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 	}
 	query := queryArg
 
-	// Extract time parameter - either time or time_window must be provided
+	// Validate timeout format if provided
+	if timeout != "" {
+		if _, err := time.ParseDuration(timeout); err != nil {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_metrics_query failed after %v: invalid timeout format: %v by session id: %s", duration, err, sessionID)
+			return NewTextResult("", fmt.Errorf("invalid timeout format '%s': must be a valid duration string (e.g., '30s', '1m', '5m'): %v", timeout, err)), nil
+		}
+	}
+
+	// Extract time parameter - either time or time_window must be provided, default to 24h if neither provided
 	var queryTime *time.Time
 	if timeWindowStr != "" {
 		duration, err := time.ParseDuration(timeWindowStr)
@@ -220,13 +229,18 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 		queryTime = &evalTime
 	} else if timeArg != "" {
 		parsedTime := parseTime(timeArg, time.Time{})
-		if !parsedTime.IsZero() {
-			queryTime = &parsedTime
+		if parsedTime.IsZero() {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_metrics_query failed after %v: invalid time format by session id: %s", duration, sessionID)
+			return NewTextResult("", errors.New("invalid time format, use RFC3339 (e.g., '2024-01-01T00:00:00Z') or Unix timestamp")), nil
 		}
+		queryTime = &parsedTime
 	} else {
-		duration := time.Since(start)
-		klog.Errorf("Tool call: prometheus_metrics_query failed after %v: missing required parameter: time or time_window by session id: %s", duration, sessionID)
-		return NewTextResult("", errors.New("missing required parameter: either time or time_window must be provided")), nil
+		// Default to 24 hours ago if neither time nor time_window is provided
+		now := time.Now()
+		defaultTime := now.Add(-24 * time.Hour)
+		queryTime = &defaultTime
+		klog.V(1).Infof("Tool call: prometheus_metrics_query - using default time_window of 24h by session id: %s", sessionID)
 	}
 
 	// Execute the instant query with the provided parameters
@@ -286,6 +300,15 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 		return NewTextResult("", errors.New("missing required parameter: query")), nil
 	}
 
+	// Validate timeout format if provided
+	if timeout != "" {
+		if _, err := time.ParseDuration(timeout); err != nil {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid timeout format: %v by session id: %s", duration, err, sessionID)
+			return NewTextResult("", fmt.Errorf("invalid timeout format '%s': must be a valid duration string (e.g., '30s', '1m', '5m'): %v", timeout, err)), nil
+		}
+	}
+
 	// using range parameter as alternative to start/end/step
 	if rangeArg != "" {
 		// Parse range duration
@@ -330,7 +353,20 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 			}
 		}
 		if stepArg != "" {
+			// Validate step format
+			if _, err := time.ParseDuration(stepArg); err != nil {
+				duration := time.Since(start)
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid step format: %v by session id: %s", duration, err, sessionID)
+				return NewTextResult("", fmt.Errorf("invalid step format '%s': must be a valid duration string (e.g., '15s', '1m', '1h'): %v", stepArg, err)), nil
+			}
 			step = stepArg
+		}
+
+		// Validate start < end
+		if startTime.After(endTime) || startTime.Equal(endTime) {
+			duration := time.Since(start)
+			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: start time must be before end time by session id: %s", duration, sessionID)
+			return NewTextResult("", fmt.Errorf("start time (%s) must be before end time (%s)", startTime.Format(time.RFC3339), endTime.Format(time.RFC3339))), nil
 		}
 
 		ret, err := k.QueryPrometheusRange(queryArg, startTime, endTime, step, timeout)
@@ -362,6 +398,38 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 	}
 
 	// validation for start/end/step when range is not provided
+	// If none are provided, default to 24h range
+	if startArg == "" && endArg == "" && stepArg == "" {
+		// Default to 24 hours ago to now
+		endTime := time.Now()
+		startTime := endTime.Add(-24 * time.Hour)
+		step := "5m" // Default step for 24h range
+		klog.V(1).Infof("Tool call: prometheus_metrics_query_range - using default range of 24h by session id: %s", sessionID)
+		ret, err := k.QueryPrometheusRange(queryArg, startTime, endTime, step, timeout)
+		if err != nil {
+			duration := time.Since(start)
+			errMsg := err.Error()
+			if strings.Contains(errMsg, "unknown by name") || strings.Contains(errMsg, "metrics not found") {
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: metric not found: %s by session id: %s", duration, queryArg, sessionID)
+				return NewTextResult("", fmt.Errorf("ERROR: Metric not found. The specified metric '%s' does not exist in Prometheus. Please check the metric name and ensure it's correctly spelled.", queryArg)), nil
+			} else if strings.Contains(errMsg, "parse error") {
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid PromQL syntax: %s by session id: %s", duration, queryArg, sessionID)
+				return NewTextResult("", fmt.Errorf("ERROR: Invalid PromQL query syntax in '%s'. Please check your query format.", queryArg)), nil
+			} else if strings.Contains(errMsg, "failed to discover Prometheus") {
+				klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: cannot connect to Prometheus server by session id: %s", duration, sessionID)
+				return NewTextResult("", fmt.Errorf("ERROR: Cannot connect to Prometheus server. The server may be unavailable or misconfigured.")), nil
+			}
+			klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: %v by session id: %s", duration, err, sessionID)
+			return NewTextResult("", fmt.Errorf("ERROR: Failed to execute Prometheus range query: %v", err)), nil
+		}
+		if strings.Contains(ret, "ERROR_TYPE") && (strings.Contains(ret, "NO_DATA_POINTS") || strings.Contains(ret, "NO_MATCHING_SERIES") || strings.Contains(ret, "METRIC_NOT_FOUND")) {
+			ret = "IMPORTANT - CONCLUSIVE RESULT: " + ret
+		}
+		duration := time.Since(start)
+		klog.V(1).Infof("Tool call: prometheus_metrics_query_range completed successfully in %v by session id: %s", duration, sessionID)
+		return NewTextResult(ret, nil), nil
+	}
+
 	if startArg == "" {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: missing required parameter: start (or use range parameter) by session id: %s", duration, sessionID)
@@ -397,8 +465,20 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 		return NewTextResult("", errors.New("invalid end time format")), nil
 	}
 
-	// Parse step
+	// Parse and validate step
 	step := stepArg
+	if _, err := time.ParseDuration(step); err != nil {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: invalid step format: %v by session id: %s", duration, err, sessionID)
+		return NewTextResult("", fmt.Errorf("invalid step format '%s': must be a valid duration string (e.g., '15s', '1m', '1h'): %v", step, err)), nil
+	}
+
+	// Validate start < end
+	if startTime.After(endTime) || startTime.Equal(endTime) {
+		duration := time.Since(start)
+		klog.Errorf("Tool call: prometheus_metrics_query_range failed after %v: start time must be before end time by session id: %s", duration, sessionID)
+		return NewTextResult("", fmt.Errorf("start time (%s) must be before end time (%s)", startTime.Format(time.RFC3339), endTime.Format(time.RFC3339))), nil
+	}
 
 	// Execute the range query with the provided parameters
 	ret, err := k.QueryPrometheusRange(query, startTime, endTime, step, timeout)
@@ -611,10 +691,10 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 		}
 	}
 
-	// Extract time window parameters - either start/end or time_window must be provided
+	// Extract time window parameters - either start/end or time_window must be provided, default to 24h if neither provided
 	timeWindowStr := ctr.GetString("time_window", "")
 	var startTime, endTime *time.Time
-	
+
 	if timeWindowStr != "" {
 		duration, err := time.ParseDuration(timeWindowStr)
 		if err != nil {
@@ -655,11 +735,31 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 			}
 		}
 
-		// Validate that both start and end are provided if neither time_window is used
-		if startTime == nil || endTime == nil {
+		// If neither time_window nor start/end provided, default to 24h
+		if startTime == nil && endTime == nil {
+			now := time.Now()
+			defaultStart := now.Add(-24 * time.Hour)
+			startTime = &defaultStart
+			endTime = &now
+			klog.V(1).Infof("Tool call: prometheus_series_query - using default time_window of 24h by session id: %s", sessionID)
+		} else if startTime == nil || endTime == nil {
+			// If only one is provided, default the other to create 24h window
+			now := time.Now()
+			if startTime == nil {
+				defaultStart := now.Add(-24 * time.Hour)
+				startTime = &defaultStart
+			}
+			if endTime == nil {
+				endTime = &now
+			}
+			klog.V(1).Infof("Tool call: prometheus_series_query - using default time_window of 24h (one time parameter missing) by session id: %s", sessionID)
+		}
+
+		// Validate start < end
+		if startTime.After(*endTime) || startTime.Equal(*endTime) {
 			duration := time.Since(start)
-			klog.Errorf("Tool call: prometheus_series_query failed after %v: both start and end must be provided, or use time_window by session id: %s", duration, sessionID)
-			return NewTextResult("", errors.New("both start and end must be provided, or use time_window")), nil
+			klog.Errorf("Tool call: prometheus_series_query failed after %v: start time must be before end time by session id: %s", duration, sessionID)
+			return NewTextResult("", fmt.Errorf("start time (%s) must be before end time (%s)", startTime.Format(time.RFC3339), endTime.Format(time.RFC3339))), nil
 		}
 	}
 
@@ -1038,7 +1138,7 @@ func (s *Server) prometheusGetAlerts(ctx context.Context, ctr mcp.CallToolReques
 		klog.Errorf("Tool call: prometheus_get_alerts failed to get Kubernetes client after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
-	
+
 	startTimeStr := ctr.GetString("start_time", "")
 	endTimeStr := ctr.GetString("end_time", "")
 	timeWindowStr := ctr.GetString("time_window", "")
@@ -1071,6 +1171,19 @@ func (s *Server) prometheusGetAlerts(ctx context.Context, ctr mcp.CallToolReques
 		}
 		startTime = &startParsed
 		endTime = &endParsed
+
+		// Validate start < end
+		if startTime.After(*endTime) || startTime.Equal(*endTime) {
+			klog.Errorf("Tool call: prometheus_get_alerts failed after %v: start_time must be before end_time", time.Since(start))
+			return NewTextResult("", fmt.Errorf("start_time (%s) must be before end_time (%s)", startTime.Format(time.RFC3339), endTime.Format(time.RFC3339))), nil
+		}
+	} else {
+		// Neither time_window nor start_time/end_time provided, default to 24h
+		now := time.Now()
+		defaultStart := now.Add(-24 * time.Hour)
+		startTime = &defaultStart
+		endTime = &now
+		klog.V(1).Infof("Tool call: prometheus_get_alerts - using default time_window of 24h by session id: %s", getSessionID(ctx))
 	}
 
 	sessionID := getSessionID(ctx)
@@ -1192,6 +1305,12 @@ func (s *Server) prometheusGetRules(ctx context.Context, ctr mcp.CallToolRequest
 		}
 		startTime = &startParsed
 		endTime = &endParsed
+
+		// Validate start < end
+		if startTime.After(*endTime) || startTime.Equal(*endTime) {
+			klog.Errorf("Tool call: prometheus_get_rules failed after %v: start_time must be before end_time", time.Since(start))
+			return NewTextResult("", fmt.Errorf("start_time (%s) must be before end_time (%s)", startTime.Format(time.RFC3339), endTime.Format(time.RFC3339))), nil
+		}
 	}
 
 	sessionID := getSessionID(ctx)
@@ -1269,8 +1388,8 @@ func (s *Server) prometheusListLabelNames(ctx context.Context, ctr mcp.CallToolR
 		klog.Errorf("Tool call: prometheus_list_label_names failed to get Kubernetes client after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
-	startRfc3339 := ctr.GetString("startRfc3339", "")
-	endRfc3339 := ctr.GetString("endRfc3339", "")
+	startRfc3339 := ctr.GetString("start", "")
+	endRfc3339 := ctr.GetString("end", "")
 	limit := int(ctr.GetFloat("limit", 0))
 
 	// Extract matches parameter using GetRawArguments
@@ -1289,7 +1408,7 @@ func (s *Server) prometheusListLabelNames(ctx context.Context, ctr mcp.CallToolR
 	}
 
 	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: prometheus_list_label_names - startRfc3339=%s, endRfc3339=%s, limit=%d, matches_count=%d - got called by session id: %s",
+	klog.V(1).Infof("Tool: prometheus_list_label_names - start=%s, end=%s, limit=%d, matches_count=%d - got called by session id: %s",
 		startRfc3339, endRfc3339, limit, len(matches), sessionID)
 
 	// Call the Kubernetes function
@@ -1314,8 +1433,8 @@ func (s *Server) prometheusListLabelValues(ctx context.Context, ctr mcp.CallTool
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 	labelName := ctr.GetString("labelName", "")
-	startRfc3339 := ctr.GetString("startRfc3339", "")
-	endRfc3339 := ctr.GetString("endRfc3339", "")
+	startRfc3339 := ctr.GetString("start", "")
+	endRfc3339 := ctr.GetString("end", "")
 	limit := int(ctr.GetFloat("limit", 0))
 
 	// Extract matches parameter using GetRawArguments
@@ -1334,7 +1453,7 @@ func (s *Server) prometheusListLabelValues(ctx context.Context, ctr mcp.CallTool
 	}
 
 	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: prometheus_list_label_values - labelName=%s, startRfc3339=%s, endRfc3339=%s, limit=%d, matches_count=%d - got called by session id: %s",
+	klog.V(1).Infof("Tool: prometheus_list_label_values - labelName=%s, start=%s, end=%s, limit=%d, matches_count=%d - got called by session id: %s",
 		labelName, startRfc3339, endRfc3339, limit, len(matches), sessionID)
 
 	// Extract required parameters
