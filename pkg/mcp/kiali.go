@@ -12,38 +12,65 @@ import (
 
 func (s *Server) initKiali() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("kiali_health_check",
+		{Tool: WithMeta(
+			mcp.NewTool("kiali_health_check",
 			mcp.WithDescription("Check the health of Kiali service. Verifies if Kiali is accessible and responding properly."),
+		),
+			map[string]any{"provider": ProviderKiali},
 		), Handler: s.kialiHealthCheck},
-		{Tool: mcp.NewTool("kiali_namespace_validations",
+		{Tool: WithMeta(
+			mcp.NewTool("kiali_namespace_validations",
 			mcp.WithDescription("Namespace Validation Auditor - Detects Istio configuration errors before they cause outages. Scans VirtualServices, DestinationRules, and policies for semantic/runtime errors like invalid hosts or conflicting rules. Provides actionable diagnostics to prevent traffic disruptions and accelerate troubleshooting."),
 			mcp.WithString("namespace", mcp.Description("Namespace to get validations for"), mcp.Required()),
+		),
+			map[string]any{"provider": ProviderKiali},
 		), Handler: s.kialiNamespaceValidations},
-		{Tool: mcp.NewTool("kiali_namespace_tls",
+		{Tool: WithMeta(
+			mcp.NewTool("kiali_namespace_tls",
 			mcp.WithDescription("Namespace TLS Compliance Checker - Audits the mTLS encryption status across namespace workloads. Evaluates traffic encryption state (STRICT/PERMISSIVE/DISABLED) by synthesizing PeerAuthentications and DestinationRules. Identifies security gaps for compliance enforcement and decrypts TLS-related failure root causes."),
 			mcp.WithString("namespace", mcp.Description("Namespace to get TLS status for"), mcp.Required()),
+		),
+			map[string]any{"provider": ProviderKiali},
 		), Handler: s.kialiNamespaceTLS},
-		{Tool: mcp.NewTool("kiali_clusters_services",
+		{Tool: WithMeta(
+			mcp.NewTool("kiali_clusters_services",
 			mcp.WithDescription("Cluster Service Inventory Tool - Discover all services with Istio sidecar status across clusters. Catalogue services with metadata, labels, and mesh participation status. Enables mesh coverage auditing, orphaned service detection, and dependency mapping."),
 			mcp.WithString("namespace", mcp.Description("Filter by specific namespace (optional)")),
+		),
+			map[string]any{"provider": ProviderKiali},
 		), Handler: s.kialiClustersServices},
-		{Tool: mcp.NewTool("kiali_istio_config",
+		{Tool: WithMeta(
+			mcp.NewTool("kiali_istio_config",
 			mcp.WithDescription("Istio Configuration Inventory Tool - Audits all Istio config objects for drift and compliance. Lists VirtualServices, DestinationRules, Gateways, and ServiceEntries with normalized specs. Detects configuration drift, undocumented changes, and policy violations."),
+		),
+			map[string]any{"provider": ProviderKiali},
 		), Handler: s.kialiIstioConfig},
-		{Tool: mcp.NewTool("kiali_tracing_info",
+		{Tool: WithMeta(
+			mcp.NewTool("kiali_tracing_info",
 			mcp.WithDescription("Tracing Integration Status Tool - Verifies distributed tracing backend connectivity and health. Reports tracing system status (Jaeger/Tempo), endpoint availability, and configuration errors. Ensures trace data exists for incident investigations."),
+		),
+			map[string]any{"provider": ProviderKiali},
 		), Handler: s.kialiTracingInfo},
-		{Tool: mcp.NewTool("kiali_namespace_metrics",
+		{Tool: WithMeta(
+			mcp.NewTool("kiali_namespace_metrics",
 			mcp.WithDescription("Namespace Metrics Aggregator - Provides a namespace-level health and performance overview. Aggregates workload request rates, error ratios, and latency across all services in a namespace. Detects anomalous patterns and degradation hotspots."),
 			mcp.WithString("namespace", mcp.Description("Namespace to get metrics for"), mcp.Required()),
+		),
+			map[string]any{"provider": ProviderKiali},
 		), Handler: s.kialiNamespaceMetrics},
-		{Tool: mcp.NewTool("kiali_service_metrics",
+		{Tool: WithMeta(
+			mcp.NewTool("kiali_service_metrics",
 			mcp.WithDescription("Service Metrics Explorer - Delivers granular service-level traffic and error analytics. Reveals request volumes, failure rates, latency distributions, and traffic composition for individual services. Enables deep dives during outages and performance optimization."),
 			mcp.WithString("namespace", mcp.Description("Namespace of the service"), mcp.Required()),
 			mcp.WithString("service", mcp.Description("Service name"), mcp.Required()),
+		),
+			map[string]any{"provider": ProviderKiali},
 		), Handler: s.kialiServiceMetrics},
-		{Tool: mcp.NewTool("kiali_mesh_graph",
+		{Tool: WithMeta(
+			mcp.NewTool("kiali_mesh_graph",
 			mcp.WithDescription("Mesh Topology Mapper - Visualizes service dependencies with real-time health and security context. Maps workload communications, traffic flow bottlenecks, mTLS status, and failure propagation paths. Essential for blast radius analysis, root cause identification, and security exposure assessment."),
+		),
+			map[string]any{"provider": ProviderKiali},
 		), Handler: s.kialiMeshGraph},
 	}
 }

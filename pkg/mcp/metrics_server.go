@@ -12,14 +12,20 @@ import (
 
 func (s *Server) initMetricsServer() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("nodes_metrics",
-			mcp.WithDescription("Get CPU and memory metrics for all nodes or a specific node"),
-			mcp.WithString("name", mcp.Description("Name of the node (optional, if not provided will return metrics for all nodes)")),
+		{Tool: WithMeta(
+			mcp.NewTool("nodes_metrics",
+				mcp.WithDescription("Get CPU and memory metrics for all nodes or a specific node"),
+				mcp.WithString("name", mcp.Description("Name of the node (optional, if not provided will return metrics for all nodes)")),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.nodesMetrics},
-		{Tool: mcp.NewTool("pods_metrics",
-			mcp.WithDescription("Get CPU and memory metrics for pods in a namespace"),
-			mcp.WithString("namespace", mcp.Description("Namespace to get pod metrics from (optional, if not provided will use default namespace)")),
-			mcp.WithString("name", mcp.Description("Name of the pod (optional, if not provided will return metrics for all pods in the namespace)")),
+		{Tool: WithMeta(
+			mcp.NewTool("pods_metrics",
+				mcp.WithDescription("Get CPU and memory metrics for pods in a namespace"),
+				mcp.WithString("namespace", mcp.Description("Namespace to get pod metrics from (optional, if not provided will use default namespace)")),
+				mcp.WithString("name", mcp.Description("Name of the pod (optional, if not provided will return metrics for all pods in the namespace)")),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsMetrics},
 	}
 }

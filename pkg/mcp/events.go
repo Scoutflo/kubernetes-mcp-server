@@ -12,16 +12,19 @@ import (
 
 func (s *Server) initEvents() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("events_list",
-			mcp.WithDescription("List all the Kubernetes events in the current cluster from all namespaces with optional filtering by namespace, resource name, kind, or API version"),
-			mcp.WithString("namespace",
-				mcp.Description("Optional Namespace to retrieve the events from. If not provided, will list events from all namespaces")),
-			mcp.WithString("involved_object_name",
-				mcp.Description("Optional filter to show events only for resources with this name")),
-			mcp.WithString("involved_object_kind",
-				mcp.Description("Optional filter to show events only for resources of this kind (e.g. Pod, Deployment)")),
-			mcp.WithString("involved_object_api_version",
-				mcp.Description("Optional filter to show events only for resources with this apiVersion")),
+		{Tool: WithMeta(
+			mcp.NewTool("events_list",
+				mcp.WithDescription("List all the Kubernetes events in the current cluster from all namespaces with optional filtering by namespace, resource name, kind, or API version"),
+				mcp.WithString("namespace",
+					mcp.Description("Optional Namespace to retrieve the events from. If not provided, will list events from all namespaces")),
+				mcp.WithString("involved_object_name",
+					mcp.Description("Optional filter to show events only for resources with this name")),
+				mcp.WithString("involved_object_kind",
+					mcp.Description("Optional filter to show events only for resources of this kind (e.g. Pod, Deployment)")),
+				mcp.WithString("involved_object_api_version",
+					mcp.Description("Optional filter to show events only for resources with this apiVersion")),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.eventsList},
 	}
 }

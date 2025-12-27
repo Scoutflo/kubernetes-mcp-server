@@ -13,12 +13,18 @@ import (
 
 func (s *Server) initNodes() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("nodes_list",
-			mcp.WithDescription("List all Kubernetes nodes in the current cluster"),
+		{Tool: WithMeta(
+			mcp.NewTool("nodes_list",
+				mcp.WithDescription("List all Kubernetes nodes in the current cluster"),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.nodesList},
-		{Tool: mcp.NewTool("nodes_get",
-			mcp.WithDescription("Get detailed information about a specific Kubernetes node"),
-			mcp.WithString("name", mcp.Description("Name of the node"), mcp.Required()),
+		{Tool: WithMeta(
+			mcp.NewTool("nodes_get",
+				mcp.WithDescription("Get detailed information about a specific Kubernetes node"),
+				mcp.WithString("name", mcp.Description("Name of the node"), mcp.Required()),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.nodesGet},
 	}
 }

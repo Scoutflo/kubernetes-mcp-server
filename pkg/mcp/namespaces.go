@@ -13,8 +13,11 @@ import (
 func (s *Server) initNamespaces() []server.ServerTool {
 	ret := make([]server.ServerTool, 0)
 	ret = append(ret, server.ServerTool{
-		Tool: mcp.NewTool("namespaces_list",
-			mcp.WithDescription("List all the Kubernetes namespaces in the current cluster"),
+		Tool: WithMeta(
+			mcp.NewTool("namespaces_list",
+				mcp.WithDescription("List all the Kubernetes namespaces in the current cluster"),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.namespacesList,
 	})
 	return ret
