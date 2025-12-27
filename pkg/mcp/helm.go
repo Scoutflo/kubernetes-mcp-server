@@ -31,7 +31,7 @@ func (s *Server) initHelm() []server.ServerTool {
 				),
 			),
 			map[string]any{
-				"provider": ProviderHelm,
+				"provider": ProviderKubernetes,
 				"hitl": map[string]any{
 					"required":     true,
 					"riskLevel":    RiskLow,
@@ -49,7 +49,7 @@ func (s *Server) initHelm() []server.ServerTool {
 				mcp.Required(),
 			),
 		),
-			map[string]any{"provider": ProviderHelm},
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.helmListRepositories},
 
 		{Tool: WithMeta(
@@ -60,7 +60,7 @@ func (s *Server) initHelm() []server.ServerTool {
 				),
 			),
 			map[string]any{
-				"provider": ProviderHelm,
+				"provider": ProviderKubernetes,
 				"hitl": map[string]any{
 					"required":     true,
 					"riskLevel":    RiskLow,
@@ -89,7 +89,7 @@ func (s *Server) initHelm() []server.ServerTool {
 				mcp.Description("The resource to get information about. If not provided, all resources will be returned, can be one of: all, hooks, manifest, notes, values"),
 			),
 		),
-			map[string]any{"provider": ProviderHelm},
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.helmGetRelease},
 
 		{Tool: WithMeta(
@@ -132,7 +132,7 @@ func (s *Server) initHelm() []server.ServerTool {
 				mcp.Description("The output format of the helm list command, one of: table, json, yaml. Prefer table for human readability"),
 			),
 		),
-			map[string]any{"provider": ProviderHelm},
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.helmListReleases},
 
 		{Tool: WithMeta(
@@ -180,7 +180,7 @@ func (s *Server) initHelm() []server.ServerTool {
 				// ),
 			),
 			map[string]any{
-				"provider": ProviderHelm,
+				"provider": ProviderKubernetes,
 				"hitl": map[string]any{
 					"required":     true,
 					"riskLevel":    RiskMedium,
@@ -214,7 +214,7 @@ func (s *Server) initHelm() []server.ServerTool {
 				),
 			),
 			map[string]any{
-				"provider": ProviderHelm,
+				"provider": ProviderKubernetes,
 				"hitl": map[string]any{
 					"required":     true,
 					"riskLevel":    RiskHigh,
@@ -270,7 +270,7 @@ func (s *Server) initHelm() []server.ServerTool {
 				// ),
 			),
 			map[string]any{
-				"provider": ProviderHelm,
+				"provider": ProviderKubernetes,
 				"hitl": map[string]any{
 					"required":     true,
 					"riskLevel":    RiskMedium,

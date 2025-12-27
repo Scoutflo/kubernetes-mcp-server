@@ -58,7 +58,7 @@ func (h HITLConfig) Has(key string) bool {
 
 // WithMeta adds or merges metadata to a tool. If the tool already has metadata,
 // it will be merged with the new metadata (new values override existing ones for same keys).
-// Automatically transforms flat keys with `hitl/` prefix to nested `hitl` object structure.
+// Automatically transforms keys inside nested `hitl` objects to have `hitl/` prefix for LangGraph compatibility.
 func WithMeta(tool mcp.Tool, metadata map[string]any) mcp.Tool {
 	// Start with existing metadata if it exists
 	existingMeta := make(map[string]any)
@@ -70,17 +70,15 @@ func WithMeta(tool mcp.Tool, metadata map[string]any) mcp.Tool {
 		}
 	}
 
-	// Transform incoming metadata: convert flat `hitl/*` keys to nested `hitl` object
+	// Process incoming metadata: handle flat hitl/* keys and nested hitl objects
 	transformedMeta := make(map[string]any)
 	hitlMap := make(map[string]any)
 
-	// Check if metadata already has a nested hitl object
-	var existingHitl map[string]any
+	// Check if existing metadata has a nested hitl object
 	if existingHitlRaw, ok := existingMeta["hitl"]; ok {
 		if existingHitlMap, ok := existingHitlRaw.(map[string]any); ok {
-			existingHitl = existingHitlMap
-			// Copy existing hitl values
-			for k, v := range existingHitl {
+			// Copy existing hitl values (they may already have hitl/ prefix)
+			for k, v := range existingHitlMap {
 				hitlMap[k] = v
 			}
 		}
@@ -89,9 +87,20 @@ func WithMeta(tool mcp.Tool, metadata map[string]any) mcp.Tool {
 	// Process incoming metadata
 	for k, v := range metadata {
 		if strings.HasPrefix(k, "hitl/") {
-			// Extract key without "hitl/" prefix
-			hitlKey := strings.TrimPrefix(k, "hitl/")
-			hitlMap[hitlKey] = v
+			// Flat hitl/* key at top level - add to nested hitl object with hitl/ prefix
+			hitlMap[k] = v
+		} else if k == "hitl" {
+			// Nested hitl object - process its keys
+			if hitlObj, ok := v.(map[string]any); ok {
+				for hitlKey, hitlValue := range hitlObj {
+					// If key doesn't already have hitl/ prefix, add it
+					if !strings.HasPrefix(hitlKey, "hitl/") {
+						hitlMap["hitl/"+hitlKey] = hitlValue
+					} else {
+						hitlMap[hitlKey] = hitlValue
+					}
+				}
+			}
 		} else {
 			// Keep non-hitl keys as-is
 			transformedMeta[k] = v
@@ -106,6 +115,20 @@ func WithMeta(tool mcp.Tool, metadata map[string]any) mcp.Tool {
 	// Merge transformed metadata with existing metadata
 	for k, v := range transformedMeta {
 		existingMeta[k] = v
+	}
+
+	// Transform any existing nested hitl object in merged metadata
+	if hitlObj, ok := existingMeta["hitl"].(map[string]any); ok {
+		transformedHitl := make(map[string]any)
+		for k, v := range hitlObj {
+			// If key doesn't already have hitl/ prefix, add it
+			if !strings.HasPrefix(k, "hitl/") {
+				transformedHitl["hitl/"+k] = v
+			} else {
+				transformedHitl[k] = v
+			}
+		}
+		existingMeta["hitl"] = transformedHitl
 	}
 
 	// Set the merged metadata

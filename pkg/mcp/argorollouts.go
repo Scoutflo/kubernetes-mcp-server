@@ -96,7 +96,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 					),
 				),
 				map[string]any{
-					"provider": ProviderArgoRollouts,
+					"provider": ProviderArgoCD,
 					"hitl": map[string]any{
 						"required":     true,
 						"riskLevel":    RiskLow,
@@ -124,7 +124,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 					),
 				),
 				map[string]any{
-					"provider": ProviderArgoRollouts,
+					"provider": ProviderArgoCD,
 					"hitl": map[string]any{
 						"required":     true,
 						"riskLevel":    RiskMedium,
@@ -149,7 +149,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 					),
 				),
 				map[string]any{
-					"provider": ProviderArgoRollouts,
+					"provider": ProviderArgoCD,
 					"hitl": map[string]any{
 						"required":     true,
 						"riskLevel":    RiskMedium,
@@ -176,7 +176,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 					mcp.Description("Output format (json, yaml, wide)"),
 				),
 			),
-				map[string]any{"provider": ProviderArgoRollouts},
+				map[string]any{"provider": ProviderArgoCD},
 			),
 			Handler: s.getArgoRollout,
 		},
@@ -198,7 +198,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 					),
 				),
 				map[string]any{
-					"provider": ProviderArgoRollouts,
+					"provider": ProviderArgoCD,
 					"hitl": map[string]any{
 						"required":     true,
 						"riskLevel":    RiskMedium,
@@ -223,7 +223,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 					),
 				),
 				map[string]any{
-					"provider": ProviderArgoRollouts,
+					"provider": ProviderArgoCD,
 					"hitl": map[string]any{
 						"required":     true,
 						"riskLevel":    RiskLow,
@@ -255,7 +255,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 					),
 				),
 				map[string]any{
-					"provider": ProviderArgoRollouts,
+					"provider": ProviderArgoCD,
 					"hitl": map[string]any{
 						"required":     true,
 						"riskLevel":    RiskMedium,
