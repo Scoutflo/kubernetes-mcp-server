@@ -15,7 +15,7 @@ import (
 
 func (s *Server) initHelm() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("helm_add_repository",
 				mcp.WithDescription("Add a Helm chart repository"),
 				mcp.WithString("name",
@@ -30,30 +30,48 @@ func (s *Server) initHelm() []server.ServerTool {
 					mcp.Description("Namespace to use for Helm operations (optional)"),
 				),
 			),
-			RiskLow,
-			"This will add a Helm chart repository. Proceed?",
+			map[string]any{
+				"provider": ProviderHelm,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskLow,
+					"approvalType": "single",
+					"message":      "This will add a Helm chart repository. Proceed?",
+				},
+			},
 		), Handler: s.helmAddRepository},
 
-		{Tool: mcp.NewTool("helm_list_repositories",
+		{Tool: WithMeta(
+			mcp.NewTool("helm_list_repositories",
 			mcp.WithDescription("List all configured Helm repositories"),
 			mcp.WithString("random_string",
 				mcp.Description("Dummy parameter for no-parameter tools"),
 				mcp.Required(),
 			),
+		),
+			map[string]any{"provider": ProviderHelm},
 		), Handler: s.helmListRepositories},
 
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("helm_update_repositories",
 				mcp.WithDescription("Update Helm repositories to get the latest charts"),
 				mcp.WithString("repo_name",
 					mcp.Description("Optional name of the repository to update. If not provided, all repositories will be updated"),
 				),
 			),
-			RiskLow,
-			"This will update Helm chart repositories. Proceed?",
+			map[string]any{
+				"provider": ProviderHelm,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskLow,
+					"approvalType": "single",
+					"message":      "This will update Helm chart repositories. Proceed?",
+				},
+			},
 		), Handler: s.helmUpdateRepositories},
 
-		{Tool: mcp.NewTool("helm_get_release",
+		{Tool: WithMeta(
+			mcp.NewTool("helm_get_release",
 			mcp.WithDescription("Get detailed information about a Helm release, available resources are: "+
 				"all (download all information for a named release), "+
 				"hooks (download all hooks for a named release), "+
@@ -70,9 +88,12 @@ func (s *Server) initHelm() []server.ServerTool {
 			mcp.WithString("resource",
 				mcp.Description("The resource to get information about. If not provided, all resources will be returned, can be one of: all, hooks, manifest, notes, values"),
 			),
+		),
+			map[string]any{"provider": ProviderHelm},
 		), Handler: s.helmGetRelease},
 
-		{Tool: mcp.NewTool("helm_list_releases",
+		{Tool: WithMeta(
+			mcp.NewTool("helm_list_releases",
 			mcp.WithDescription("List all of the Helm releases for a specific namespace "+
 				"If the --filter flag is provided, it will be treated as a filter. Filters are "+
 				"regular expressions (Perl compatible) that are applied to the list of releases. "+
@@ -110,9 +131,11 @@ func (s *Server) initHelm() []server.ServerTool {
 			mcp.WithString("output",
 				mcp.Description("The output format of the helm list command, one of: table, json, yaml. Prefer table for human readability"),
 			),
+		),
+			map[string]any{"provider": ProviderHelm},
 		), Handler: s.helmListReleases},
 
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("helm_install_release",
 				mcp.WithDescription("Install a Helm chart. The chart argument can be either: a chart reference('example/mariadb'), "+
 					"a path to a chart directory, a packaged chart, or a fully qualified URL. "+
@@ -156,11 +179,18 @@ func (s *Server) initHelm() []server.ServerTool {
 				// 	mcp.Description("If 'true', wait for the release to be installed (accepted values: 'true', 'false')"),
 				// ),
 			),
-			RiskMedium,
-			"This will install a Helm release and deploy resources to the cluster. Proceed?",
+			map[string]any{
+				"provider": ProviderHelm,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskMedium,
+					"approvalType": "single",
+					"message":      "This will install a Helm release and deploy resources to the cluster. Proceed?",
+				},
+			},
 		), Handler: s.helmInstallRelease},
 
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("helm_uninstall_release",
 				mcp.WithDescription("Uninstall a Helm release takes a release name and namespace as arguments "+
 					"It removes all of the resources associated with the last release of the chart "+
@@ -183,11 +213,18 @@ func (s *Server) initHelm() []server.ServerTool {
 					mcp.Description("If 'true', wait for the release to be uninstalled (accepted values: 'true', 'false')"),
 				),
 			),
-			RiskHigh,
-			"This will uninstall a Helm release and remove all associated resources. This action cannot be undone. Proceed?",
+			map[string]any{
+				"provider": ProviderHelm,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskHigh,
+					"approvalType": "single",
+					"message":      "This will uninstall a Helm release and remove all associated resources. This action cannot be undone. Proceed?",
+				},
+			},
 		), Handler: s.helmUninstallRelease},
 
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("helm_upgrade_release",
 				mcp.WithDescription("Upgrade a release to a new version of a chart. The upgrade arguments must be a release and chart. The chart "+
 					"argument can be either: a chart reference('example/mariadb'), a path to a chart directory, "+
@@ -232,8 +269,15 @@ func (s *Server) initHelm() []server.ServerTool {
 				// 	mcp.Description("If 'true', wait for the release to be upgraded (accepted values: 'true', 'false')"),
 				// ),
 			),
-			RiskMedium,
-			"This will upgrade a Helm release and may modify running resources. Proceed?",
+			map[string]any{
+				"provider": ProviderHelm,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskMedium,
+					"approvalType": "single",
+					"message":      "This will upgrade a Helm release and may modify running resources. Proceed?",
+				},
+			},
 		), Handler: s.helmUpgradeRelease},
 	}
 }

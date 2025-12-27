@@ -15,7 +15,7 @@ import (
 func (s *Server) initArgoRollouts() []server.ServerTool {
 	return []server.ServerTool{
 		{
-			Tool: WithHITLMeta(
+			Tool: WithMeta(
 				mcp.NewTool("create_argo_rollout_config",
 					mcp.WithDescription("Generate rollout configuration manifests with progressive delivery strategies for controlled deployments"),
 					// Required parameters
@@ -95,13 +95,20 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 						mcp.Description("Analysis templates to use during rollout, comma-separated"),
 					),
 				),
-				RiskLow,
-				"This will generate an Argo Rollout configuration. Proceed?",
+				map[string]any{
+					"provider": ProviderArgoRollouts,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskLow,
+						"approvalType": "single",
+						"message":      "This will generate an Argo Rollout configuration. Proceed?",
+					},
+				},
 			),
 			Handler: s.createArgoRolloutsConfig,
 		},
 		{
-			Tool: WithHITLMeta(
+			Tool: WithMeta(
 				mcp.NewTool("promote_argo_rollout",
 					mcp.WithDescription("Advance rollout progression to subsequent stages after verifying current phase stability"),
 					mcp.WithString("name",
@@ -116,13 +123,20 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 						mcp.Description("If 'true', fully promote the rollout instead of just advancing by one step (blue-green strategy only)"),
 					),
 				),
-				RiskMedium,
-				"This will promote an Argo Rollout to the next stage and may affect traffic routing. Proceed?",
+				map[string]any{
+					"provider": ProviderArgoRollouts,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will promote an Argo Rollout to the next stage and may affect traffic routing. Proceed?",
+					},
+				},
 			),
 			Handler: s.promoteArgoRollout,
 		},
 		{
-			Tool: WithHITLMeta(
+			Tool: WithMeta(
 				mcp.NewTool("abort_argo_rollout",
 					mcp.WithDescription("Terminate active rollouts and revert to previous stable versions upon detecting issues"),
 					mcp.WithString("name",
@@ -134,13 +148,21 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 						mcp.Required(),
 					),
 				),
-				RiskMedium,
-				"This will abort an ongoing Argo Rollout and revert to the previous version. Proceed?",
+				map[string]any{
+					"provider": ProviderArgoRollouts,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will abort an ongoing Argo Rollout and revert to the previous version. Proceed?",
+					},
+				},
 			),
 			Handler: s.abortArgoRollout,
 		},
 		{
-			Tool: mcp.NewTool("get_argo_rollout",
+			Tool: WithMeta(
+				mcp.NewTool("get_argo_rollout",
 				mcp.WithDescription("Retrieve rollout status including current phase, progress metrics, and verification results"),
 				mcp.WithString("name",
 					mcp.Description("Name of the rollout"),
@@ -154,10 +176,12 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 					mcp.Description("Output format (json, yaml, wide)"),
 				),
 			),
+				map[string]any{"provider": ProviderArgoRollouts},
+			),
 			Handler: s.getArgoRollout,
 		},
 		{
-			Tool: WithHITLMeta(
+			Tool: WithMeta(
 				mcp.NewTool("set_argo_rollout_weight",
 					mcp.WithDescription("Adjust traffic distribution percentages between canary and stable deployment versions"),
 					mcp.WithString("name",
@@ -173,13 +197,20 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 						mcp.Required(),
 					),
 				),
-				RiskMedium,
-				"This will adjust traffic weight for an Argo Rollout and may affect service availability. Proceed?",
+				map[string]any{
+					"provider": ProviderArgoRollouts,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will adjust traffic weight for an Argo Rollout and may affect service availability. Proceed?",
+					},
+				},
 			),
 			Handler: s.setArgoRolloutWeight,
 		},
 		{
-			Tool: WithHITLMeta(
+			Tool: WithMeta(
 				mcp.NewTool("pause_argo_rollout",
 					mcp.WithDescription("Temporarily suspend rollout progression for configuration verification or manual checks"),
 					mcp.WithString("name",
@@ -191,13 +222,20 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 						mcp.Required(),
 					),
 				),
-				RiskLow,
-				"This will pause an Argo Rollout. Proceed?",
+				map[string]any{
+					"provider": ProviderArgoRollouts,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskLow,
+						"approvalType": "single",
+						"message":      "This will pause an Argo Rollout. Proceed?",
+					},
+				},
 			),
 			Handler: s.pauseArgoRollout,
 		},
 		{
-			Tool: WithHITLMeta(
+			Tool: WithMeta(
 				mcp.NewTool("set_argo_rollout_image",
 					mcp.WithDescription("Update container image versions within rollouts to deploy new application releases"),
 					mcp.WithString("name",
@@ -216,8 +254,15 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 						mcp.Required(),
 					),
 				),
-				RiskMedium,
-				"This will update the container image for an Argo Rollout and may trigger a new deployment. Proceed?",
+				map[string]any{
+					"provider": ProviderArgoRollouts,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will update the container image for an Argo Rollout and may trigger a new deployment. Proceed?",
+					},
+				},
 			),
 			Handler: s.setArgoRolloutImage,
 		},

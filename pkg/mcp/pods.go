@@ -25,50 +25,72 @@ import (
 
 func (s *Server) initPods() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("pods_list",
-			mcp.WithDescription("List all the Kubernetes pods in the current cluster from all namespaces"),
+		{Tool: WithMeta(
+			mcp.NewTool("pods_list",
+				mcp.WithDescription("List all the Kubernetes pods in the current cluster from all namespaces"),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsListInAllNamespaces},
-		{Tool: mcp.NewTool("pods_list_in_namespace",
-			mcp.WithDescription("List all the Kubernetes pods in the specified namespace in the current cluster"),
-			mcp.WithString("namespace", mcp.Description("Namespace to list pods from"), mcp.Required()),
+		{Tool: WithMeta(
+			mcp.NewTool("pods_list_in_namespace",
+				mcp.WithDescription("List all the Kubernetes pods in the specified namespace in the current cluster"),
+				mcp.WithString("namespace", mcp.Description("Namespace to list pods from"), mcp.Required()),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsListInNamespace},
-		{Tool: mcp.NewTool("pods_get",
-			mcp.WithDescription("Get a Kubernetes Pod in the current or provided namespace with the provided name"),
-			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
-			mcp.WithString("name", mcp.Description("Name of the Pod"), mcp.Required()),
+		{Tool: WithMeta(
+			mcp.NewTool("pods_get",
+				mcp.WithDescription("Get a Kubernetes Pod in the current or provided namespace with the provided name"),
+				mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
+				mcp.WithString("name", mcp.Description("Name of the Pod"), mcp.Required()),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsGet},
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("pods_delete",
 				mcp.WithDescription("Delete a Kubernetes Pod in the current or provided namespace with the provided name"),
 				mcp.WithString("namespace", mcp.Description("Namespace to delete the Pod from")),
 				mcp.WithString("name", mcp.Description("Name of the Pod to delete"), mcp.Required()),
 			),
-			RiskCritical,
-			"This will delete a Kubernetes Pod. This may cause service interruption. Proceed?",
-		), Handler: s.podsDelete},
-		{Tool: mcp.NewTool("pods_exec",
-			mcp.WithDescription("Execute a command in a Kubernetes Pod in the current or provided namespace with the provided name and command"),
-			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
-			mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
-			mcp.WithArray("command", mcp.Description("Command to execute in the Pod container. "+
-				"The first item is the command to be run, and the rest are the arguments to that command. "+
-				`Example: ["ls", "-l", "/tmp"]`),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskCritical,
+					"approvalType": "single",
+					"message":      "This will delete a Kubernetes Pod. This may cause service interruption. Proceed?",
 				},
-				mcp.Required(),
+			},
+		), Handler: s.podsDelete},
+		{Tool: WithMeta(
+			mcp.NewTool("pods_exec",
+				mcp.WithDescription("Execute a command in a Kubernetes Pod in the current or provided namespace with the provided name and command"),
+				mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
+				mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
+				mcp.WithArray("command", mcp.Description("Command to execute in the Pod container. "+
+					"The first item is the command to be run, and the rest are the arguments to that command. "+
+					`Example: ["ls", "-l", "/tmp"]`),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
+					mcp.Required(),
+				),
 			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsExec},
-		{Tool: mcp.NewTool("pods_log",
-			mcp.WithDescription("Get the logs of a Kubernetes Pod in the current or provided namespace with the provided name"),
-			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod logs from")),
-			mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
-			mcp.WithNumber("tail_lines", mcp.Description("Number of lines to get from the end of the logs (Optional, default is 256)")),
+		{Tool: WithMeta(
+			mcp.NewTool("pods_log",
+				mcp.WithDescription("Get the logs of a Kubernetes Pod in the current or provided namespace with the provided name"),
+				mcp.WithString("namespace", mcp.Description("Namespace to get the Pod logs from")),
+				mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
+				mcp.WithNumber("tail_lines", mcp.Description("Number of lines to get from the end of the logs (Optional, default is 256)")),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsLog},
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("pods_run",
 				mcp.WithDescription("Run a Kubernetes Pod in the current or provided namespace with the provided container image and optional name"),
 				mcp.WithString("namespace", mcp.Description("Namespace to run the Pod in")),
@@ -76,8 +98,15 @@ func (s *Server) initPods() []server.ServerTool {
 				mcp.WithString("image", mcp.Description("Container Image to run in the Pod"), mcp.Required()),
 				mcp.WithNumber("port", mcp.Description("TCP/IP port to expose from the Pod container (Optional, no port exposed if not provided)")),
 			),
-			RiskMedium,
-			"This will create and run a new Kubernetes Pod. Proceed?",
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskMedium,
+					"approvalType": "single",
+					"message":      "This will create and run a new Kubernetes Pod. Proceed?",
+				},
+			},
 		), Handler: s.podsRun},
 	}
 }

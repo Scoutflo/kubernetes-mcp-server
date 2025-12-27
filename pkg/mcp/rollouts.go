@@ -15,7 +15,7 @@ import (
 func (s *Server) initRollouts() []server.ServerTool {
 	return []server.ServerTool{
 		{
-			Tool: WithHITLMeta(
+			Tool: WithMeta(
 				mcp.NewTool("rollout",
 					mcp.WithDescription("The rollout action to perform on the resource (history, pause, restart, resume, status, undo)"),
 					mcp.WithString("action", mcp.Description("The action to perform on the resource"), mcp.Required()),
@@ -24,8 +24,15 @@ func (s *Server) initRollouts() []server.ServerTool {
 					mcp.WithString("namespace", mcp.Description("The namespace of the resource (optional, uses default namespace if not provided)")),
 					mcp.WithString("revision", mcp.Description("The revision to rollback to (only used with 'undo' action, defaults to previous revision if not specified)")),
 				),
-				RiskMedium,
-				"This will perform a rollout action on a Kubernetes resource and may affect running workloads. Proceed?",
+				map[string]any{
+					"provider": ProviderKubernetes,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will perform a rollout action on a Kubernetes resource and may affect running workloads. Proceed?",
+					},
+				},
 			),
 			Handler: s.rollout,
 		},

@@ -15,128 +15,164 @@ import (
 
 func (s *Server) initPrometheus() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("prometheus_generate_query",
-			mcp.WithDescription("Convert natural language descriptions into valid PromQL queries for efficient metric investigation"),
-			mcp.WithString("description", mcp.Description("Natural language description of the metric you want to query"), mcp.Required()),
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_generate_query",
+				mcp.WithDescription("Convert natural language descriptions into valid PromQL queries for efficient metric investigation"),
+				mcp.WithString("description", mcp.Description("Natural language description of the metric you want to query"), mcp.Required()),
+			),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusGenerateQuery},
-		{Tool: mcp.NewTool("prometheus_metrics_query",
-			mcp.WithDescription("Retrieve current metric values through instant queries to monitor real-time system performance"),
-			mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
-			mcp.WithString("time", mcp.Description("Evaluation timestamp in RFC3339 or unix timestamp format (optional)")),
-			mcp.WithString("timeout", mcp.Description("Evaluation timeout (optional)")),
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_metrics_query",
+				mcp.WithDescription("Retrieve current metric values through instant queries to monitor real-time system performance"),
+				mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
+				mcp.WithString("time", mcp.Description("Evaluation timestamp in RFC3339 or unix timestamp format (optional)")),
+				mcp.WithString("timeout", mcp.Description("Evaluation timeout (optional)")),
+			),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusMetrics},
-		{Tool: mcp.NewTool("prometheus_metrics_query_range",
-			mcp.WithDescription("Obtain historical metric data using range queries to analyze trends and performance patterns"),
-			mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
-			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format")),
-			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format")),
-			mcp.WithString("step", mcp.Description("Query resolution step width (e.g., '15s', '1m', '1h')")),
-			mcp.WithString("range", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start/end")),
-			mcp.WithString("timeout", mcp.Description("Evaluation timeout (optional)")),
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_metrics_query_range",
+				mcp.WithDescription("Obtain historical metric data using range queries to analyze trends and performance patterns"),
+				mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
+				mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format")),
+				mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format")),
+				mcp.WithString("step", mcp.Description("Query resolution step width (e.g., '15s', '1m', '1h')")),
+				mcp.WithString("range", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start/end")),
+				mcp.WithString("timeout", mcp.Description("Evaluation timeout (optional)")),
+			),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusMetricsRange},
-		{Tool: mcp.NewTool("prometheus_list_metrics",
-			mcp.WithDescription("List all available metric names to verify monitoring coverage and discoverability"),
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_list_metrics",
+				mcp.WithDescription("List all available metric names to verify monitoring coverage and discoverability"),
+			),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusListMetrics},
-		{Tool: mcp.NewTool("prometheus_metric_info",
-			mcp.WithDescription("Retrieve metadata and statistics for specific metrics to understand their characteristics"),
-			mcp.WithString("metric", mcp.Description("Name of the metric to get information about"), mcp.Required()),
-			mcp.WithBoolean("include_statistics", mcp.Description("Include count, min, max, and avg statistics for this metric. May be slower for metrics with many time series.")),
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_metric_info",
+				mcp.WithDescription("Retrieve metadata and statistics for specific metrics to understand their characteristics"),
+				mcp.WithString("metric", mcp.Description("Name of the metric to get information about"), mcp.Required()),
+				mcp.WithBoolean("include_statistics", mcp.Description("Include count, min, max, and avg statistics for this metric. May be slower for metrics with many time series.")),
+			),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusMetricInfo},
-		{Tool: mcp.NewTool("prometheus_series_query",
-			mcp.WithDescription("Find time series matching label selectors to isolate relevant metrics for analysis"),
-			mcp.WithArray("match", mcp.Description("Series selector arguments"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
-				mcp.Required()),
-			mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format (optional)")),
-			mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format (optional)")),
-			mcp.WithNumber("limit", mcp.Description("Maximum number of returned items (optional)")),
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_series_query",
+				mcp.WithDescription("Find time series matching label selectors to isolate relevant metrics for analysis"),
+				mcp.WithArray("match", mcp.Description("Series selector arguments"),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
+					mcp.Required()),
+				mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format (optional)")),
+				mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format (optional)")),
+				mcp.WithNumber("limit", mcp.Description("Maximum number of returned items (optional)")),
+			),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusSeries},
-		{Tool: mcp.NewTool("prometheus_targets",
-			mcp.WithDescription("List active scrape targets with health status to verify data collection integrity"),
-			mcp.WithString("state", mcp.Description("Target state filter, must be one of: active, dropped, any (optional)")),
-			mcp.WithString("scrape_pool", mcp.Description("Scrape pool name (optional)")),
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_targets",
+				mcp.WithDescription("List active scrape targets with health status to verify data collection integrity"),
+				mcp.WithString("state", mcp.Description("Target state filter, must be one of: active, dropped, any (optional)")),
+				mcp.WithString("scrape_pool", mcp.Description("Scrape pool name (optional)")),
+			),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusTargets},
-		{Tool: mcp.NewTool("prometheus_targets_metadata",
-			mcp.WithDescription("Retrieve metric metadata from specific targets to validate exposure consistency"),
-			mcp.WithString("match_target", mcp.Description("Target label selectors (optional)")),
-			mcp.WithString("metric", mcp.Description("Metric name (optional)")),
-			mcp.WithNumber("limit", mcp.Description("Maximum number of targets (optional)")),
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_targets_metadata",
+				mcp.WithDescription("Retrieve metric metadata from specific targets to validate exposure consistency"),
+				mcp.WithString("match_target", mcp.Description("Target label selectors (optional)")),
+				mcp.WithString("metric", mcp.Description("Metric name (optional)")),
+				mcp.WithNumber("limit", mcp.Description("Maximum number of targets (optional)")),
+			),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusTargetMetadata},
-		{Tool: mcp.NewTool("prometheus_list_label_names",
-			mcp.WithDescription("List all label names across metrics to understand dimensional structure"),
-			mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the time range to filter the results by")),
-			mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the time range to filter the results by")),
-			mcp.WithNumber("limit", mcp.Description("Optionally, the maximum number of results to return")),
-			mcp.WithArray("matches", mcp.Description("Optionally, a list of label matchers to filter the results by"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_list_label_names",
+				mcp.WithDescription("List all label names across metrics to understand dimensional structure"),
+				mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the time range to filter the results by")),
+				mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the time range to filter the results by")),
+				mcp.WithNumber("limit", mcp.Description("Optionally, the maximum number of results to return")),
+				mcp.WithArray("matches", mcp.Description("Optionally, a list of label matchers to filter the results by"),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
+				),
 			),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusListLabelNames},
-		{Tool: mcp.NewTool("prometheus_list_label_values",
-			mcp.WithDescription("List values for specific labels to identify monitored instances and dimensions"),
-			mcp.WithString("labelName", mcp.Description("The name of the label to query"), mcp.Required()),
-			mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the query")),
-			mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the query")),
-			mcp.WithNumber("limit", mcp.Description("Optionally, the maximum number of results to return")),
-			mcp.WithArray("matches", mcp.Description("Optionally, a list of selectors to filter the results by"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_list_label_values",
+				mcp.WithDescription("List values for specific labels to identify monitored instances and dimensions"),
+				mcp.WithString("labelName", mcp.Description("The name of the label to query"), mcp.Required()),
+				mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the query")),
+				mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the query")),
+				mcp.WithNumber("limit", mcp.Description("Optionally, the maximum number of results to return")),
+				mcp.WithArray("matches", mcp.Description("Optionally, a list of selectors to filter the results by"),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
+				),
 			),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusListLabelValues},
-		{Tool: mcp.NewTool("prometheus_get_alerts",
-			mcp.WithDescription("List currently firing alerts to identify active issues requiring attention"),
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_get_alerts",
+				mcp.WithDescription("List currently firing alerts to identify active issues requiring attention"),
+			),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusGetAlerts},
-		{Tool: mcp.NewTool("prometheus_get_rules",
-			mcp.WithDescription("Retrieve configured alerting and recording rules to verify their definitions"),
-			mcp.WithArray("rule_name", mcp.Description("Rule names filter"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_get_rules",
+				mcp.WithDescription("Retrieve configured alerting and recording rules to verify their definitions"),
+				mcp.WithArray("rule_name", mcp.Description("Rule names filter"),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
+				),
+				mcp.WithArray("rule_group", mcp.Description("Rule group names filter"),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
+				),
+				mcp.WithArray("file", mcp.Description("File paths filter"),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
+				),
+				mcp.WithBoolean("exclude_alerts", mcp.Description("Exclude alerts flag")),
+				mcp.WithArray("match", mcp.Description("Label selectors"),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
+				),
+				mcp.WithNumber("group_limit", mcp.Description("Group limit")),
 			),
-			mcp.WithArray("rule_group", mcp.Description("Rule group names filter"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
-			),
-			mcp.WithArray("file", mcp.Description("File paths filter"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
-			),
-			mcp.WithBoolean("exclude_alerts", mcp.Description("Exclude alerts flag")),
-			mcp.WithArray("match", mcp.Description("Label selectors"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
-			),
-			mcp.WithNumber("group_limit", mcp.Description("Group limit")),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusGetRules},
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("prometheus_create_alert",
 				mcp.WithDescription("Define new alert rules to monitor specific metric conditions and thresholds"),
 				mcp.WithString("alertname", mcp.Description("Name of the alert to create"), mcp.Required()),
@@ -148,10 +184,17 @@ func (s *Server) initPrometheus() []server.ServerTool {
 				mcp.WithObject("annotations", mcp.Description("Map of annotations to add to the alert (description, summary, etc.)")),
 				mcp.WithObject("alertlabels", mcp.Description("Map of labels to attach to the alert")),
 			),
-			RiskLow,
-			"This will create a new Prometheus alert rule. Proceed?",
+			map[string]any{
+				"provider": ProviderPrometheus,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskLow,
+					"approvalType": "single",
+					"message":      "This will create a new Prometheus alert rule. Proceed?",
+				},
+			},
 		), Handler: s.prometheusCreateAlert},
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("prometheus_update_alert",
 				mcp.WithDescription("Modify existing alert rules to refine conditions, thresholds, or notification settings"),
 				mcp.WithString("alertname", mcp.Description("Name of the alert to update"), mcp.Required()),
@@ -163,25 +206,45 @@ func (s *Server) initPrometheus() []server.ServerTool {
 				mcp.WithObject("annotations", mcp.Description("New or updated annotations for the alert")),
 				mcp.WithObject("alertlabels", mcp.Description("New or updated labels for the alert")),
 			),
-			RiskLow,
-			"This will update an existing Prometheus alert rule. Proceed?",
+			map[string]any{
+				"provider": ProviderPrometheus,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskLow,
+					"approvalType": "single",
+					"message":      "This will update an existing Prometheus alert rule. Proceed?",
+				},
+			},
 		), Handler: s.prometheusUpdateAlert},
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("prometheus_delete_alert",
 				mcp.WithDescription("Remove alert rules to deactivate notifications and simplify monitoring"),
 				mcp.WithString("applabel", mcp.Description("Application label that identifies the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
 				mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert"), mcp.Required()),
 				mcp.WithString("alertname", mcp.Description("Name of the specific alert to delete within the rule group (optional)")),
 			),
-			RiskLow,
-			"This will delete a Prometheus alert rule. Proceed?",
+			map[string]any{
+				"provider": ProviderPrometheus,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskLow,
+					"approvalType": "single",
+					"message":      "This will delete a Prometheus alert rule. Proceed?",
+				},
+			},
 		), Handler: s.prometheusDeleteAlert},
-		{Tool: mcp.NewTool("prometheus_runtimeinfo",
-			mcp.WithDescription("Retrieve server performance metrics to monitor Prometheus instance health"),
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_runtimeinfo",
+				mcp.WithDescription("Retrieve server performance metrics to monitor Prometheus instance health"),
+			),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusRuntimeInfo},
-		{Tool: mcp.NewTool("prometheus_TSDB_status",
-			mcp.WithDescription("Obtain database status information to verify storage integrity and performance"),
-			mcp.WithNumber("limit", mcp.Description("Number of items limit")),
+		{Tool: WithMeta(
+			mcp.NewTool("prometheus_TSDB_status",
+				mcp.WithDescription("Obtain database status information to verify storage integrity and performance"),
+				mcp.WithNumber("limit", mcp.Description("Number of items limit")),
+			),
+			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusTSDBStatus},
 	}
 }

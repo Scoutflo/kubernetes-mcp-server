@@ -15,7 +15,7 @@ func (s *Server) initLabels() []server.ServerTool {
 	commonApiVersion := "v1 Pod, v1 Service, v1 Node, apps/v1 Deployment, networking.k8s.io/v1 Ingress"
 	commonApiVersion = fmt.Sprintf("(common apiVersion and kind include: %s)", commonApiVersion)
 	return []server.ServerTool{
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("label_resource",
 				mcp.WithDescription("Apply labels to a Kubernetes resource\n"+
 					commonApiVersion),
@@ -39,11 +39,18 @@ func (s *Server) initLabels() []server.ServerTool {
 					mcp.Required(),
 				),
 			),
-			RiskLow,
-			"This will add labels to a Kubernetes resource. Proceed?",
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskLow,
+					"approvalType": "single",
+					"message":      "This will add labels to a Kubernetes resource. Proceed?",
+				},
+			},
 		), Handler: s.labelResource},
 
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("remove_label",
 				mcp.WithDescription("Remove a label from a Kubernetes resource\n"+
 					commonApiVersion),
@@ -67,11 +74,18 @@ func (s *Server) initLabels() []server.ServerTool {
 					mcp.Required(),
 				),
 			),
-			RiskLow,
-			"This will remove a label from a Kubernetes resource. Proceed?",
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskLow,
+					"approvalType": "single",
+					"message":      "This will remove a label from a Kubernetes resource. Proceed?",
+				},
+			},
 		), Handler: s.removeLabel},
 
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("annotate_resource",
 				mcp.WithDescription("Apply annotations to a Kubernetes resource\n"+
 					commonApiVersion),
@@ -95,11 +109,18 @@ func (s *Server) initLabels() []server.ServerTool {
 					mcp.Required(),
 				),
 			),
-			RiskLow,
-			"This will add annotations to a Kubernetes resource. Proceed?",
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskLow,
+					"approvalType": "single",
+					"message":      "This will add annotations to a Kubernetes resource. Proceed?",
+				},
+			},
 		), Handler: s.annotateResource},
 
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("remove_annotation",
 				mcp.WithDescription("Remove an annotation from a Kubernetes resource\n"+
 					commonApiVersion),
@@ -123,8 +144,15 @@ func (s *Server) initLabels() []server.ServerTool {
 					mcp.Required(),
 				),
 			),
-			RiskLow,
-			"This will remove an annotation from a Kubernetes resource. Proceed?",
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskLow,
+					"approvalType": "single",
+					"message":      "This will remove an annotation from a Kubernetes resource. Proceed?",
+				},
+			},
 		), Handler: s.removeAnnotation},
 	}
 }

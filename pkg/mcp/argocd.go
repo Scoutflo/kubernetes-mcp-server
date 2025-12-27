@@ -17,7 +17,8 @@ import (
 func (s *Server) initArgoCD() []server.ServerTool {
 	return []server.ServerTool{
 		{
-			Tool: mcp.NewTool("argocd_list_applications",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_list_applications",
 				mcp.WithDescription("List all ArgoCD-managed applications with their synchronization status and health for cluster-wide oversight"),
 				mcp.WithString("project",
 					mcp.Description("Filter applications by project name (optional)"),
@@ -32,10 +33,13 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("Forces application reconciliation if set to 'hard' or 'normal' (optional)"),
 				),
 			),
+				map[string]any{"provider": ProviderArgoCD},
+			),
 			Handler: s.argocdListApplications,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_application",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_application",
 				mcp.WithDescription("Retrieve detailed application configuration including sync state and resource status for deployment inspection"),
 				mcp.WithString("name",
 					mcp.Description("Name of the application"),
@@ -48,20 +52,25 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("Forces application reconciliation if set to 'hard' or 'normal' (optional)"),
 				),
 			),
+				map[string]any{"provider": ProviderArgoCD},
+			),
 			Handler: s.argocdGetApplication,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_application_events",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_application_events",
 				mcp.WithDescription("Access historical events for specific applications to track configuration changes and operational history"),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
 				),
 			),
+				map[string]any{"provider": ProviderArgoCD},
+			),
 			Handler: s.argocdGetApplicationEvents,
 		},
 		{
-			Tool: WithHITLMeta(
+			Tool: WithMeta(
 				mcp.NewTool("argocd_sync_application",
 					mcp.WithDescription("Trigger manual synchronization between Git definitions and cluster resources to enforce desired states"),
 					mcp.WithString("name",
@@ -78,13 +87,20 @@ func (s *Server) initArgoCD() []server.ServerTool {
 						mcp.Description("If 'true', preview the sync without making changes (accepted values: 'true', 'false')"),
 					),
 				),
-				RiskMedium,
-				"This will sync an ArgoCD application and may modify cluster resources. Proceed?",
+				map[string]any{
+					"provider": ProviderArgoCD,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will sync an ArgoCD application and may modify cluster resources. Proceed?",
+					},
+				},
 			),
 			Handler: s.argocdSyncApplication,
 		},
 		{
-			Tool: WithHITLMeta(
+			Tool: WithMeta(
 				mcp.NewTool("argocd_create_application",
 					mcp.WithDescription("Define new applications in ArgoCD to establish GitOps workflows for deployment management. Provide parameters as simple strings - the tool automatically constructs the proper ArgoCD nested structure (metadata, spec.source, spec.destination, spec.syncPolicy). Example: name='my-app', repo_url='https://github.com/user/repo.git', path='k8s/', dest_server='https://kubernetes.default.svc', dest_namespace='production'"),
 					mcp.WithString("name",
@@ -130,13 +146,20 @@ func (s *Server) initArgoCD() []server.ServerTool {
 						mcp.Description("Whether to update the application if it already exists (string, optional). Accepted values: 'true' or 'false'. Default: 'false'"),
 					),
 				),
-				RiskMedium,
-				"This will create a new ArgoCD application and may deploy resources to the cluster. Proceed?",
+				map[string]any{
+					"provider": ProviderArgoCD,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will create a new ArgoCD application and may deploy resources to the cluster. Proceed?",
+					},
+				},
 			),
 			Handler: s.argocdCreateApplication,
 		},
 		{
-			Tool: WithHITLMeta(
+			Tool: WithMeta(
 				mcp.NewTool("argocd_update_application",
 					mcp.WithDescription("Modify application configurations to adjust source repositories, target clusters, or sync policies. Provide only the parameters you want to update as simple strings - the tool automatically constructs the proper ArgoCD nested structure. All parameters except 'name' are optional - only provide the ones you want to change"),
 					mcp.WithString("name",
@@ -174,13 +197,20 @@ func (s *Server) initArgoCD() []server.ServerTool {
 						mcp.Description("Whether to validate the application (string, optional). Accepted values: 'true' or 'false'. Default: 'true'"),
 					),
 				),
-				RiskMedium,
-				"This will update an ArgoCD application configuration and may affect deployments. Proceed?",
+				map[string]any{
+					"provider": ProviderArgoCD,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will update an ArgoCD application configuration and may affect deployments. Proceed?",
+					},
+				},
 			),
 			Handler: s.argocdUpdateApplication,
 		},
 		{
-			Tool: WithHITLMeta(
+			Tool: WithMeta(
 				mcp.NewTool("argocd_delete_application",
 					mcp.WithDescription("Remove applications from ArgoCD management while preserving underlying Kubernetes resources"),
 					mcp.WithString("name",
@@ -194,33 +224,47 @@ func (s *Server) initArgoCD() []server.ServerTool {
 						mcp.Description("The propagation policy ('foreground', 'background', or 'orphan')"),
 					),
 				),
-				RiskHigh,
-				"This will delete an ArgoCD application and may remove associated resources. This action cannot be undone. Proceed?",
+				map[string]any{
+					"provider": ProviderArgoCD,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskHigh,
+						"approvalType": "single",
+						"message":      "This will delete an ArgoCD application and may remove associated resources. This action cannot be undone. Proceed?",
+					},
+				},
 			),
 			Handler: s.argocdDeleteApplication,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_application_resource_tree",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_application_resource_tree",
 				mcp.WithDescription("Retrieve hierarchical dependency relationships between resources within an application"),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
 				),
 			),
+				map[string]any{"provider": ProviderArgoCD},
+			),
 			Handler: s.argocdGetApplicationResourceTree,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_application_managed_resources",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_application_managed_resources",
 				mcp.WithDescription("List all Kubernetes resources currently managed under specific ArgoCD applications"),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
 				),
 			),
+				map[string]any{"provider": ProviderArgoCD},
+			),
 			Handler: s.argocdGetApplicationManagedResources,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_application_workload_logs",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_application_workload_logs",
 				mcp.WithDescription("Access container logs from application workloads to monitor runtime behavior and outputs"),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
@@ -237,10 +281,13 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("Follow logs (accepted values: 'true', 'false', default: 'false')"),
 				),
 			),
+				map[string]any{"provider": ProviderArgoCD},
+			),
 			Handler: s.argocdGetApplicationWorkloadLogs,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_resource_events",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_resource_events",
 				mcp.WithDescription("Retrieve event history for individual Kubernetes resources managed by ArgoCD"),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
@@ -251,10 +298,13 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Required(),
 				),
 			),
+				map[string]any{"provider": ProviderArgoCD},
+			),
 			Handler: s.argocdGetResourceEvents,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_resource_actions",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_resource_actions",
 				mcp.WithDescription("Discover available operations for specific resources like restart, rollback, or resource hooks"),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
@@ -265,10 +315,12 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Required(),
 				),
 			),
+				map[string]any{"provider": ProviderArgoCD},
+			),
 			Handler: s.argocdGetResourceActions,
 		},
 		{
-			Tool: WithHITLMeta(
+			Tool: WithMeta(
 				mcp.NewTool("argocd_run_resource_action",
 					mcp.WithDescription("Execute resource-specific operations such as pod restarts or job retries within applications"),
 					mcp.WithString("name",
@@ -284,8 +336,15 @@ func (s *Server) initArgoCD() []server.ServerTool {
 						mcp.Required(),
 					),
 				),
-				RiskMedium,
-				"This will execute an action on an ArgoCD resource and may affect running workloads. Proceed?",
+				map[string]any{
+					"provider": ProviderArgoCD,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will execute an action on an ArgoCD resource and may affect running workloads. Proceed?",
+					},
+				},
 			),
 			Handler: s.argocdRunResourceAction,
 		},

@@ -17,38 +17,42 @@ func (s *Server) initResources() []server.ServerTool {
 	commonApiVersion := "v1 Pod, v1 Service, v1 Node, apps/v1 Deployment, networking.k8s.io/v1 Ingress"
 	commonApiVersion = fmt.Sprintf("(common apiVersion and kind include: %s)", commonApiVersion)
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("resources_list",
-			mcp.WithDescription("List Kubernetes resources and objects in the current cluster by providing their apiVersion and kind and optionally the namespace\n"+
-				commonApiVersion),
-			mcp.WithString("apiVersion",
-				mcp.Description("apiVersion of the resources (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
-				mcp.Required(),
+		{Tool: WithMeta(
+			mcp.NewTool("resources_list",
+				mcp.WithDescription("List Kubernetes resources and objects in the current cluster by providing their apiVersion and kind and optionally the namespace\n"+
+					commonApiVersion),
+				mcp.WithString("apiVersion",
+					mcp.Description("apiVersion of the resources (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
+					mcp.Required(),
+				),
+				mcp.WithString("kind",
+					mcp.Description("kind of the resources (examples of valid kind are: Pod, Service, Deployment, Ingress)"),
+					mcp.Required(),
+				),
+				mcp.WithString("namespace",
+					mcp.Description("Optional Namespace to retrieve the namespaced resources from (ignored in case of cluster scoped resources). If not provided, will list resources from all namespaces"))),
+			map[string]any{"provider": ProviderKubernetes},
+		), Handler: s.resourcesList},
+		{Tool: WithMeta(
+			mcp.NewTool("resources_get",
+				mcp.WithDescription("Get a Kubernetes resource in the current cluster by providing its apiVersion, kind, optionally the namespace, and its name\n"+
+					commonApiVersion),
+				mcp.WithString("apiVersion",
+					mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
+					mcp.Required(),
+				),
+				mcp.WithString("kind",
+					mcp.Description("kind of the resource (examples of valid kind are: Pod, Service, Deployment, Ingress)"),
+					mcp.Required(),
+				),
+				mcp.WithString("namespace",
+					mcp.Description("Optional Namespace to retrieve the namespaced resource from (ignored in case of cluster scoped resources). If not provided, will get resource from configured namespace"),
+				),
+				mcp.WithString("name", mcp.Description("Name of the resource"), mcp.Required()),
 			),
-			mcp.WithString("kind",
-				mcp.Description("kind of the resources (examples of valid kind are: Pod, Service, Deployment, Ingress)"),
-				mcp.Required(),
-			),
-			mcp.WithString("namespace",
-				mcp.Description("Optional Namespace to retrieve the namespaced resources from (ignored in case of cluster scoped resources). If not provided, will list resources from all namespaces"))),
-			Handler: s.resourcesList,
-		},
-		{Tool: mcp.NewTool("resources_get",
-			mcp.WithDescription("Get a Kubernetes resource in the current cluster by providing its apiVersion, kind, optionally the namespace, and its name\n"+
-				commonApiVersion),
-			mcp.WithString("apiVersion",
-				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
-				mcp.Required(),
-			),
-			mcp.WithString("kind",
-				mcp.Description("kind of the resource (examples of valid kind are: Pod, Service, Deployment, Ingress)"),
-				mcp.Required(),
-			),
-			mcp.WithString("namespace",
-				mcp.Description("Optional Namespace to retrieve the namespaced resource from (ignored in case of cluster scoped resources). If not provided, will get resource from configured namespace"),
-			),
-			mcp.WithString("name", mcp.Description("Name of the resource"), mcp.Required()),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.resourcesGet},
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("resources_create_or_update",
 				mcp.WithDescription("Create or update a Kubernetes resource in the current cluster by providing a YAML or JSON representation of the resource\n"+
 					commonApiVersion),
@@ -57,10 +61,17 @@ func (s *Server) initResources() []server.ServerTool {
 					mcp.Required(),
 				),
 			),
-			RiskMedium,
-			"This will create or update a Kubernetes resource. Proceed?",
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskMedium,
+					"approvalType": "single",
+					"message":      "This will create or update a Kubernetes resource. Proceed?",
+				},
+			},
 		), Handler: s.resourcesCreateOrUpdate},
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("resources_delete",
 				mcp.WithDescription("Delete a Kubernetes resource in the current cluster by providing its apiVersion, kind, optionally the namespace, and its name\n"+
 					commonApiVersion),
@@ -77,24 +88,34 @@ func (s *Server) initResources() []server.ServerTool {
 				),
 				mcp.WithString("name", mcp.Description("Name of the resource"), mcp.Required()),
 			),
-			RiskCritical,
-			"This will permanently delete a Kubernetes resource. This action cannot be undone. Proceed?",
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskCritical,
+					"approvalType": "single",
+					"message":      "This will permanently delete a Kubernetes resource. This action cannot be undone. Proceed?",
+				},
+			},
 		), Handler: s.resourcesDelete},
-		{Tool: mcp.NewTool("get_resources_yaml",
-			mcp.WithDescription("Get the YAML representation of a resource in Kubernetes\n"+
-				commonApiVersion),
-			mcp.WithString("apiVersion",
-				mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
-				mcp.Required(),
+		{Tool: WithMeta(
+			mcp.NewTool("get_resources_yaml",
+				mcp.WithDescription("Get the YAML representation of a resource in Kubernetes\n"+
+					commonApiVersion),
+				mcp.WithString("apiVersion",
+					mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
+					mcp.Required(),
+				),
+				mcp.WithString("kind",
+					mcp.Description("kind of the resource (examples of valid kind are: Pod, Service, Deployment, Ingress)"),
+					mcp.Required(),
+				),
+				mcp.WithString("namespace",
+					mcp.Description("The namespace of the resource to get the definition for"),
+				),
+				mcp.WithString("name", mcp.Description("The name of the resource to get the YAML definition for. If not provided, all resources of the given type will be returned")),
 			),
-			mcp.WithString("kind",
-				mcp.Description("kind of the resource (examples of valid kind are: Pod, Service, Deployment, Ingress)"),
-				mcp.Required(),
-			),
-			mcp.WithString("namespace",
-				mcp.Description("The namespace of the resource to get the definition for"),
-			),
-			mcp.WithString("name", mcp.Description("The name of the resource to get the YAML definition for. If not provided, all resources of the given type will be returned")),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.resourcesYaml},
 		// {Tool: mcp.NewTool("apply_manifest",
 		// 	mcp.WithDescription("Apply a YAML resource file to the Kubernetes cluster"),
@@ -105,7 +126,7 @@ func (s *Server) initResources() []server.ServerTool {
 		// 		mcp.Description("The raw YAML content to apply (either this or manifest_path must be provided)"),
 		// 	),
 		// ), Handler: s.applyManifest},
-		{Tool: WithHITLMeta(
+		{Tool: WithMeta(
 			mcp.NewTool("resources_patch",
 				mcp.WithDescription("Patch a resource in Kubernetes\n"+
 					commonApiVersion),
@@ -132,8 +153,15 @@ func (s *Server) initResources() []server.ServerTool {
 					mcp.Description("The type of patch to apply (json, merge, strategic). Defaults to strategic for Kubernetes resources"),
 				),
 			),
-			RiskMedium,
-			"This will patch and modify a Kubernetes resource. Proceed?",
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskMedium,
+					"approvalType": "single",
+					"message":      "This will patch and modify a Kubernetes resource. Proceed?",
+				},
+			},
 		), Handler: s.resourcesPatch},
 	}
 }
