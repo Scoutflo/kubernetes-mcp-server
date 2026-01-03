@@ -463,3 +463,89 @@ func (s *Server) resourcesPatch(ctx context.Context, ctr mcp.CallToolRequest) (*
 	klog.V(1).Infof("Tool call: resources_patch completed successfully in %v by session id: %s", duration, sessionID)
 	return NewTextResult(ret, nil), nil
 }
+
+func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: get_resources_yaml failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
+
+	namespace, err := ctr.RequireString("namespace")
+	if err != nil {
+		namespace = ""
+	}
+
+	name := ctr.GetString("name", "")
+
+	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
+	if err != nil {
+		klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to get resource YAML, %s", err)), nil
+	}
+
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: get_resources_yaml - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, name, sessionID)
+
+	var yamlOutput string
+
+	if name != "" {
+		ret, err := k.ResourcesGet(ctx, gvk, namespace, name)
+		duration := time.Since(start)
+
+		if err != nil {
+			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
+			return NewTextResult("", fmt.Errorf("failed to get resource YAML: %v", err)), nil
+		}
+
+		var resourceData interface{}
+		if err := json.Unmarshal([]byte(ret), &resourceData); err != nil {
+			klog.Errorf("Tool call: get_resources_yaml failed to unmarshal response after %v: %v", duration, err)
+			return NewTextResult("", fmt.Errorf("failed to unmarshal resource: %v", err)), nil
+		}
+
+		yamlBytes, err := yaml.Marshal(resourceData)
+		if err != nil {
+			klog.Errorf("Tool call: get_resources_yaml failed to marshal result to YAML after %v: %v", duration, err)
+			return NewTextResult("", fmt.Errorf("failed to marshal resource to YAML: %v", err)), nil
+		}
+
+		yamlOutput = string(yamlBytes)
+	} else {
+		limit := ctr.GetInt("limit", 10)
+		continueToken := ctr.GetString("continue", "")
+
+		ret, freshContinueToken, remainingCount, err := k.ResourcesList(ctx, gvk, namespace, int64(limit), continueToken)
+		duration := time.Since(start)
+
+		if err != nil {
+			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
+			return NewTextResult("", fmt.Errorf("failed to list resources: %v", err)), nil
+		}
+
+		var data interface{}
+		if err := json.Unmarshal(ret, &data); err != nil {
+			klog.Errorf("Tool call: get_resources_yaml failed to unmarshal response after %v: %v", duration, err)
+			return NewTextResult("", fmt.Errorf("failed to unmarshal resource list: %v", err)), nil
+		}
+
+		response := ListResourceToolOutput{
+			Data:                data,
+			ContinueToken:       freshContinueToken,
+			RemainingItemsCount: remainingCount,
+		}
+
+		yamlBytes, err := yaml.Marshal(response)
+		if err != nil {
+			klog.Errorf("Tool call: get_resources_yaml failed to marshal result to YAML after %v: %v", duration, err)
+			return NewTextResult("", fmt.Errorf("failed to marshal resource list to YAML: %v", err)), nil
+		}
+
+		yamlOutput = string(yamlBytes)
+	}
+
+	duration := time.Since(start)
+	klog.V(1).Infof("Tool call: get_resources_yaml completed successfully in %v by session id: %s", duration, sessionID)
+	return NewTextResult(yamlOutput, nil), nil
+}
