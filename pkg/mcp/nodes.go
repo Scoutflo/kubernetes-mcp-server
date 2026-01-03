@@ -13,11 +13,43 @@ import (
 
 func (s *Server) initNodes() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("nodes_get",
-			mcp.WithDescription("Get detailed information about a specific Kubernetes node"),
-			mcp.WithString("name", mcp.Description("Name of the node"), mcp.Required()),
+		{Tool: WithMeta(
+			mcp.NewTool("nodes_list",
+				mcp.WithDescription("List all Kubernetes nodes in the current cluster"),
+			),
+			map[string]any{"provider": ProviderKubernetes},
+		), Handler: s.nodesList},
+		{Tool: WithMeta(
+			mcp.NewTool("nodes_get",
+				mcp.WithDescription("Get detailed information about a specific Kubernetes node"),
+				mcp.WithString("name", mcp.Description("Name of the node"), mcp.Required()),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.nodesGet},
 	}
+}
+
+// nodesList handles the nodes_list tool request
+func (s *Server) nodesList(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
+	k, err := s.getKubernetesClient(ctr)
+	if err != nil {
+		klog.Errorf("Tool call: nodes_list failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
+	}
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: nodes_list - listing all nodes - got called by session id: %s", sessionID)
+
+	ret, err := k.NodesList(ctx)
+	duration := time.Since(start)
+
+	if err != nil {
+		klog.Errorf("Tool call: nodes_list failed after %v: %v by session id: %s", duration, err, sessionID)
+		return NewTextResult("", fmt.Errorf("failed to list nodes: %v", err)), nil
+	}
+
+	klog.V(1).Infof("Tool call: nodes_list completed successfully in %v by session id: %s", duration, sessionID)
+	return NewTextResult(ret, nil), nil
 }
 
 // nodesGet handles the nodes_get tool request

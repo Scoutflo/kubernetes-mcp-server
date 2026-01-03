@@ -12,8 +12,11 @@ import (
 
 func (s *Server) initConfiguration() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("get_available_API_resources",
-			mcp.WithDescription("Get all available and supported API resources in the Kubernetes cluster"),
+		{Tool: WithMeta(
+			mcp.NewTool("get_available_API_resources",
+				mcp.WithDescription("Get all available and supported API resources in the Kubernetes cluster"),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.getAvailableAPIResources},
 	}
 }

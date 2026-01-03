@@ -14,16 +14,11 @@ import (
 func (s *Server) initNamespaces() []server.ServerTool {
 	ret := make([]server.ServerTool, 0)
 	ret = append(ret, server.ServerTool{
-		Tool: mcp.NewTool("namespaces_list",
-			mcp.WithDescription("List all the Kubernetes namespaces in the current cluster"),
-			mcp.WithNumber("limit",
-				mcp.DefaultNumber(5),
-				mcp.Description("Count of the resources that needs to be listed, this works in additional parameter called 'continue' which will have the value of continue token of paginated data."),
-				mcp.Required(),
+		Tool: WithMeta(
+			mcp.NewTool("namespaces_list",
+				mcp.WithDescription("List all the Kubernetes namespaces in the current cluster"),
 			),
-			mcp.WithString("continue",
-				mcp.Description("The continue token that received in previous call with limited count of resource items, this field works with additional field called 'limit'. "),
-			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.namespacesList,
 	})
 	return ret

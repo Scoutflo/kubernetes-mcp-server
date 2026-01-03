@@ -13,19 +13,19 @@ import (
 
 func (s *Server) initEvents() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("events_list",
-			mcp.WithDescription("List all the Kubernetes events in the current cluster from all namespaces with optional filtering by namespace, resource name, kind, or API version"),
-			mcp.WithString("namespace",
-				mcp.Description("Optional Namespace to retrieve the events from. If not provided, will list events from all namespaces")),
-			mcp.WithString("involved_object_name",
-				mcp.Description("Optional filter to show events only for resources with this name")),
-			mcp.WithString("involved_object_kind",
-				mcp.Description("Optional filter to show events only for resources of this kind (e.g. Pod, Deployment)")),
-			mcp.WithString("involved_object_api_version",
-				mcp.Description("Optional filter to show events only for resources with this apiVersion")),
-			mcp.WithString("start_time", mcp.Description("Start time for event retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
-			mcp.WithString("end_time", mcp.Description("End time for event retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
-			mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves events from (now - time_window) to now.")),
+		{Tool: WithMeta(
+			mcp.NewTool("events_list",
+				mcp.WithDescription("List all the Kubernetes events in the current cluster from all namespaces with optional filtering by namespace, resource name, kind, or API version"),
+				mcp.WithString("namespace",
+					mcp.Description("Optional Namespace to retrieve the events from. If not provided, will list events from all namespaces")),
+				mcp.WithString("involved_object_name",
+					mcp.Description("Optional filter to show events only for resources with this name")),
+				mcp.WithString("involved_object_kind",
+					mcp.Description("Optional filter to show events only for resources of this kind (e.g. Pod, Deployment)")),
+				mcp.WithString("involved_object_api_version",
+					mcp.Description("Optional filter to show events only for resources with this apiVersion")),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.eventsList},
 	}
 }

@@ -13,21 +13,30 @@ import (
 
 func (s *Server) initConverters() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("docker_compose_to_k8s_manifest",
-			mcp.WithDescription("Converts a Docker Compose file to a Kubernetes manifest. Transforms services, volumes, networks, and other configurations from Docker Compose format to equivalent Kubernetes resources such as Deployments, StatefulSets, Services, ConfigMaps, and more."),
-			mcp.WithString("docker_compose", mcp.Description("Docker Compose YAML content to convert to Kubernetes manifest"), mcp.Required()),
-			mcp.WithString("namespace", mcp.Description("Optional namespace to use for all generated Kubernetes resources")),
+		{Tool: WithMeta(
+			mcp.NewTool("docker_compose_to_k8s_manifest",
+				mcp.WithDescription("Converts a Docker Compose file to a Kubernetes manifest. Transforms services, volumes, networks, and other configurations from Docker Compose format to equivalent Kubernetes resources such as Deployments, StatefulSets, Services, ConfigMaps, and more."),
+				mcp.WithString("docker_compose", mcp.Description("Docker Compose YAML content to convert to Kubernetes manifest"), mcp.Required()),
+				mcp.WithString("namespace", mcp.Description("Optional namespace to use for all generated Kubernetes resources")),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.dockerComposeToK8sManifest},
-		{Tool: mcp.NewTool("k8s_manifest_to_helm_chart",
-			mcp.WithDescription("Converts a Kubernetes manifest to a Helm chart. Transforms Kubernetes resources into templated Helm chart files with parameterized values, following best practices."),
-			mcp.WithString("k8s_manifest", mcp.Description("Kubernetes manifest YAML content to convert to a Helm chart"), mcp.Required()),
-			mcp.WithString("chart_name", mcp.Description("Optional name for the generated Helm chart")),
+		{Tool: WithMeta(
+			mcp.NewTool("k8s_manifest_to_helm_chart",
+				mcp.WithDescription("Converts a Kubernetes manifest to a Helm chart. Transforms Kubernetes resources into templated Helm chart files with parameterized values, following best practices."),
+				mcp.WithString("k8s_manifest", mcp.Description("Kubernetes manifest YAML content to convert to a Helm chart"), mcp.Required()),
+				mcp.WithString("chart_name", mcp.Description("Optional name for the generated Helm chart")),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.k8sManifestToHelmChart},
-		{Tool: mcp.NewTool("k8s_manifest_to_argo_rollout",
-			mcp.WithDescription("Converts a Kubernetes Deployment manifest to an Argo Rollout resource with associated Service resources. Transforms a standard Kubernetes Deployment into an Argo Rollout with advanced deployment strategies like Canary or Blue/Green deployments, and creates all necessary Service resources required for the chosen rollout strategy."),
-			mcp.WithString("k8s_manifest", mcp.Description("Kubernetes Deployment manifest YAML content to convert to an Argo Rollout"), mcp.Required()),
-			mcp.WithString("strategy", mcp.Description("Rollout strategy to use: 'canary' or 'blueGreen'. For 'blueGreen', both active and preview services will be created. For 'canary', a main service will be created.")),
-			mcp.WithString("canary_config", mcp.Description("Optional JSON configuration for canary deployment strategy please use the following if not provided: '{\"steps\":[{\"setWeight\":20},{\"pause\":{\"duration\":\"10\"}},{\"setWeight\":40},{\"pause\":{\"duration\":\"10\"}},{\"setWeight\":60},{\"pause\":{\"duration\":\"10\"}},{\"setWeight\":80},{\"pause\":{\"duration\":\"10\"}}]}'")),
+		{Tool: WithMeta(
+			mcp.NewTool("k8s_manifest_to_argo_rollout",
+				mcp.WithDescription("Converts a Kubernetes Deployment manifest to an Argo Rollout resource with associated Service resources. Transforms a standard Kubernetes Deployment into an Argo Rollout with advanced deployment strategies like Canary or Blue/Green deployments, and creates all necessary Service resources required for the chosen rollout strategy."),
+				mcp.WithString("k8s_manifest", mcp.Description("Kubernetes Deployment manifest YAML content to convert to an Argo Rollout"), mcp.Required()),
+				mcp.WithString("strategy", mcp.Description("Rollout strategy to use: 'canary' or 'blueGreen'. For 'blueGreen', both active and preview services will be created. For 'canary', a main service will be created.")),
+				mcp.WithString("canary_config", mcp.Description("Optional JSON configuration for canary deployment strategy please use the following if not provided: '{\"steps\":[{\"setWeight\":20},{\"pause\":{\"duration\":\"10\"}},{\"setWeight\":40},{\"pause\":{\"duration\":\"10\"}},{\"setWeight\":60},{\"pause\":{\"duration\":\"10\"}},{\"setWeight\":80},{\"pause\":{\"duration\":\"10\"}}]}'")),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.k8sManifestToArgoRollout},
 	}
 }
