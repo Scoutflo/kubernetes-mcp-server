@@ -16,12 +16,18 @@ import (
 //
 // Example usage:
 // {
-//   "name": "pods_list",
+//   "name": "pods_get",
 //   "arguments": {
 //     "k8surl": "https://your-k8s-api-server:6443",
 //     "k8stoken": "your-auth-token"
 //   }
 // }
+
+type ListResourceToolOutput struct {
+	Data                interface{} `json:"data"`
+	ContinueToken       string      `json:"continueToken,omitempty"`
+	RemainingItemsCount int64       `json:"remainingItemsCount,omitempty"`
+}
 
 func (s *Server) initPods() []server.ServerTool {
 	return []server.ServerTool{
@@ -109,62 +115,6 @@ func (s *Server) initPods() []server.ServerTool {
 			},
 		), Handler: s.podsRun},
 	}
-}
-
-func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	start := time.Now()
-	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: pods_list - listing all pods in all namespaces - got called by session id: %s", sessionID)
-
-	// Get Kubernetes client from request parameters
-	k, err := s.getKubernetesClient(ctr)
-	if err != nil {
-		klog.Errorf("Tool call: pods_list failed to get Kubernetes client after %v: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
-	}
-
-	ret, err := k.PodsListInAllNamespaces(ctx)
-	duration := time.Since(start)
-
-	if err != nil {
-		klog.Errorf("Tool call: pods_list failed after %v: %v", duration, err)
-		return NewTextResult("", fmt.Errorf("failed to list pods in all namespaces: %v", err)), nil
-	}
-
-	klog.V(1).Infof("Tool call: pods_list completed successfully in %v by session id: %s", duration, sessionID)
-	return NewTextResult(ret, err), nil
-}
-
-func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	start := time.Now()
-	ns := ctr.GetString("namespace", "")
-
-	sessionID := getSessionID(ctx)
-
-	klog.V(1).Infof("Tool: pods_list_in_namespace - listing all pods in namespace: %s - got called by session id: %s", ns, sessionID)
-
-	if ns == "" {
-		klog.Errorf("Tool call: pods_list_in_namespace failed after %v: missing namespace parameter", time.Since(start))
-		return NewTextResult("", errors.New("failed to list pods in namespace, missing argument namespace")), nil
-	}
-
-	// Get Kubernetes client from request parameters
-	k, err := s.getKubernetesClient(ctr)
-	if err != nil {
-		klog.Errorf("Tool call: pods_list_in_namespace failed to get Kubernetes client after %v: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
-	}
-
-	ret, err := k.PodsListInNamespace(ctx, ns)
-	duration := time.Since(start)
-
-	if err != nil {
-		klog.Errorf("Tool call: pods_list_in_namespace failed after %v: %v", duration, err)
-		return NewTextResult("", fmt.Errorf("failed to list pods in namespace %s: %v", ns, err)), nil
-	}
-
-	klog.V(1).Infof("Tool call: pods_list_in_namespace completed successfully in %v by session id: %s", duration, sessionID)
-	return NewTextResult(ret, err), nil
 }
 
 func (s *Server) podsGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -299,12 +249,45 @@ func (s *Server) podsLog(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 	ns := ctr.GetString("namespace", "")
 	name := ctr.GetString("name", "")
 	tailLines := ctr.GetFloat("tail_lines", 256)
+	startTimeStr := ctr.GetString("start_time", "")
+	endTimeStr := ctr.GetString("end_time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: pods_log - getting logs of pod: %s in namespace: %s with tail lines: %.0f - got called by session id: %s", name, ns, tailLines, sessionID)
 
 	if name == "" {
 		klog.Errorf("Tool call: pods_log failed after %v: missing name parameter", time.Since(start))
 		return NewTextResult("", errors.New("failed to get pod log, missing argument name")), nil
+	}
+
+	var startTime, endTime *time.Time
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			klog.Errorf("Tool call: pods_log failed after %v: invalid time_window format: %v", time.Since(start), err)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else if startTimeStr != "" || endTimeStr != "" {
+		if startTimeStr == "" || endTimeStr == "" {
+			klog.Errorf("Tool call: pods_log failed after %v: both start_time and end_time must be provided together", time.Since(start))
+			return NewTextResult("", errors.New("both start_time and end_time must be provided together, or use time_window")), nil
+		}
+		startParsed := parseTime(startTimeStr, time.Time{})
+		if startParsed.IsZero() {
+			klog.Errorf("Tool call: pods_log failed after %v: invalid start_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid start_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		endParsed := parseTime(endTimeStr, time.Time{})
+		if endParsed.IsZero() {
+			klog.Errorf("Tool call: pods_log failed after %v: invalid end_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid end_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		startTime = &startParsed
+		endTime = &endParsed
 	}
 
 	// Get Kubernetes client from request parameters
@@ -314,7 +297,7 @@ func (s *Server) podsLog(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 
-	ret, err := k.PodsLog(ctx, ns, name, int(tailLines))
+	ret, err := k.PodsLog(ctx, ns, name, int(tailLines), startTime, endTime)
 	duration := time.Since(start)
 
 	if err != nil {

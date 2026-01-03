@@ -2,11 +2,13 @@ package kubernetes
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strings"
+	"time"
 )
 
-func (k *Kubernetes) EventsList(ctx context.Context, namespace string, fieldSelectors []string) (string, error) {
+func (k *Kubernetes) EventsList(ctx context.Context, namespace string, fieldSelectors []string, startTime, endTime *time.Time) (string, error) {
 	// Create the API endpoint URL with query parameters
 	endpoint := "/apis/v1/get-events"
 
@@ -35,6 +37,13 @@ func (k *Kubernetes) EventsList(ctx context.Context, namespace string, fieldSele
 		case "involvedObject.apiVersion":
 			queryParams.Add("involved_object_api_version", value)
 		}
+	}
+
+	if startTime != nil && !startTime.IsZero() {
+		queryParams.Add("start_time", fmt.Sprintf("%d", startTime.Unix()))
+	}
+	if endTime != nil && !endTime.IsZero() {
+		queryParams.Add("end_time", fmt.Sprintf("%d", endTime.Unix()))
 	}
 
 	// Append query parameters to the endpoint if any

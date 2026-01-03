@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -33,7 +34,11 @@ func (s *Server) namespacesList(ctx context.Context, ctr mcp.CallToolRequest) (*
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: namespaces_list - listing all namespaces - got called by session id: %s", sessionID)
 
-	ret, err := k.NamespacesList(ctx)
+	limit := ctr.GetInt("limit", 10)
+
+	continueToken := ctr.GetString("continue", "")
+
+	ret, freshContinueToken, remainingCount, err := k.NamespacesList(ctx, int64(limit), continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -43,5 +48,23 @@ func (s *Server) namespacesList(ctx context.Context, ctr mcp.CallToolRequest) (*
 		klog.V(1).Infof("Tool call: namespaces_list completed successfully in %v by session id: %s", duration, sessionID)
 	}
 
-	return NewTextResult(ret, err), nil
+	var data interface{}
+	if err := json.Unmarshal(ret, &data); err != nil {
+		klog.Errorf("Tool call: namespaces_list failed to unmarshal response after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to unmarshal namespace list: %v", err)), nil
+	}
+
+	response := ListResourceToolOutput{
+		Data:                data,
+		ContinueToken:       freshContinueToken,
+		RemainingItemsCount: remainingCount,
+	}
+
+	jsonBytes, err := json.Marshal(response)
+	if err != nil {
+		klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to marshal resource list: %v", err)), nil
+	}
+
+	return NewTextResult(string(jsonBytes), err), nil
 }

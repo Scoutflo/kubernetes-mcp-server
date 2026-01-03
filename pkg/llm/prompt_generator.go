@@ -25,19 +25,15 @@ Below is the list of available Kubernetes tools that can be included in your pro
 ### Cluster Information Tools
 - configuration_view (Get Kubernetes configuration)
 - get_available_API_resources (Get all available API resources)
-- get_resources_yaml (Get YAML representation of resources)
 - namespaces_list (List all namespaces)
 - events_list (List Kubernetes events)
 
 ### Node Tools
 - nodes_get (Get detailed node information)
-- nodes_list (List all nodes)
 - nodes_metrics (Get node metrics)
 
 ### Pod Tools
 - pods_get (Get pod details)
-- pods_list (List all pods)
-- pods_list_in_namespace (List pods in namespace)
 - pods_log (Get pod logs)
 - pods_delete (Delete a pod)
 - pods_exec (Execute commands in pod)
@@ -48,7 +44,7 @@ Below is the list of available Kubernetes tools that can be included in your pro
 - resources_create_or_update (Create/update resources)
 - resources_delete (Delete resources)
 - resources_get (Get specific resource)
-- resources_list (List resources)
+- resources_list (List resources with optional view parameter: 'json' or 'yaml')
 - resources_patch (Patch resources)
 - apply_manifest (Apply YAML manifest)
 - rollout (Manage deployments rollout)

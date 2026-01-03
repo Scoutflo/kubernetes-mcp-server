@@ -44,7 +44,7 @@ func (s *Server) rollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 	start := time.Now()
 	k, err := s.getKubernetesClient(ctr)
 	if err != nil {
-		klog.Errorf("Tool call: pods_list_in_namespace failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		klog.Errorf("Tool call: rollout failed to get Kubernetes client after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 	// Extract required parameters

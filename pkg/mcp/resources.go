@@ -11,6 +11,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/yaml"
 )
 
 func (s *Server) initResources() []server.ServerTool {
@@ -177,6 +178,12 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	if err != nil {
 		namespace = ""
 	}
+
+	limit := ctr.GetInt("limit", 10)
+
+	continueToken := ctr.GetString("continue", "")
+	view := ctr.GetString("view", "json")
+
 	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
 	if err != nil {
 		klog.Errorf("Tool call: resources_list failed after %v: %v", time.Since(start), err)
@@ -184,9 +191,9 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	}
 
 	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: resources_list - apiVersion: %s, kind: %s, namespace: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, sessionID)
+	klog.V(1).Infof("Tool: resources_list - apiVersion: %s, kind: %s, namespace: %s, view: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, view, sessionID)
 
-	ret, err := k.ResourcesList(ctx, gvk, namespace)
+	ret, freshContinueToken, remainingCount, err := k.ResourcesList(ctx, gvk, namespace, int64(limit), continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -194,8 +201,36 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		return NewTextResult("", fmt.Errorf("failed to list resources: %v", err)), nil
 	}
 
+	var data interface{}
+	if err := json.Unmarshal(ret, &data); err != nil {
+		klog.Errorf("Tool call: resources_list failed to unmarshal response after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to unmarshal resource list: %v", err)), nil
+	}
+
+	response := ListResourceToolOutput{
+		Data:                data,
+		ContinueToken:       freshContinueToken,
+		RemainingItemsCount: remainingCount,
+	}
+
+	if view == "yaml" {
+		yamlBytes, err := yaml.Marshal(response)
+		if err != nil {
+			klog.Errorf("Tool call: resources_list failed to marshal result to YAML after %v: %v", duration, err)
+			return NewTextResult("", fmt.Errorf("failed to marshal resource list to YAML: %v", err)), nil
+		}
+		klog.V(1).Infof("Tool call: resources_list completed successfully in %v by session id: %s", duration, sessionID)
+		return NewTextResult(string(yamlBytes), nil), nil
+	}
+
+	jsonBytes, err := json.Marshal(response)
+	if err != nil {
+		klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to marshal resource list: %v", err)), nil
+	}
+
 	klog.V(1).Infof("Tool call: resources_list completed successfully in %v by session id: %s", duration, sessionID)
-	return NewTextResult(ret, err), nil
+	return NewTextResult(string(jsonBytes), nil), nil
 }
 
 func (s *Server) resourcesGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -314,51 +349,6 @@ func parseGroupVersionKind(arguments map[string]interface{}) (*schema.GroupVersi
 		return nil, errors.New("invalid argument apiVersion")
 	}
 	return &schema.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind.(string)}, nil
-}
-
-func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	start := time.Now()
-	k, err := s.getKubernetesClient(ctr)
-	if err != nil {
-		klog.Errorf("Tool call: get_resources_yaml failed to get Kubernetes client after %v: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
-	}
-	namespace, err := ctr.RequireString("namespace")
-	if err != nil {
-		namespace = ""
-	}
-	gvk, err := parseGroupVersionKind(ctr.GetRawArguments().(map[string]interface{}))
-	if err != nil {
-		klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", time.Since(start), err)
-		return NewTextResult("", fmt.Errorf("failed to get YAML, %s", err)), nil
-	}
-
-	name := ctr.GetString("name", "")
-
-	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: get_resources_yaml - apiVersion: %s, kind: %s, namespace: %s, name: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, name, sessionID)
-
-	if name != "" {
-		// Get a specific resource
-		ret, err := k.ResourcesGet(ctx, gvk, namespace, name)
-		duration := time.Since(start)
-		if err != nil {
-			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
-			return NewTextResult("", fmt.Errorf("failed to get resource YAML: %v", err)), nil
-		}
-		klog.V(1).Infof("Tool call: get_resources_yaml completed successfully in %v by session id: %s", duration, sessionID)
-		return NewTextResult(ret, err), nil
-	} else {
-		// Get all resources of this type in the namespace
-		ret, err := k.ResourcesList(ctx, gvk, namespace)
-		duration := time.Since(start)
-		if err != nil {
-			klog.Errorf("Tool call: get_resources_yaml failed after %v: %v", duration, err)
-			return NewTextResult("", fmt.Errorf("failed to list resources YAML: %v", err)), nil
-		}
-		klog.V(1).Infof("Tool call: get_resources_yaml completed successfully in %v by session id: %s", duration, sessionID)
-		return NewTextResult(ret, err), nil
-	}
 }
 
 // func (s *Server) applyManifest(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {

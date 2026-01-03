@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -54,11 +55,13 @@ func getResourceTypeFromGVK(gvk *schema.GroupVersionKind) string {
 	return strings.ToLower(gvk.Kind) + "." + gvk.Group
 }
 
-func (k *Kubernetes) ResourcesList(ctx context.Context, gvk *schema.GroupVersionKind, namespace string) (string, error) {
+func (k *Kubernetes) ResourcesList(ctx context.Context, gvk *schema.GroupVersionKind, namespace string, limit int64, continueToken string) ([]byte, string, int64, error) {
 	// Create a JSON payload for the list-resources endpoint
 	requestBody := map[string]interface{}{
 		"apiVersion": gvk.GroupVersion().String(),
 		"kind":       gvk.Kind,
+		"limit":      limit,
+		"continue":   continueToken,
 	}
 
 	// Add namespace if provided
@@ -67,12 +70,21 @@ func (k *Kubernetes) ResourcesList(ctx context.Context, gvk *schema.GroupVersion
 	}
 
 	// Make API request to the dedicated MCP endpoint
-	response, err := k.MakeAPIRequest("POST", "/apis/v1/list-resources", requestBody)
+	apiResponse, err := k.MakeAPIRequestWithHeaders("POST", "/apis/v1/list-resources", requestBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to list resources: %v", err)
+		fmt.Errorf("failed to list resources: %v", err)
+		return nil, "", 0, err
 	}
 
-	return string(response), nil
+	data := apiResponse.Body
+	freshContinueToken := apiResponse.Headers.Get("x-continue-key")
+	remainingItemCount, err := strconv.ParseInt(apiResponse.Headers.Get("x-remaining-items"), 10, 64)
+	if err != nil {
+		fmt.Errorf("failed to list resources: %v", err)
+		return nil, "", 0, err
+	}
+
+	return data, freshContinueToken, remainingItemCount, nil
 }
 
 func (k *Kubernetes) ResourcesGet(ctx context.Context, gvk *schema.GroupVersionKind, namespace, name string) (string, error) {

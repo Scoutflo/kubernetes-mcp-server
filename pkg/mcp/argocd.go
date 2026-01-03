@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -64,6 +65,9 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("The name of the application"),
 					mcp.Required(),
 				),
+				mcp.WithString("start_time", mcp.Description("Start time for event retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
+				mcp.WithString("end_time", mcp.Description("End time for event retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
+				mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves events from (now - time_window) to now.")),
 			),
 				map[string]any{"provider": ProviderArgoCD},
 			),
@@ -280,6 +284,9 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				mcp.WithString("follow",
 					mcp.Description("Follow logs (accepted values: 'true', 'false', default: 'false')"),
 				),
+				mcp.WithString("start_time", mcp.Description("Start time for log retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
+				mcp.WithString("end_time", mcp.Description("End time for log retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
+				mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves logs from (now - time_window) to now.")),
 			),
 				map[string]any{"provider": ProviderArgoCD},
 			),
@@ -297,6 +304,9 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("The resource reference in the format of a map with keys 'name', 'namespace', and optional 'uid'"),
 					mcp.Required(),
 				),
+				mcp.WithString("start_time", mcp.Description("Start time for event retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
+				mcp.WithString("end_time", mcp.Description("End time for event retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
+				mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves events from (now - time_window) to now.")),
 			),
 				map[string]any{"provider": ProviderArgoCD},
 			),
@@ -823,6 +833,40 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 	followStr := ctr.GetString("follow", "false")
 	follow := strings.ToLower(followStr) == "true"
 
+	startTimeStr := ctr.GetString("start_time", "")
+	endTimeStr := ctr.GetString("end_time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
+
+	var startTime, endTime *time.Time
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			klog.Errorf("Tool call: argocd_get_application_workload_logs failed after %v: invalid time_window format: %v", time.Since(start), err)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else if startTimeStr != "" || endTimeStr != "" {
+		if startTimeStr == "" || endTimeStr == "" {
+			klog.Errorf("Tool call: argocd_get_application_workload_logs failed after %v: both start_time and end_time must be provided together", time.Since(start))
+			return NewTextResult("", errors.New("both start_time and end_time must be provided together, or use time_window")), nil
+		}
+		startParsed := parseTime(startTimeStr, time.Time{})
+		if startParsed.IsZero() {
+			klog.Errorf("Tool call: argocd_get_application_workload_logs failed after %v: invalid start_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid start_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		endParsed := parseTime(endTimeStr, time.Time{})
+		if endParsed.IsZero() {
+			klog.Errorf("Tool call: argocd_get_application_workload_logs failed after %v: invalid end_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid end_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		startTime = &startParsed
+		endTime = &endParsed
+	}
+
 	klog.V(1).Infof("Tool: argocd_get_application_workload_logs - application: %s, resource: %s/%s/%s, tail: %s, follow: %t - got called",
 		name, resourceRef.Kind, resourceRef.Namespace, resourceRef.Name, tailStr, follow)
 
@@ -830,7 +874,7 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 	followStr = fmt.Sprintf("%t", follow)
 	resourceRefJSON, _ := json.Marshal(resourceRef)
 
-	result, err := k.GetApplicationWorkloadLogs(ctx, name, string(resourceRefJSON), followStr, tailStr)
+	result, err := k.GetApplicationWorkloadLogs(ctx, name, string(resourceRefJSON), followStr, tailStr, startTime, endTime)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -878,6 +922,40 @@ func (s *Server) argocdGetResourceEvents(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
 	}
 
+	startTimeStr := ctr.GetString("start_time", "")
+	endTimeStr := ctr.GetString("end_time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
+
+	var startTime, endTime *time.Time
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			klog.Errorf("Tool call: argocd_get_resource_events failed after %v: invalid time_window format: %v", time.Since(start), err)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else if startTimeStr != "" || endTimeStr != "" {
+		if startTimeStr == "" || endTimeStr == "" {
+			klog.Errorf("Tool call: argocd_get_resource_events failed after %v: both start_time and end_time must be provided together", time.Since(start))
+			return NewTextResult("", errors.New("both start_time and end_time must be provided together, or use time_window")), nil
+		}
+		startParsed := parseTime(startTimeStr, time.Time{})
+		if startParsed.IsZero() {
+			klog.Errorf("Tool call: argocd_get_resource_events failed after %v: invalid start_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid start_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		endParsed := parseTime(endTimeStr, time.Time{})
+		if endParsed.IsZero() {
+			klog.Errorf("Tool call: argocd_get_resource_events failed after %v: invalid end_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid end_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		startTime = &startParsed
+		endTime = &endParsed
+	}
+
 	klog.V(1).Infof("Tool: argocd_get_resource_events - application: %s, resource: %s/%s - got called",
 		name, resourceNamespace, resourceName)
 
@@ -887,7 +965,7 @@ func (s *Server) argocdGetResourceEvents(ctx context.Context, ctr mcp.CallToolRe
 		"namespace": resourceNamespace,
 	})
 
-	result, err := k.GetApplicationResourceEvents(ctx, name, string(resourceRefJSON))
+	result, err := k.GetApplicationResourceEvents(ctx, name, string(resourceRefJSON), startTime, endTime)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -1085,10 +1163,44 @@ func (s *Server) argocdGetApplicationEvents(ctx context.Context, ctr mcp.CallToo
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
+	startTimeStr := ctr.GetString("start_time", "")
+	endTimeStr := ctr.GetString("end_time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
+
+	var startTime, endTime *time.Time
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			klog.Errorf("Tool call: argocd_get_application_events failed after %v: invalid time_window format: %v", time.Since(start), err)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else if startTimeStr != "" || endTimeStr != "" {
+		if startTimeStr == "" || endTimeStr == "" {
+			klog.Errorf("Tool call: argocd_get_application_events failed after %v: both start_time and end_time must be provided together", time.Since(start))
+			return NewTextResult("", errors.New("both start_time and end_time must be provided together, or use time_window")), nil
+		}
+		startParsed := parseTime(startTimeStr, time.Time{})
+		if startParsed.IsZero() {
+			klog.Errorf("Tool call: argocd_get_application_events failed after %v: invalid start_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid start_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		endParsed := parseTime(endTimeStr, time.Time{})
+		if endParsed.IsZero() {
+			klog.Errorf("Tool call: argocd_get_application_events failed after %v: invalid end_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid end_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		startTime = &startParsed
+		endTime = &endParsed
+	}
+
 	klog.V(1).Infof("Tool: argocd_get_application_events - application: %s - got called", name)
 
 	// Get application events using the K8s Dashboard API
-	result, err := k.GetApplicationEvents(ctx, name)
+	result, err := k.GetApplicationEvents(ctx, name, startTime, endTime)
 	duration := time.Since(start)
 
 	if err != nil {
