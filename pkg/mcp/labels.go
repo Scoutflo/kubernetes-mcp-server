@@ -17,8 +17,7 @@ func (s *Server) initLabels() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("label_resource",
-				mcp.WithDescription("Apply labels to a Kubernetes resource\n"+
-					commonApiVersion),
+				mcp.WithDescription("Add or update labels on a Kubernetes resource. Labels are key-value pairs used for resource organization, filtering, and selector matching. Returns the updated resource. Use when you need to tag resources for organization, enable label-based selection, or add metadata for tooling. Requires apiVersion, kind, name, labels object, and optional namespace."),
 				mcp.WithString("apiVersion",
 					mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 					mcp.Required(),
@@ -52,8 +51,7 @@ func (s *Server) initLabels() []server.ServerTool {
 
 		{Tool: WithMeta(
 			mcp.NewTool("remove_label",
-				mcp.WithDescription("Remove a label from a Kubernetes resource\n"+
-					commonApiVersion),
+				mcp.WithDescription("Remove a specific label from a Kubernetes resource by its key. Returns the updated resource without the specified label. Use when you need to remove labels from resources. Requires apiVersion, kind, name, label key, and optional namespace."),
 				mcp.WithString("apiVersion",
 					mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 					mcp.Required(),
@@ -87,8 +85,7 @@ func (s *Server) initLabels() []server.ServerTool {
 
 		{Tool: WithMeta(
 			mcp.NewTool("annotate_resource",
-				mcp.WithDescription("Apply annotations to a Kubernetes resource\n"+
-					commonApiVersion),
+				mcp.WithDescription("Add or update annotations on a Kubernetes resource. Annotations store metadata for tools and controllers without affecting resource behavior. Returns the updated resource. Use when you need to add metadata, store tool-specific information, or attach non-identifying data to resources. Requires apiVersion, kind, name, annotations object, and optional namespace."),
 				mcp.WithString("apiVersion",
 					mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 					mcp.Required(),
@@ -122,8 +119,7 @@ func (s *Server) initLabels() []server.ServerTool {
 
 		{Tool: WithMeta(
 			mcp.NewTool("remove_annotation",
-				mcp.WithDescription("Remove an annotation from a Kubernetes resource\n"+
-					commonApiVersion),
+				mcp.WithDescription("Remove a specific annotation from a Kubernetes resource by its key. Returns the updated resource without the specified annotation. Use when you need to remove annotations from resources. Requires apiVersion, kind, name, annotation key, and optional namespace."),
 				mcp.WithString("apiVersion",
 					mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 					mcp.Required(),

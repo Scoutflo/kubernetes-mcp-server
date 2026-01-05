@@ -20,8 +20,7 @@ func (s *Server) initResources() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("resources_list",
-				mcp.WithDescription("List Kubernetes resources and objects in the current cluster by providing their apiVersion and kind and optionally the namespace\n"+
-					commonApiVersion),
+				mcp.WithDescription("List Kubernetes resources of a specific type in the cluster. Returns all matching resources with their metadata and status. Use when you need to discover resources, check what exists in a namespace or cluster, or enumerate resources of a specific type. Requires apiVersion and kind. Common examples: v1 Pod, v1 Service, v1 Node, apps/v1 Deployment, networking.k8s.io/v1 Ingress"),
 				mcp.WithString("apiVersion",
 					mcp.Description("apiVersion of the resources (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 					mcp.Required(),
@@ -36,8 +35,7 @@ func (s *Server) initResources() []server.ServerTool {
 		), Handler: s.resourcesList},
 		{Tool: WithMeta(
 			mcp.NewTool("resources_get",
-				mcp.WithDescription("Get a Kubernetes resource in the current cluster by providing its apiVersion, kind, optionally the namespace, and its name\n"+
-					commonApiVersion),
+				mcp.WithDescription("Retrieve a specific Kubernetes resource by its identifier. Returns complete resource definition including spec, status, and metadata. Use when you need to inspect a resource's configuration, check its current state, or read resource details. Requires apiVersion, kind, name, and optional namespace. Common examples: v1 Pod, v1 Service, v1 Node, apps/v1 Deployment, networking.k8s.io/v1 Ingress"),
 				mcp.WithString("apiVersion",
 					mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 					mcp.Required(),
@@ -55,8 +53,7 @@ func (s *Server) initResources() []server.ServerTool {
 		), Handler: s.resourcesGet},
 		{Tool: WithMeta(
 			mcp.NewTool("resources_create_or_update",
-				mcp.WithDescription("Create or update a Kubernetes resource in the current cluster by providing a YAML or JSON representation of the resource\n"+
-					commonApiVersion),
+				mcp.WithDescription("Create a new Kubernetes resource or update an existing one by providing a YAML or JSON manifest. Automatically determines whether to create or update based on resource existence. Returns the created or updated resource. Use when you need to deploy resources, apply configurations, or modify existing resources. Requires resource manifest in YAML or JSON format."),
 				mcp.WithString("resource",
 					mcp.Description("A JSON or YAML containing a representation of the Kubernetes resource. Should include top-level fields such as apiVersion,kind,metadata, and spec"),
 					mcp.Required(),
@@ -74,8 +71,7 @@ func (s *Server) initResources() []server.ServerTool {
 		), Handler: s.resourcesCreateOrUpdate},
 		{Tool: WithMeta(
 			mcp.NewTool("resources_delete",
-				mcp.WithDescription("Delete a Kubernetes resource in the current cluster by providing its apiVersion, kind, optionally the namespace, and its name\n"+
-					commonApiVersion),
+				mcp.WithDescription("Delete a Kubernetes resource from the cluster. Removes the resource and its associated objects. Returns deletion status. Use when you need to remove resources, clean up deployments, or delete unwanted objects. Deletion is permanent. Requires apiVersion, kind, name, and optional namespace."),
 				mcp.WithString("apiVersion",
 					mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 					mcp.Required(),
@@ -101,8 +97,7 @@ func (s *Server) initResources() []server.ServerTool {
 		), Handler: s.resourcesDelete},
 		{Tool: WithMeta(
 			mcp.NewTool("get_resources_yaml",
-				mcp.WithDescription("Get the YAML representation of a resource in Kubernetes\n"+
-					commonApiVersion),
+				mcp.WithDescription("Retrieve Kubernetes resources in YAML format. Returns resource definitions as YAML for a specific resource or all resources of a given type. Use when you need YAML output for resources, export configurations, or work with YAML-based tools. Supports both single resource retrieval and listing. Requires apiVersion and kind. Optional name to get a specific resource, or omit to list all resources of the type. Common examples: v1 Pod, v1 Service, v1 Node, apps/v1 Deployment, networking.k8s.io/v1 Ingress"),
 				mcp.WithString("apiVersion",
 					mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 					mcp.Required(),
@@ -129,8 +124,7 @@ func (s *Server) initResources() []server.ServerTool {
 		// ), Handler: s.applyManifest},
 		{Tool: WithMeta(
 			mcp.NewTool("resources_patch",
-				mcp.WithDescription("Patch a resource in Kubernetes\n"+
-					commonApiVersion),
+				mcp.WithDescription("Apply partial updates to a Kubernetes resource without replacing the entire resource. Supports three patch types: json (RFC 6902), merge (RFC 7396), and strategic (Kubernetes default). Returns the patched resource. Use when you need to modify specific fields of a resource efficiently. Requires apiVersion, kind, resource name, patch object, and optional namespace."),
 				mcp.WithString("apiVersion",
 					mcp.Description("apiVersion of the resource (examples of valid apiVersion are: v1, apps/v1, networking.k8s.io/v1)"),
 					mcp.Required(),

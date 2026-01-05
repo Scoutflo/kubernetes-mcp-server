@@ -34,20 +34,20 @@ func (s *Server) initPods() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("pods_list",
-				mcp.WithDescription("List all the Kubernetes pods in the current cluster from all namespaces"),
+				mcp.WithDescription("List all Kubernetes pods across all namespaces in the cluster. Returns pod metadata including name, namespace, status, node assignment, and creation timestamps. Supports pagination with limit and continue token. Use when you need to discover pods cluster-wide, check pod distribution, or audit pod resources. No parameters required."),
 			),
 			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsListInAllNamespaces},
 		{Tool: WithMeta(
 			mcp.NewTool("pods_list_in_namespace",
-				mcp.WithDescription("List all the Kubernetes pods in the specified namespace in the current cluster"),
+				mcp.WithDescription("List all Kubernetes pods in a specific namespace. Returns pod metadata including name, status, node assignment, container information, and creation timestamps. Supports pagination with limit and continue token. Use when you need to see pods in a particular namespace, check application deployments, or monitor namespace resources. Requires namespace name."),
 				mcp.WithString("namespace", mcp.Description("Namespace to list pods from"), mcp.Required()),
 			),
 			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsListInNamespace},
 		{Tool: WithMeta(
 			mcp.NewTool("pods_get",
-				mcp.WithDescription("Get a Kubernetes Pod in the current or provided namespace with the provided name"),
+				mcp.WithDescription("Retrieve complete information about a Kubernetes Pod including status, containers, events, resource usage, and configuration. Returns pod state, container statuses, recent events, and resource requests/limits. Use when you need to inspect pod details, check health status, or gather information for troubleshooting. Requires pod name and optional namespace."),
 				mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
 				mcp.WithString("name", mcp.Description("Name of the Pod"), mcp.Required()),
 			),
@@ -55,7 +55,7 @@ func (s *Server) initPods() []server.ServerTool {
 		), Handler: s.podsGet},
 		{Tool: WithMeta(
 			mcp.NewTool("pods_delete",
-				mcp.WithDescription("Delete a Kubernetes Pod in the current or provided namespace with the provided name"),
+				mcp.WithDescription("Delete a Kubernetes Pod from the cluster. Removes the pod and terminates its containers. Use when you need to remove a pod, force recreation by a controller, or clean up resources. Deletion is immediate and cannot be undone. Requires pod name and optional namespace."),
 				mcp.WithString("namespace", mcp.Description("Namespace to delete the Pod from")),
 				mcp.WithString("name", mcp.Description("Name of the Pod to delete"), mcp.Required()),
 			),
@@ -71,7 +71,7 @@ func (s *Server) initPods() []server.ServerTool {
 		), Handler: s.podsDelete},
 		{Tool: WithMeta(
 			mcp.NewTool("pods_exec",
-				mcp.WithDescription("Execute a command in a Kubernetes Pod in the current or provided namespace with the provided name and command"),
+				mcp.WithDescription("Execute commands inside running pod containers. Returns command output and exit status. Use when you need to run diagnostic commands, inspect container state, or perform administrative tasks inside a pod. Requires pod name, namespace, and command array (first item is command, remaining items are arguments)."),
 				mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
 				mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
 				mcp.WithArray("command", mcp.Description("Command to execute in the Pod container. "+
@@ -90,7 +90,7 @@ func (s *Server) initPods() []server.ServerTool {
 		), Handler: s.podsExec},
 		{Tool: WithMeta(
 			mcp.NewTool("pods_log",
-				mcp.WithDescription("Get the logs of a Kubernetes Pod in the current or provided namespace with the provided name"),
+				mcp.WithDescription("Retrieve container logs from a Kubernetes Pod. Returns log output from all containers or a specific container. Supports time-based filtering (start_time/end_time or time_window), tail lines limit, and container selection. Use when you need to view application logs, debug issues, or monitor runtime output. Requires pod name and optional namespace."),
 				mcp.WithString("namespace", mcp.Description("Namespace to get the Pod logs from")),
 				mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
 				mcp.WithNumber("tail_lines", mcp.Description("Number of lines to get from the end of the logs (Optional, default is 256)")),
@@ -99,7 +99,7 @@ func (s *Server) initPods() []server.ServerTool {
 		), Handler: s.podsLog},
 		{Tool: WithMeta(
 			mcp.NewTool("pods_run",
-				mcp.WithDescription("Run a Kubernetes Pod in the current or provided namespace with the provided container image and optional name"),
+				mcp.WithDescription("Create and run a new Kubernetes Pod with a specified container image. Returns pod creation status and pod details. Use when you need to run a temporary pod for testing, debugging, or one-off tasks. Requires container image name and optional pod name, namespace, and port."),
 				mcp.WithString("namespace", mcp.Description("Namespace to run the Pod in")),
 				mcp.WithString("name", mcp.Description("Name of the Pod (Optional, random name if not provided)")),
 				mcp.WithString("image", mcp.Description("Container Image to run in the Pod"), mcp.Required()),

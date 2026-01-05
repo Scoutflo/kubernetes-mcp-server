@@ -84,7 +84,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusTargets},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_targets_metadata",
-				mcp.WithDescription("Retrieve metric metadata from specific targets to validate exposure consistency"),
+				mcp.WithDescription("Retrieve metric metadata from Prometheus scrape targets. Returns metadata about metrics exposed by specific targets including help text, type, and unit information. Use when you need to verify what metrics a target exposes or validate metric consistency across targets. Targets are Prometheus scrape endpoints that expose metrics."),
 				mcp.WithString("match_target", mcp.Description("Target label selectors (optional)")),
 				mcp.WithString("metric", mcp.Description("Metric name (optional)")),
 				mcp.WithNumber("limit", mcp.Description("Maximum number of targets (optional)")),
@@ -241,7 +241,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusRuntimeInfo},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_TSDB_status",
-				mcp.WithDescription("Obtain database status information to verify storage integrity and performance"),
+				mcp.WithDescription("Retrieve TSDB (Time Series Database) status information from Prometheus. Returns storage statistics including head stats, series data, chunk information, and retention details. Use when you need to monitor Prometheus storage health, check data retention, or diagnose storage issues. TSDB is Prometheus's storage backend."),
 				mcp.WithNumber("limit", mcp.Description("Number of items limit")),
 			),
 			map[string]any{"provider": ProviderPrometheus},

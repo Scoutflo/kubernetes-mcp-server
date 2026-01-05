@@ -16,7 +16,7 @@ func (s *Server) initNamespaces() []server.ServerTool {
 	ret = append(ret, server.ServerTool{
 		Tool: WithMeta(
 			mcp.NewTool("namespaces_list",
-				mcp.WithDescription("List all the Kubernetes namespaces in the current cluster"),
+				mcp.WithDescription("List all Kubernetes namespaces in the cluster. Returns namespace names, status, labels, annotations, and creation timestamps. Use when you need to discover available namespaces, check namespace existence, or audit cluster organization."),
 			),
 			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.namespacesList,

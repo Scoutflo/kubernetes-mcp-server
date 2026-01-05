@@ -128,7 +128,7 @@ func (s *Server) initIstio() []server.ServerTool {
 		), Handler: s.istioGetTelemetries},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_get_ztunnel_config",
-			mcp.WithDescription("Access ztunnel configurations managing secure communications within ambient mesh architecture"),
+			mcp.WithDescription("Retrieve ztunnel configuration for secure communications in Istio ambient mesh. Returns ztunnel configuration including workload, service, policy, certificate, and connection information. Use when you need to inspect ambient mesh configuration or troubleshoot ztunnel connectivity. Ztunnel is the zero-trust tunnel component in Istio's ambient mesh mode. Requires optional namespace, pod name, and config type."),
 			mcp.WithString("ns",
 				mcp.Description("The namespace of the pod to get ztunnel configuration for (optional, defaults to istio-system)"),
 			),
@@ -143,7 +143,7 @@ func (s *Server) initIstio() []server.ServerTool {
 		), Handler: s.ztunnelConfig},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_get_waypoint",
-			mcp.WithDescription("Retrieve waypoint proxy configurations for inspecting and managing east-west traffic"),
+			mcp.WithDescription("Retrieve waypoint proxy configuration and status for Istio ambient mesh. Returns waypoint information including status, generation, and apply operations. Use when you need to inspect waypoint configuration, check waypoint status, or manage waypoint proxies. Waypoints are L7 proxies that handle traffic for workloads in ambient mesh mode. Requires waypoint name and namespace."),
 			mcp.WithString("name",
 				mcp.Description("Name of the waypoint to get status for"),
 				mcp.Required(),

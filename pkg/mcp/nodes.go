@@ -15,13 +15,13 @@ func (s *Server) initNodes() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("nodes_list",
-				mcp.WithDescription("List all Kubernetes nodes in the current cluster"),
+				mcp.WithDescription("List all Kubernetes nodes in the cluster. Returns node metadata including name, status, roles, labels, annotations, and system information. Use when you need to discover cluster nodes, check node availability, audit cluster infrastructure, or verify node configuration. No parameters required."),
 			),
 			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.nodesList},
 		{Tool: WithMeta(
 			mcp.NewTool("nodes_get",
-				mcp.WithDescription("Get detailed information about a specific Kubernetes node"),
+				mcp.WithDescription("Retrieve complete information about a Kubernetes node. Returns node capacity, allocatable resources, conditions, labels, annotations, and system information. Use when you need to inspect node configuration, check resource availability, verify node health, or troubleshoot scheduling problems. Requires node name."),
 				mcp.WithString("name", mcp.Description("Name of the node"), mcp.Required()),
 			),
 			map[string]any{"provider": ProviderKubernetes},

@@ -15,7 +15,7 @@ func (s *Server) initEvents() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("events_list",
-				mcp.WithDescription("List all the Kubernetes events in the current cluster from all namespaces with optional filtering by namespace, resource name, kind, or API version"),
+				mcp.WithDescription("List Kubernetes events across all namespaces or filtered by criteria. Returns event details including type, reason, message, involved object, timestamp, and source. Supports filtering by namespace, resource name, kind, API version, and time range. Use when you need to audit cluster activity, troubleshoot resource issues, track changes, or investigate incidents. Optional filters: namespace, involved_object_name, involved_object_kind, involved_object_api_version, and time parameters."),
 				mcp.WithString("namespace",
 					mcp.Description("Optional Namespace to retrieve the events from. If not provided, will list events from all namespaces")),
 				mcp.WithString("involved_object_name",
