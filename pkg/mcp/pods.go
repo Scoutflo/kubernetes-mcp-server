@@ -34,7 +34,9 @@ func (s *Server) initPods() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("pods_list",
-				mcp.WithDescription("List all Kubernetes pods across all namespaces in the cluster. Returns pod metadata including name, namespace, status, node assignment, and creation timestamps. Supports pagination with limit and continue token. Use when you need to discover pods cluster-wide, check pod distribution, or audit pod resources. No parameters required."),
+				mcp.WithDescription("List all Kubernetes pods across all namespaces in the cluster. Returns pod metadata including name, namespace, status, node assignment, and creation timestamps. Supports pagination with limit and continue token. Use when you need to discover pods cluster-wide, check pod distribution, or audit pod resources."),
+				mcp.WithNumber("limit", mcp.Description("Maximum number of items to return (default 10)")),
+				mcp.WithString("continue", mcp.Description("Continuation token for pagination from a previous response")),
 			),
 			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsListInAllNamespaces},
@@ -42,6 +44,8 @@ func (s *Server) initPods() []server.ServerTool {
 			mcp.NewTool("pods_list_in_namespace",
 				mcp.WithDescription("List all Kubernetes pods in a specific namespace. Returns pod metadata including name, status, node assignment, container information, and creation timestamps. Supports pagination with limit and continue token. Use when you need to see pods in a particular namespace, check application deployments, or monitor namespace resources. Requires namespace name."),
 				mcp.WithString("namespace", mcp.Description("Namespace to list pods from"), mcp.Required()),
+				mcp.WithNumber("limit", mcp.Description("Maximum number of items to return (default 10)")),
+				mcp.WithString("continue", mcp.Description("Continuation token for pagination from a previous response")),
 			),
 			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsListInNamespace},
