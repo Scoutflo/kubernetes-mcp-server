@@ -16,12 +16,15 @@ func (s *Server) initPromptGenerator() []server.ServerTool {
 
 	// Define and return the server tools
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("prompt_generator",
-			mcp.WithDescription("Generate a well-structured prompt for Kubernetes analysis based on a description"),
-			mcp.WithString("description",
-				mcp.Description("Natural language description of the prompt to generate"),
-				mcp.Required(),
+		{Tool: WithMeta(
+			mcp.NewTool("prompt_generator",
+				mcp.WithDescription("Convert natural language descriptions into structured Kubernetes operation prompts. Returns a formatted prompt that can be used to guide Kubernetes operations. Use when you need to translate user intent or requirements into actionable Kubernetes tool calls and parameters. Requires a description of the desired operation."),
+				mcp.WithString("description",
+					mcp.Description("Natural language description of the prompt to generate"),
+					mcp.Required(),
+				),
 			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.promptGenerator},
 	}
 }

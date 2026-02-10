@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -17,7 +18,8 @@ import (
 func (s *Server) initArgoCD() []server.ServerTool {
 	return []server.ServerTool{
 		{
-			Tool: mcp.NewTool("argocd_list_applications",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_list_applications",
 				mcp.WithDescription("List all ArgoCD-managed applications with their synchronization status and health for cluster-wide oversight"),
 				mcp.WithString("project",
 					mcp.Description("Filter applications by project name (optional)"),
@@ -32,10 +34,13 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("Forces application reconciliation if set to 'hard' or 'normal' (optional)"),
 				),
 			),
+				map[string]any{"provider": ProviderArgoCD},
+			),
 			Handler: s.argocdListApplications,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_application",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_application",
 				mcp.WithDescription("Retrieve detailed application configuration including sync state and resource status for deployment inspection"),
 				mcp.WithString("name",
 					mcp.Description("Name of the application"),
@@ -48,163 +53,222 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("Forces application reconciliation if set to 'hard' or 'normal' (optional)"),
 				),
 			),
+				map[string]any{"provider": ProviderArgoCD},
+			),
 			Handler: s.argocdGetApplication,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_application_events",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_application_events",
 				mcp.WithDescription("Access historical events for specific applications to track configuration changes and operational history"),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
 				),
+				mcp.WithString("start_time", mcp.Description("Start time for event retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
+				mcp.WithString("end_time", mcp.Description("End time for event retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
+				mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves events from (now - time_window) to now.")),
+			),
+				map[string]any{"provider": ProviderArgoCD},
 			),
 			Handler: s.argocdGetApplicationEvents,
 		},
 		{
-			Tool: mcp.NewTool("argocd_sync_application",
-				mcp.WithDescription("Trigger manual synchronization between Git definitions and cluster resources to enforce desired states"),
-				mcp.WithString("name",
-					mcp.Description("Name of the application"),
-					mcp.Required(),
+			Tool: WithMeta(
+				mcp.NewTool("argocd_sync_application",
+					mcp.WithDescription("Trigger manual synchronization between Git definitions and cluster resources to enforce desired states"),
+					mcp.WithString("name",
+						mcp.Description("Name of the application"),
+						mcp.Required(),
+					),
+					mcp.WithString("revision",
+						mcp.Description("Revision to sync to (e.g., a branch, tag, or commit SHA)"),
+					),
+					mcp.WithString("prune",
+						mcp.Description("If 'true', prune resources that are no longer defined in Git (accepted values: 'true', 'false')"),
+					),
+					mcp.WithString("dry_run",
+						mcp.Description("If 'true', preview the sync without making changes (accepted values: 'true', 'false')"),
+					),
 				),
-				mcp.WithString("revision",
-					mcp.Description("Revision to sync to (e.g., a branch, tag, or commit SHA)"),
-				),
-				mcp.WithString("prune",
-					mcp.Description("If 'true', prune resources that are no longer defined in Git (accepted values: 'true', 'false')"),
-				),
-				mcp.WithString("dry_run",
-					mcp.Description("If 'true', preview the sync without making changes (accepted values: 'true', 'false')"),
-				),
+				map[string]any{
+					"provider": ProviderArgoCD,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will sync an ArgoCD application and may modify cluster resources. Proceed?",
+					},
+				},
 			),
 			Handler: s.argocdSyncApplication,
 		},
 		{
-			Tool: mcp.NewTool("argocd_create_application",
-				mcp.WithDescription("Define new applications in ArgoCD to establish GitOps workflows for deployment management. Provide parameters as simple strings - the tool automatically constructs the proper ArgoCD nested structure (metadata, spec.source, spec.destination, spec.syncPolicy). Example: name='my-app', repo_url='https://github.com/user/repo.git', path='k8s/', dest_server='https://kubernetes.default.svc', dest_namespace='production'"),
-				mcp.WithString("name",
-					mcp.Description("The name of the application (string, required). Example: 'my-application'"),
-					mcp.Required(),
+			Tool: WithMeta(
+				mcp.NewTool("argocd_create_application",
+					mcp.WithDescription("Define new applications in ArgoCD to establish GitOps workflows for deployment management. Provide parameters as simple strings - the tool automatically constructs the proper ArgoCD nested structure (metadata, spec.source, spec.destination, spec.syncPolicy). Example: name='my-app', repo_url='https://github.com/user/repo.git', path='k8s/', dest_server='https://kubernetes.default.svc', dest_namespace='production'"),
+					mcp.WithString("name",
+						mcp.Description("The name of the application (string, required). Example: 'my-application'"),
+						mcp.Required(),
+					),
+					mcp.WithString("project",
+						mcp.Description("The ArgoCD project name (string, required). Example: 'default'"),
+						mcp.Required(),
+					),
+					mcp.WithString("repo_url",
+						mcp.Description("The Git repository URL (string, required). Full HTTPS or SSH URL. Example: 'https://github.com/user/repo.git' or 'git@github.com:user/repo.git'"),
+						mcp.Required(),
+					),
+					mcp.WithString("path",
+						mcp.Description("Path within the repository where Kubernetes manifests are located (string, required). Example: 'k8s/' or '.' for root directory"),
+						mcp.Required(),
+					),
+					mcp.WithString("dest_server",
+						mcp.Description("Destination Kubernetes API server URL (string, required). Use 'https://kubernetes.default.svc' for in-cluster, or full URL for external clusters. Example: 'https://kubernetes.default.svc'"),
+						mcp.Required(),
+					),
+					mcp.WithString("dest_namespace",
+						mcp.Description("Destination Kubernetes namespace where resources will be deployed (string, required). Example: 'production' or 'default'"),
+						mcp.Required(),
+					),
+					mcp.WithString("revision",
+						mcp.Description("Git revision to sync (string, optional). Can be branch name, tag, or commit SHA. Default: 'HEAD'. Example: 'main', 'v1.0.0', or 'abc123def'"),
+					),
+					mcp.WithString("automated_sync",
+						mcp.Description("Enable automated sync policy (string, optional). Accepted values: 'true' or 'false'. Default: 'false'. When 'true', ArgoCD will automatically sync when Git changes are detected"),
+					),
+					mcp.WithString("prune",
+						mcp.Description("Enable auto-prune for resources (string, optional). Accepted values: 'true' or 'false'. Default: 'false'. When 'true', resources removed from Git will be automatically deleted from cluster"),
+					),
+					mcp.WithString("self_heal",
+						mcp.Description("Enable self-healing (string, optional). Accepted values: 'true' or 'false'. Default: 'false'. When 'true', ArgoCD will automatically revert manual changes to match Git state"),
+					),
+					mcp.WithString("validate",
+						mcp.Description("Whether to validate the application before creation (string, optional). Accepted values: 'true' or 'false'. Default: 'true'"),
+					),
+					mcp.WithString("upsert",
+						mcp.Description("Whether to update the application if it already exists (string, optional). Accepted values: 'true' or 'false'. Default: 'false'"),
+					),
 				),
-				mcp.WithString("project",
-					mcp.Description("The ArgoCD project name (string, required). Example: 'default'"),
-					mcp.Required(),
-				),
-				mcp.WithString("repo_url",
-					mcp.Description("The Git repository URL (string, required). Full HTTPS or SSH URL. Example: 'https://github.com/user/repo.git' or 'git@github.com:user/repo.git'"),
-					mcp.Required(),
-				),
-				mcp.WithString("path",
-					mcp.Description("Path within the repository where Kubernetes manifests are located (string, required). Example: 'k8s/' or '.' for root directory"),
-					mcp.Required(),
-				),
-				mcp.WithString("dest_server",
-					mcp.Description("Destination Kubernetes API server URL (string, required). Use 'https://kubernetes.default.svc' for in-cluster, or full URL for external clusters. Example: 'https://kubernetes.default.svc'"),
-					mcp.Required(),
-				),
-				mcp.WithString("dest_namespace",
-					mcp.Description("Destination Kubernetes namespace where resources will be deployed (string, required). Example: 'production' or 'default'"),
-					mcp.Required(),
-				),
-				mcp.WithString("revision",
-					mcp.Description("Git revision to sync (string, optional). Can be branch name, tag, or commit SHA. Default: 'HEAD'. Example: 'main', 'v1.0.0', or 'abc123def'"),
-				),
-				mcp.WithString("automated_sync",
-					mcp.Description("Enable automated sync policy (string, optional). Accepted values: 'true' or 'false'. Default: 'false'. When 'true', ArgoCD will automatically sync when Git changes are detected"),
-				),
-				mcp.WithString("prune",
-					mcp.Description("Enable auto-prune for resources (string, optional). Accepted values: 'true' or 'false'. Default: 'false'. When 'true', resources removed from Git will be automatically deleted from cluster"),
-				),
-				mcp.WithString("self_heal",
-					mcp.Description("Enable self-healing (string, optional). Accepted values: 'true' or 'false'. Default: 'false'. When 'true', ArgoCD will automatically revert manual changes to match Git state"),
-				),
-				mcp.WithString("validate",
-					mcp.Description("Whether to validate the application before creation (string, optional). Accepted values: 'true' or 'false'. Default: 'true'"),
-				),
-				mcp.WithString("upsert",
-					mcp.Description("Whether to update the application if it already exists (string, optional). Accepted values: 'true' or 'false'. Default: 'false'"),
-				),
+				map[string]any{
+					"provider": ProviderArgoCD,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will create a new ArgoCD application and may deploy resources to the cluster. Proceed?",
+					},
+				},
 			),
 			Handler: s.argocdCreateApplication,
 		},
 		{
-			Tool: mcp.NewTool("argocd_update_application",
-				mcp.WithDescription("Modify application configurations to adjust source repositories, target clusters, or sync policies. Provide only the parameters you want to update as simple strings - the tool automatically constructs the proper ArgoCD nested structure. All parameters except 'name' are optional - only provide the ones you want to change"),
-				mcp.WithString("name",
-					mcp.Description("The application name to update (string, required). Example: 'my-application'"),
-					mcp.Required(),
+			Tool: WithMeta(
+				mcp.NewTool("argocd_update_application",
+					mcp.WithDescription("Modify application configurations to adjust source repositories, target clusters, or sync policies. Provide only the parameters you want to update as simple strings - the tool automatically constructs the proper ArgoCD nested structure. All parameters except 'name' are optional - only provide the ones you want to change"),
+					mcp.WithString("name",
+						mcp.Description("The application name to update (string, required). Example: 'my-application'"),
+						mcp.Required(),
+					),
+					mcp.WithString("project",
+						mcp.Description("New ArgoCD project name (string, optional). Example: 'production'"),
+					),
+					mcp.WithString("repo_url",
+						mcp.Description("New Git repository URL (string, optional). Full HTTPS or SSH URL. Example: 'https://github.com/user/new-repo.git'"),
+					),
+					mcp.WithString("path",
+						mcp.Description("New path within the repository (string, optional). Example: 'k8s/manifests/'"),
+					),
+					mcp.WithString("dest_server",
+						mcp.Description("New destination Kubernetes API server URL (string, optional). Example: 'https://kubernetes.default.svc'"),
+					),
+					mcp.WithString("dest_namespace",
+						mcp.Description("New destination Kubernetes namespace (string, optional). Example: 'staging'"),
+					),
+					mcp.WithString("revision",
+						mcp.Description("New Git revision to sync (string, optional). Can be branch, tag, or commit SHA. Example: 'develop' or 'v2.0.0'"),
+					),
+					mcp.WithString("automated_sync",
+						mcp.Description("Enable/disable automated sync (string, optional). Accepted values: 'true' or 'false'"),
+					),
+					mcp.WithString("prune",
+						mcp.Description("Enable/disable auto-pruning resources (string, optional). Accepted values: 'true' or 'false'"),
+					),
+					mcp.WithString("self_heal",
+						mcp.Description("Enable/disable self-healing (string, optional). Accepted values: 'true' or 'false'"),
+					),
+					mcp.WithString("validate",
+						mcp.Description("Whether to validate the application (string, optional). Accepted values: 'true' or 'false'. Default: 'true'"),
+					),
 				),
-				mcp.WithString("project",
-					mcp.Description("New ArgoCD project name (string, optional). Example: 'production'"),
-				),
-				mcp.WithString("repo_url",
-					mcp.Description("New Git repository URL (string, optional). Full HTTPS or SSH URL. Example: 'https://github.com/user/new-repo.git'"),
-				),
-				mcp.WithString("path",
-					mcp.Description("New path within the repository (string, optional). Example: 'k8s/manifests/'"),
-				),
-				mcp.WithString("dest_server",
-					mcp.Description("New destination Kubernetes API server URL (string, optional). Example: 'https://kubernetes.default.svc'"),
-				),
-				mcp.WithString("dest_namespace",
-					mcp.Description("New destination Kubernetes namespace (string, optional). Example: 'staging'"),
-				),
-				mcp.WithString("revision",
-					mcp.Description("New Git revision to sync (string, optional). Can be branch, tag, or commit SHA. Example: 'develop' or 'v2.0.0'"),
-				),
-				mcp.WithString("automated_sync",
-					mcp.Description("Enable/disable automated sync (string, optional). Accepted values: 'true' or 'false'"),
-				),
-				mcp.WithString("prune",
-					mcp.Description("Enable/disable auto-pruning resources (string, optional). Accepted values: 'true' or 'false'"),
-				),
-				mcp.WithString("self_heal",
-					mcp.Description("Enable/disable self-healing (string, optional). Accepted values: 'true' or 'false'"),
-				),
-				mcp.WithString("validate",
-					mcp.Description("Whether to validate the application (string, optional). Accepted values: 'true' or 'false'. Default: 'true'"),
-				),
+				map[string]any{
+					"provider": ProviderArgoCD,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will update an ArgoCD application configuration and may affect deployments. Proceed?",
+					},
+				},
 			),
 			Handler: s.argocdUpdateApplication,
 		},
 		{
-			Tool: mcp.NewTool("argocd_delete_application",
-				mcp.WithDescription("Remove applications from ArgoCD management while preserving underlying Kubernetes resources"),
-				mcp.WithString("name",
-					mcp.Description("The name of the application to delete"),
-					mcp.Required(),
+			Tool: WithMeta(
+				mcp.NewTool("argocd_delete_application",
+					mcp.WithDescription("Remove applications from ArgoCD management while preserving underlying Kubernetes resources"),
+					mcp.WithString("name",
+						mcp.Description("The name of the application to delete"),
+						mcp.Required(),
+					),
+					mcp.WithString("cascade",
+						mcp.Description("Whether to delete application resources as well (accepted values: 'true', 'false', default: 'true')"),
+					),
+					mcp.WithString("propagation_policy",
+						mcp.Description("The propagation policy ('foreground', 'background', or 'orphan')"),
+					),
 				),
-				mcp.WithString("cascade",
-					mcp.Description("Whether to delete application resources as well (accepted values: 'true', 'false', default: 'true')"),
-				),
-				mcp.WithString("propagation_policy",
-					mcp.Description("The propagation policy ('foreground', 'background', or 'orphan')"),
-				),
+				map[string]any{
+					"provider": ProviderArgoCD,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskHigh,
+						"approvalType": "single",
+						"message":      "This will delete an ArgoCD application and may remove associated resources. This action cannot be undone. Proceed?",
+					},
+				},
 			),
 			Handler: s.argocdDeleteApplication,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_application_resource_tree",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_application_resource_tree",
 				mcp.WithDescription("Retrieve hierarchical dependency relationships between resources within an application"),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
 				),
 			),
+				map[string]any{"provider": ProviderArgoCD},
+			),
 			Handler: s.argocdGetApplicationResourceTree,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_application_managed_resources",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_application_managed_resources",
 				mcp.WithDescription("List all Kubernetes resources currently managed under specific ArgoCD applications"),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
 					mcp.Required(),
 				),
 			),
+				map[string]any{"provider": ProviderArgoCD},
+			),
 			Handler: s.argocdGetApplicationManagedResources,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_application_workload_logs",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_application_workload_logs",
 				mcp.WithDescription("Access container logs from application workloads to monitor runtime behavior and outputs"),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
@@ -220,11 +284,17 @@ func (s *Server) initArgoCD() []server.ServerTool {
 				mcp.WithString("follow",
 					mcp.Description("Follow logs (accepted values: 'true', 'false', default: 'false')"),
 				),
+				mcp.WithString("start_time", mcp.Description("Start time for log retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
+				mcp.WithString("end_time", mcp.Description("End time for log retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
+				mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves logs from (now - time_window) to now.")),
+			),
+				map[string]any{"provider": ProviderArgoCD},
 			),
 			Handler: s.argocdGetApplicationWorkloadLogs,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_resource_events",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_resource_events",
 				mcp.WithDescription("Retrieve event history for individual Kubernetes resources managed by ArgoCD"),
 				mcp.WithString("application_name",
 					mcp.Description("The name of the application"),
@@ -234,11 +304,17 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Description("The resource reference in the format of a map with keys 'name', 'namespace', and optional 'uid'"),
 					mcp.Required(),
 				),
+				mcp.WithString("start_time", mcp.Description("Start time for event retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
+				mcp.WithString("end_time", mcp.Description("End time for event retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
+				mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') - alternative to start_time/end_time. If provided, retrieves events from (now - time_window) to now.")),
+			),
+				map[string]any{"provider": ProviderArgoCD},
 			),
 			Handler: s.argocdGetResourceEvents,
 		},
 		{
-			Tool: mcp.NewTool("argocd_get_resource_actions",
+			Tool: WithMeta(
+				mcp.NewTool("argocd_get_resource_actions",
 				mcp.WithDescription("Discover available operations for specific resources like restart, rollback, or resource hooks"),
 				mcp.WithString("name",
 					mcp.Description("The name of the application"),
@@ -249,23 +325,36 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.Required(),
 				),
 			),
+				map[string]any{"provider": ProviderArgoCD},
+			),
 			Handler: s.argocdGetResourceActions,
 		},
 		{
-			Tool: mcp.NewTool("argocd_run_resource_action",
-				mcp.WithDescription("Execute resource-specific operations such as pod restarts or job retries within applications"),
-				mcp.WithString("name",
-					mcp.Description("The name of the application"),
-					mcp.Required(),
+			Tool: WithMeta(
+				mcp.NewTool("argocd_run_resource_action",
+					mcp.WithDescription("Execute resource-specific operations such as pod restarts or job retries within applications"),
+					mcp.WithString("name",
+						mcp.Description("The name of the application"),
+						mcp.Required(),
+					),
+					mcp.WithString("resource_ref",
+						mcp.Description("The resource reference in the format of a map with keys 'name', 'namespace', 'kind', 'group', and 'version'"),
+						mcp.Required(),
+					),
+					mcp.WithString("action",
+						mcp.Description("The name of the action to run"),
+						mcp.Required(),
+					),
 				),
-				mcp.WithString("resource_ref",
-					mcp.Description("The resource reference in the format of a map with keys 'name', 'namespace', 'kind', 'group', and 'version'"),
-					mcp.Required(),
-				),
-				mcp.WithString("action",
-					mcp.Description("The name of the action to run"),
-					mcp.Required(),
-				),
+				map[string]any{
+					"provider": ProviderArgoCD,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will execute an action on an ArgoCD resource and may affect running workloads. Proceed?",
+					},
+				},
 			),
 			Handler: s.argocdRunResourceAction,
 		},
@@ -744,6 +833,40 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 	followStr := ctr.GetString("follow", "false")
 	follow := strings.ToLower(followStr) == "true"
 
+	startTimeStr := ctr.GetString("start_time", "")
+	endTimeStr := ctr.GetString("end_time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
+
+	var startTime, endTime *time.Time
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			klog.Errorf("Tool call: argocd_get_application_workload_logs failed after %v: invalid time_window format: %v", time.Since(start), err)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else if startTimeStr != "" || endTimeStr != "" {
+		if startTimeStr == "" || endTimeStr == "" {
+			klog.Errorf("Tool call: argocd_get_application_workload_logs failed after %v: both start_time and end_time must be provided together", time.Since(start))
+			return NewTextResult("", errors.New("both start_time and end_time must be provided together, or use time_window")), nil
+		}
+		startParsed := parseTime(startTimeStr, time.Time{})
+		if startParsed.IsZero() {
+			klog.Errorf("Tool call: argocd_get_application_workload_logs failed after %v: invalid start_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid start_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		endParsed := parseTime(endTimeStr, time.Time{})
+		if endParsed.IsZero() {
+			klog.Errorf("Tool call: argocd_get_application_workload_logs failed after %v: invalid end_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid end_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		startTime = &startParsed
+		endTime = &endParsed
+	}
+
 	klog.V(1).Infof("Tool: argocd_get_application_workload_logs - application: %s, resource: %s/%s/%s, tail: %s, follow: %t - got called",
 		name, resourceRef.Kind, resourceRef.Namespace, resourceRef.Name, tailStr, follow)
 
@@ -751,7 +874,7 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 	followStr = fmt.Sprintf("%t", follow)
 	resourceRefJSON, _ := json.Marshal(resourceRef)
 
-	result, err := k.GetApplicationWorkloadLogs(ctx, name, string(resourceRefJSON), followStr, tailStr)
+	result, err := k.GetApplicationWorkloadLogs(ctx, name, string(resourceRefJSON), followStr, tailStr, startTime, endTime)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -799,6 +922,40 @@ func (s *Server) argocdGetResourceEvents(ctx context.Context, ctr mcp.CallToolRe
 		return NewTextResult("", fmt.Errorf("resource_ref.namespace is required")), nil
 	}
 
+	startTimeStr := ctr.GetString("start_time", "")
+	endTimeStr := ctr.GetString("end_time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
+
+	var startTime, endTime *time.Time
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			klog.Errorf("Tool call: argocd_get_resource_events failed after %v: invalid time_window format: %v", time.Since(start), err)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else if startTimeStr != "" || endTimeStr != "" {
+		if startTimeStr == "" || endTimeStr == "" {
+			klog.Errorf("Tool call: argocd_get_resource_events failed after %v: both start_time and end_time must be provided together", time.Since(start))
+			return NewTextResult("", errors.New("both start_time and end_time must be provided together, or use time_window")), nil
+		}
+		startParsed := parseTime(startTimeStr, time.Time{})
+		if startParsed.IsZero() {
+			klog.Errorf("Tool call: argocd_get_resource_events failed after %v: invalid start_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid start_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		endParsed := parseTime(endTimeStr, time.Time{})
+		if endParsed.IsZero() {
+			klog.Errorf("Tool call: argocd_get_resource_events failed after %v: invalid end_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid end_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		startTime = &startParsed
+		endTime = &endParsed
+	}
+
 	klog.V(1).Infof("Tool: argocd_get_resource_events - application: %s, resource: %s/%s - got called",
 		name, resourceNamespace, resourceName)
 
@@ -808,7 +965,7 @@ func (s *Server) argocdGetResourceEvents(ctx context.Context, ctr mcp.CallToolRe
 		"namespace": resourceNamespace,
 	})
 
-	result, err := k.GetApplicationResourceEvents(ctx, name, string(resourceRefJSON))
+	result, err := k.GetApplicationResourceEvents(ctx, name, string(resourceRefJSON), startTime, endTime)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -1006,10 +1163,44 @@ func (s *Server) argocdGetApplicationEvents(ctx context.Context, ctr mcp.CallToo
 		return NewTextResult("", fmt.Errorf("application name is required")), nil
 	}
 
+	startTimeStr := ctr.GetString("start_time", "")
+	endTimeStr := ctr.GetString("end_time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
+
+	var startTime, endTime *time.Time
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			klog.Errorf("Tool call: argocd_get_application_events failed after %v: invalid time_window format: %v", time.Since(start), err)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else if startTimeStr != "" || endTimeStr != "" {
+		if startTimeStr == "" || endTimeStr == "" {
+			klog.Errorf("Tool call: argocd_get_application_events failed after %v: both start_time and end_time must be provided together", time.Since(start))
+			return NewTextResult("", errors.New("both start_time and end_time must be provided together, or use time_window")), nil
+		}
+		startParsed := parseTime(startTimeStr, time.Time{})
+		if startParsed.IsZero() {
+			klog.Errorf("Tool call: argocd_get_application_events failed after %v: invalid start_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid start_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		endParsed := parseTime(endTimeStr, time.Time{})
+		if endParsed.IsZero() {
+			klog.Errorf("Tool call: argocd_get_application_events failed after %v: invalid end_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid end_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		startTime = &startParsed
+		endTime = &endParsed
+	}
+
 	klog.V(1).Infof("Tool: argocd_get_application_events - application: %s - got called", name)
 
 	// Get application events using the K8s Dashboard API
-	result, err := k.GetApplicationEvents(ctx, name)
+	result, err := k.GetApplicationEvents(ctx, name, startTime, endTime)
 	duration := time.Since(start)
 
 	if err != nil {

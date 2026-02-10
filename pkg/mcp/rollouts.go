@@ -15,13 +15,24 @@ import (
 func (s *Server) initRollouts() []server.ServerTool {
 	return []server.ServerTool{
 		{
-			Tool: mcp.NewTool("rollout",
-				mcp.WithDescription("The rollout action to perform on the resource (history, pause, restart, resume, status, undo)"),
-				mcp.WithString("action", mcp.Description("The action to perform on the resource"), mcp.Required()),
-				mcp.WithString("resource_type", mcp.Description("The type of resource to rollout (deployment, daemonset, statefulset)"), mcp.Required()),
-				mcp.WithString("resource_name", mcp.Description("The name of the resource to rollout"), mcp.Required()),
-				mcp.WithString("namespace", mcp.Description("The namespace of the resource (optional, uses default namespace if not provided)")),
-				mcp.WithString("revision", mcp.Description("The revision to rollback to (only used with 'undo' action, defaults to previous revision if not specified)")),
+			Tool: WithMeta(
+				mcp.NewTool("rollout",
+					mcp.WithDescription("Perform rollout management operations on Kubernetes deployments, daemonsets, or statefulsets. Supports actions: history (view rollout history), pause (suspend rollout), restart (restart pods), resume (resume paused rollout), status (check rollout status), undo (rollback to previous revision). Returns operation result. Use when you need to manage rollout lifecycle, control deployment progress, or rollback to previous versions. Requires action, resource type, resource name, and optional namespace and revision."),
+					mcp.WithString("action", mcp.Description("The action to perform on the resource"), mcp.Required()),
+					mcp.WithString("resource_type", mcp.Description("The type of resource to rollout (deployment, daemonset, statefulset)"), mcp.Required()),
+					mcp.WithString("resource_name", mcp.Description("The name of the resource to rollout"), mcp.Required()),
+					mcp.WithString("namespace", mcp.Description("The namespace of the resource (optional, uses default namespace if not provided)")),
+					mcp.WithString("revision", mcp.Description("The revision to rollback to (only used with 'undo' action, defaults to previous revision if not specified)")),
+				),
+				map[string]any{
+					"provider": ProviderKubernetes,
+					"hitl": map[string]any{
+						"required":     true,
+						"riskLevel":    RiskMedium,
+						"approvalType": "single",
+						"message":      "This will perform a rollout action on a Kubernetes resource and may affect running workloads. Proceed?",
+					},
+				},
 			),
 			Handler: s.rollout,
 		},
@@ -33,7 +44,7 @@ func (s *Server) rollout(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 	start := time.Now()
 	k, err := s.getKubernetesClient(ctr)
 	if err != nil {
-		klog.Errorf("Tool call: pods_list_in_namespace failed to get Kubernetes client after %v: %v", time.Since(start), err)
+		klog.Errorf("Tool call: rollout failed to get Kubernetes client after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 	// Extract required parameters

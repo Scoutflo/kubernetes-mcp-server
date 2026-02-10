@@ -14,18 +14,28 @@ import (
 
 func (s *Server) initGrafana() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("grafana_health_check",
+		{Tool: WithMeta(
+			mcp.NewTool("grafana_health_check",
 			mcp.WithDescription("Verify Grafana instance connectivity and API responsiveness to confirm operational status and service availability"),
+		),
+			map[string]any{"provider": ProviderGrafana},
 		), Handler: s.grafanaHealthCheck},
-		{Tool: mcp.NewTool("grafana_get_dashboard_by_uid",
+		{Tool: WithMeta(
+			mcp.NewTool("grafana_get_dashboard_by_uid",
 			mcp.WithDescription("Retrieve complete dashboard configurations including panel layouts and variables using unique identifier"),
 			mcp.WithString("uid", mcp.Description("The UID of the dashboard"), mcp.Required()),
+		),
+			map[string]any{"provider": ProviderGrafana},
 		), Handler: s.grafanaGetDashboardByUID},
-		{Tool: mcp.NewTool("grafana_search_dashboards",
+		{Tool: WithMeta(
+			mcp.NewTool("grafana_search_dashboards",
 			mcp.WithDescription("Discover dashboards through keyword searches to locate relevant monitoring visualizations"),
 			mcp.WithString("query", mcp.Description("The query to search for")),
+		),
+			map[string]any{"provider": ProviderGrafana},
 		), Handler: s.grafanaSearchDashboards},
-		{Tool: mcp.NewTool("grafana_update_dashboard",
+		{Tool: WithMeta(
+			mcp.NewTool("grafana_update_dashboard",
 			mcp.WithDescription(`Create or update Grafana dashboards via API. Returns dashboard URL and UID.`),
 
 			mcp.WithObject("dashboard",
@@ -40,24 +50,39 @@ func (s *Server) initGrafana() []server.ServerTool {
 
 			mcp.WithNumber("userId",
 				mcp.Description("User ID for audit trail")),
+		),
+			map[string]any{"provider": ProviderGrafana},
 		), Handler: s.grafanaUpdateDashboard},
-		{Tool: mcp.NewTool("grafana_get_dashboard_panel_queries",
+		{Tool: WithMeta(
+			mcp.NewTool("grafana_get_dashboard_panel_queries",
 			mcp.WithDescription("Inspect data source queries and configurations for specific dashboard panels to analyze data pipelines"),
 			mcp.WithString("uid", mcp.Description("The UID of the dashboard"), mcp.Required()),
+		),
+			map[string]any{"provider": ProviderGrafana},
 		), Handler: s.grafanaGetDashboardPanelQueries},
-		{Tool: mcp.NewTool("grafana_list_datasources",
+		{Tool: WithMeta(
+			mcp.NewTool("grafana_list_datasources",
 			mcp.WithDescription("List all configured data sources with their connection status and type information"),
 			mcp.WithString("type", mcp.Description("The type of datasources to search for. For example, 'prometheus', 'loki', 'tempo', etc...")),
+		),
+			map[string]any{"provider": ProviderGrafana},
 		), Handler: s.grafanaListDatasources},
-		{Tool: mcp.NewTool("grafana_get_datasource_by_uid",
+		{Tool: WithMeta(
+			mcp.NewTool("grafana_get_datasource_by_uid",
 			mcp.WithDescription("Retrieve detailed connection parameters and settings for specific data sources using UID"),
 			mcp.WithString("uid", mcp.Description("The uid of the datasource"), mcp.Required()),
+		),
+			map[string]any{"provider": ProviderGrafana},
 		), Handler: s.grafanaGetDatasourceByUID},
-		{Tool: mcp.NewTool("grafana_get_datasource_by_name",
+		{Tool: WithMeta(
+			mcp.NewTool("grafana_get_datasource_by_name",
 			mcp.WithDescription("Access data source configurations using human-readable names when UID references are unavailable"),
 			mcp.WithString("name", mcp.Description("The name of the datasource"), mcp.Required()),
+		),
+			map[string]any{"provider": ProviderGrafana},
 		), Handler: s.grafanaGetDatasourceByName},
-		{Tool: mcp.NewTool("grafana_list_alert_rules",
+		{Tool: WithMeta(
+			mcp.NewTool("grafana_list_alert_rules",
 			mcp.WithDescription("List all configured alert rules with their evaluation status and notification policies"),
 			mcp.WithNumber("limit", mcp.Description("The maximum number of results to return. Default is 100.")),
 			mcp.WithNumber("page", mcp.Description("The page number to return.")),
@@ -69,10 +94,15 @@ func (s *Server) initGrafana() []server.ServerTool {
 					}
 				},
 			),
+		),
+			map[string]any{"provider": ProviderGrafana},
 		), Handler: s.grafanaListAlertRules},
-		{Tool: mcp.NewTool("grafana_get_alert_rule_by_uid",
+		{Tool: WithMeta(
+			mcp.NewTool("grafana_get_alert_rule_by_uid",
 			mcp.WithDescription("Retrieve detailed alert rule configurations including conditions and notification channels"),
 			mcp.WithString("uid", mcp.Description("The uid of the alert rule"), mcp.Required()),
+		),
+			map[string]any{"provider": ProviderGrafana},
 		), Handler: s.grafanaGetAlertRuleByUID},
 	}
 }
@@ -260,10 +290,44 @@ func (s *Server) grafanaGetDashboardPanelQueries(ctx context.Context, ctr mcp.Ca
 		return NewTextResult("", errors.New("missing required parameter: uid")), nil
 	}
 
+	startTimeStr := ctr.GetString("start_time", "")
+	endTimeStr := ctr.GetString("end_time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
+
+	var startTime, endTime *time.Time
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			klog.Errorf("Tool call: grafana_get_dashboard_panel_queries failed after %v: invalid time_window format: %v", time.Since(start), err)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else if startTimeStr != "" || endTimeStr != "" {
+		if startTimeStr == "" || endTimeStr == "" {
+			klog.Errorf("Tool call: grafana_get_dashboard_panel_queries failed after %v: both start_time and end_time must be provided together", time.Since(start))
+			return NewTextResult("", errors.New("both start_time and end_time must be provided together, or use time_window")), nil
+		}
+		startParsed := parseTime(startTimeStr, time.Time{})
+		if startParsed.IsZero() {
+			klog.Errorf("Tool call: grafana_get_dashboard_panel_queries failed after %v: invalid start_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid start_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		endParsed := parseTime(endTimeStr, time.Time{})
+		if endParsed.IsZero() {
+			klog.Errorf("Tool call: grafana_get_dashboard_panel_queries failed after %v: invalid end_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid end_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		startTime = &startParsed
+		endTime = &endParsed
+	}
+
 	klog.V(1).Infof("Tool: grafana_get_dashboard_panel_queries - uid: %s - got called by session id: %s", uid, sessionID)
 
 	// Call the Kubernetes client to get the dashboard panel queries
-	result, err := k.GetDashboardPanelQueries(ctx, uid)
+	result, err := k.GetDashboardPanelQueries(ctx, uid, startTime, endTime)
 	duration := time.Since(start)
 
 	if err != nil {

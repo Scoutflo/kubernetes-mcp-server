@@ -15,205 +15,248 @@ import (
 
 func (s *Server) initHelm() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("helm_add_repository",
-			mcp.WithDescription("Add a Helm chart repository"),
-			mcp.WithString("name",
-				mcp.Description("Repository name"),
-				mcp.Required(),
+		{Tool: WithMeta(
+			mcp.NewTool("helm_add_repository",
+				mcp.WithDescription("Add a Helm chart repository to the Helm configuration. Enables access to charts from the specified repository for installation and upgrade operations. Returns repository addition status. Use when you need to make charts from a repository available for deployment. Requires repository name and URL."),
+				mcp.WithString("name",
+					mcp.Description("Repository name"),
+					mcp.Required(),
+				),
+				mcp.WithString("url",
+					mcp.Description("Repository URL"),
+					mcp.Required(),
+				),
+				mcp.WithString("namespace",
+					mcp.Description("Namespace to use for Helm operations (optional)"),
+				),
 			),
-			mcp.WithString("url",
-				mcp.Description("Repository URL"),
-				mcp.Required(),
-			),
-			mcp.WithString("namespace",
-				mcp.Description("Namespace to use for Helm operations (optional)"),
-			),
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskLow,
+					"approvalType": "single",
+					"message":      "This will add a Helm chart repository. Proceed?",
+				},
+			},
 		), Handler: s.helmAddRepository},
 
-		{Tool: mcp.NewTool("helm_list_repositories",
-			mcp.WithDescription("List all configured Helm repositories"),
-			mcp.WithString("random_string",
-				mcp.Description("Dummy parameter for no-parameter tools"),
-				mcp.Required(),
+		{Tool: WithMeta(
+			mcp.NewTool("helm_list_repositories",
+				mcp.WithDescription("List all Helm chart repositories configured in the Helm installation. Returns repository names, URLs, and status. Use when you need to see what chart sources are available or verify repository configuration."),
+				mcp.WithString("random_string",
+					mcp.Description("Dummy parameter for no-parameter tools"),
+					mcp.Required(),
+				),
 			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.helmListRepositories},
 
-		{Tool: mcp.NewTool("helm_update_repositories",
-			mcp.WithDescription("Update Helm repositories to get the latest charts"),
-			mcp.WithString("repo_name",
-				mcp.Description("Optional name of the repository to update. If not provided, all repositories will be updated"),
+		{Tool: WithMeta(
+			mcp.NewTool("helm_update_repositories",
+				mcp.WithDescription("Update Helm chart repositories to fetch the latest chart information and versions. Refreshes repository metadata including available charts, versions, and dependencies. Returns update status for each repository. Use when you need to refresh chart availability, check for new chart versions, or ensure repository metadata is current. Optional repository name to update a specific repository, or omit to update all repositories."),
+				mcp.WithString("repo_name",
+					mcp.Description("Optional name of the repository to update. If not provided, all repositories will be updated"),
+				),
 			),
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskLow,
+					"approvalType": "single",
+					"message":      "This will update Helm chart repositories. Proceed?",
+				},
+			},
 		), Handler: s.helmUpdateRepositories},
 
-		{Tool: mcp.NewTool("helm_get_release",
-			mcp.WithDescription("Get detailed information about a Helm release, available resources are: "+
-				"all (download all information for a named release), "+
-				"hooks (download all hooks for a named release), "+
-				"manifest (download the manifest for a named release. The manifest is a YAML-formatted file containing the complete state of the release.), "+
-				"notes (download the notes for a named release. The notes are a text document that contains information about the release.), "+
-				"values (download the values for a named release. The values are a YAML-formatted file containing the values for the release.)"),
-			mcp.WithString("name",
-				mcp.Description("The name of the release"),
-				mcp.Required(),
+		{Tool: WithMeta(
+			mcp.NewTool("helm_get_release",
+				mcp.WithDescription("Retrieve detailed information about a Helm release. Returns release data including manifest (YAML of all resources), values (configuration values), notes (release notes), hooks (lifecycle hooks), or all combined. Use when you need to inspect what was deployed, check configuration values, or review release details. Requires release name and optional namespace and resource type (all, hooks, manifest, notes, values)."),
+				mcp.WithString("name",
+					mcp.Description("The name of the release"),
+					mcp.Required(),
+				),
+				mcp.WithString("namespace",
+					mcp.Description("The namespace to get the release from (optional)"),
+				),
+				mcp.WithString("resource",
+					mcp.Description("The resource to get information about. If not provided, all resources will be returned, can be one of: all, hooks, manifest, notes, values"),
+				),
 			),
-			mcp.WithString("namespace",
-				mcp.Description("The namespace to get the release from (optional)"),
-			),
-			mcp.WithString("resource",
-				mcp.Description("The resource to get information about. If not provided, all resources will be returned, can be one of: all, hooks, manifest, notes, values"),
-			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.helmGetRelease},
 
-		{Tool: mcp.NewTool("helm_list_releases",
-			mcp.WithDescription("List all of the Helm releases for a specific namespace "+
-				"If the --filter flag is provided, it will be treated as a filter. Filters are "+
-				"regular expressions (Perl compatible) that are applied to the list of releases. "+
-				"Only items that match the filter will be returned. "+
-				"Usage: helm list --filter 'ara[a-z]+' "+
-				"NAME                UPDATED                                  CHART "+
-				"maudlin-arachnid    2020-06-18 14:17:46.125134977 +0000 UTC  alpine-0.1.0"),
-			mcp.WithString("namespace",
-				mcp.Description("The namespace to list the helm charts from (optional)"),
+		{Tool: WithMeta(
+			mcp.NewTool("helm_list_releases",
+				mcp.WithDescription("List Helm releases in a namespace or across all namespaces. Returns release names, charts, versions, status, and update timestamps. Supports filtering by regex pattern, status (deployed, failed, pending, etc.), and namespace. Use when you need to see what Helm releases are installed, check their status, or find specific releases."),
+				mcp.WithString("namespace",
+					mcp.Description("The namespace to list the helm charts from (optional)"),
+				),
+				mcp.WithString("all_namespaces",
+					mcp.Description("If 'true', list releases from all namespaces (accepted values: 'true', 'false')"),
+				),
+				mcp.WithString("all",
+					mcp.Description("If 'true', show all releases without any filter applied (accepted values: 'true', 'false')"),
+				),
+				mcp.WithString("uninstalled",
+					mcp.Description("If 'true', list uninstalled releases (accepted values: 'true', 'false')"),
+				),
+				mcp.WithString("uninstalling",
+					mcp.Description("If 'true', list uninstalling releases (accepted values: 'true', 'false')"),
+				),
+				mcp.WithString("failed",
+					mcp.Description("If 'true', list failed releases (accepted values: 'true', 'false')"),
+				),
+				mcp.WithString("deployed",
+					mcp.Description("If 'true', list deployed releases (accepted values: 'true', 'false')"),
+				),
+				mcp.WithString("pending",
+					mcp.Description("If 'true', list pending releases (accepted values: 'true', 'false')"),
+				),
+				mcp.WithString("filter",
+					mcp.Description("A regular expression (Perl compatible). Any releases that match the expression will be included in the results"),
+				),
+				mcp.WithString("output",
+					mcp.Description("The output format of the helm list command, one of: table, json, yaml. Prefer table for human readability"),
+				),
 			),
-			mcp.WithString("all_namespaces",
-				mcp.Description("If 'true', list releases from all namespaces (accepted values: 'true', 'false')"),
-			),
-			mcp.WithString("all",
-				mcp.Description("If 'true', show all releases without any filter applied (accepted values: 'true', 'false')"),
-			),
-			mcp.WithString("uninstalled",
-				mcp.Description("If 'true', list uninstalled releases (accepted values: 'true', 'false')"),
-			),
-			mcp.WithString("uninstalling",
-				mcp.Description("If 'true', list uninstalling releases (accepted values: 'true', 'false')"),
-			),
-			mcp.WithString("failed",
-				mcp.Description("If 'true', list failed releases (accepted values: 'true', 'false')"),
-			),
-			mcp.WithString("deployed",
-				mcp.Description("If 'true', list deployed releases (accepted values: 'true', 'false')"),
-			),
-			mcp.WithString("pending",
-				mcp.Description("If 'true', list pending releases (accepted values: 'true', 'false')"),
-			),
-			mcp.WithString("filter",
-				mcp.Description("A regular expression (Perl compatible). Any releases that match the expression will be included in the results"),
-			),
-			mcp.WithString("output",
-				mcp.Description("The output format of the helm list command, one of: table, json, yaml. Prefer table for human readability"),
-			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.helmListReleases},
 
-		{Tool: mcp.NewTool("helm_install_release",
-			mcp.WithDescription("Install a Helm chart. The chart argument can be either: a chart reference('example/mariadb'), "+
-				"a path to a chart directory, a packaged chart, or a fully qualified URL. "+
-				"For chart references, the latest version will be specified unless the '--version' flag is set."),
-			mcp.WithString("name",
-				mcp.Description("The name of the release"),
-				mcp.Required(),
+		{Tool: WithMeta(
+			mcp.NewTool("helm_install_release",
+				mcp.WithDescription("Install a Helm chart as a named release in the cluster. Deploys all resources defined in the chart. Returns installation status and release information. Use when you need to deploy applications or services using Helm charts. Requires chart reference (repository/chart or path), release name, and optional namespace and values."),
+				mcp.WithString("name",
+					mcp.Description("The name of the release"),
+					mcp.Required(),
+				),
+				mcp.WithString("chart",
+					mcp.Description("The chart to install (chart reference, a path to packaged chart, a path to an unpacked chart directory or URL)"),
+					mcp.Required(),
+				),
+				mcp.WithString("namespace",
+					mcp.Description("The namespace to install the release in"),
+				),
+				mcp.WithArray("set",
+					mcp.Description("A list of key-value pairs to set on the release (e.g., [\"key1=val1\", \"key2=val2\"])"),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
+				),
+				mcp.WithArray("values",
+					mcp.Description("A list of files to use as the value source (e.g., [\"myvalues.yaml\", \"override.yaml\"])"),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
+				),
+				mcp.WithString("repo_url",
+					mcp.Description("Chart repository url where to locate the requested chart"),
+				),
+				mcp.WithString("version",
+					mcp.Description("Specify a version constraint for the chart version to use"),
+				),
+				// mcp.WithString("wait",
+				// 	mcp.Description("If 'true', wait for the release to be installed (accepted values: 'true', 'false')"),
+				// ),
 			),
-			mcp.WithString("chart",
-				mcp.Description("The chart to install (chart reference, a path to packaged chart, a path to an unpacked chart directory or URL)"),
-				mcp.Required(),
-			),
-			mcp.WithString("namespace",
-				mcp.Description("The namespace to install the release in"),
-			),
-			mcp.WithArray("set",
-				mcp.Description("A list of key-value pairs to set on the release (e.g., [\"key1=val1\", \"key2=val2\"])"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskMedium,
+					"approvalType": "single",
+					"message":      "This will install a Helm release and deploy resources to the cluster. Proceed?",
 				},
-			),
-			mcp.WithArray("values",
-				mcp.Description("A list of files to use as the value source (e.g., [\"myvalues.yaml\", \"override.yaml\"])"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
-			),
-			mcp.WithString("repo_url",
-				mcp.Description("Chart repository url where to locate the requested chart"),
-			),
-			mcp.WithString("version",
-				mcp.Description("Specify a version constraint for the chart version to use"),
-			),
-			// mcp.WithString("wait",
-			// 	mcp.Description("If 'true', wait for the release to be installed (accepted values: 'true', 'false')"),
-			// ),
+			},
 		), Handler: s.helmInstallRelease},
 
-		{Tool: mcp.NewTool("helm_uninstall_release",
-			mcp.WithDescription("Uninstall a Helm release takes a release name and namespace as arguments "+
-				"It removes all of the resources associated with the last release of the chart "+
-				"as well as the release history, freeing it up for future use. "+
-				"Use the '--dry-run' flag to see which releases will be uninstalled without actually "+
-				"uninstalling them. "+
-				"Usage: helm uninstall RELEASE_NAME [...] [flags]"),
-			mcp.WithString("name",
-				mcp.Description("The name of the release"),
-				mcp.Required(),
+		{Tool: WithMeta(
+			mcp.NewTool("helm_uninstall_release",
+				mcp.WithDescription("Uninstall a Helm release and remove all associated resources from the cluster. Returns uninstallation status. Use when you need to remove a Helm-managed deployment. Deletion is permanent and removes all resources created by the release. Requires release name and namespace."),
+				mcp.WithString("name",
+					mcp.Description("The name of the release"),
+					mcp.Required(),
+				),
+				mcp.WithString("namespace",
+					mcp.Description("The namespace to uninstall the release from"),
+					mcp.Required(),
+				),
+				mcp.WithString("dry_run",
+					mcp.Description("If 'true', show which releases will be uninstalled without actually uninstalling them (accepted values: 'true', 'false')"),
+				),
+				mcp.WithString("wait",
+					mcp.Description("If 'true', wait for the release to be uninstalled (accepted values: 'true', 'false')"),
+				),
 			),
-			mcp.WithString("namespace",
-				mcp.Description("The namespace to uninstall the release from"),
-				mcp.Required(),
-			),
-			mcp.WithString("dry_run",
-				mcp.Description("If 'true', show which releases will be uninstalled without actually uninstalling them (accepted values: 'true', 'false')"),
-			),
-			mcp.WithString("wait",
-				mcp.Description("If 'true', wait for the release to be uninstalled (accepted values: 'true', 'false')"),
-			),
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskHigh,
+					"approvalType": "single",
+					"message":      "This will uninstall a Helm release and remove all associated resources. This action cannot be undone. Proceed?",
+				},
+			},
 		), Handler: s.helmUninstallRelease},
 
-		{Tool: mcp.NewTool("helm_upgrade_release",
-			mcp.WithDescription("Upgrade a release to a new version of a chart. The upgrade arguments must be a release and chart. The chart "+
-				"argument can be either: a chart reference('example/mariadb'), a path to a chart directory, "+
-				"a packaged chart, or a fully qualified URL. For chart references, the latest "+
-				"version will be specified unless the '--version' flag is set."),
-			mcp.WithString("name",
-				mcp.Description("The name of the release"),
-				mcp.Required(),
+		{Tool: WithMeta(
+			mcp.NewTool("helm_upgrade_release",
+				mcp.WithDescription("Upgrade an existing Helm release to a new chart version or with updated values. Updates resources in the cluster to match the new chart version or configuration. Returns upgrade status. Use when you need to update a deployed release with a new version or changed configuration. Requires release name, chart reference, and optional values."),
+				mcp.WithString("name",
+					mcp.Description("The name of the release"),
+					mcp.Required(),
+				),
+				mcp.WithString("chart",
+					mcp.Description("The chart to upgrade (chart reference, a path to packaged chart, a path to an unpacked chart directory or URL)"),
+					mcp.Required(),
+				),
+				mcp.WithString("namespace",
+					mcp.Description("The namespace to upgrade the release in"),
+				),
+				mcp.WithArray("set",
+					mcp.Description("A list of key-value pairs to set on the release (e.g., [\"key1=val1\", \"key2=val2\"])"),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
+				),
+				mcp.WithArray("values",
+					mcp.Description("A list of files to use as the value source (e.g., [\"myvalues.yaml\", \"override.yaml\"])"),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
+				),
+				mcp.WithString("repo_url",
+					mcp.Description("Chart repository url where to locate the requested chart"),
+				),
+				mcp.WithString("version",
+					mcp.Description("Specify a version constraint for the chart version to use"),
+				),
+				// mcp.WithString("wait",
+				// 	mcp.Description("If 'true', wait for the release to be upgraded (accepted values: 'true', 'false')"),
+				// ),
 			),
-			mcp.WithString("chart",
-				mcp.Description("The chart to upgrade (chart reference, a path to packaged chart, a path to an unpacked chart directory or URL)"),
-				mcp.Required(),
-			),
-			mcp.WithString("namespace",
-				mcp.Description("The namespace to upgrade the release in"),
-			),
-			mcp.WithArray("set",
-				mcp.Description("A list of key-value pairs to set on the release (e.g., [\"key1=val1\", \"key2=val2\"])"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskMedium,
+					"approvalType": "single",
+					"message":      "This will upgrade a Helm release and may modify running resources. Proceed?",
 				},
-			),
-			mcp.WithArray("values",
-				mcp.Description("A list of files to use as the value source (e.g., [\"myvalues.yaml\", \"override.yaml\"])"),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
-			),
-			mcp.WithString("repo_url",
-				mcp.Description("Chart repository url where to locate the requested chart"),
-			),
-			mcp.WithString("version",
-				mcp.Description("Specify a version constraint for the chart version to use"),
-			),
-			// mcp.WithString("wait",
-			// 	mcp.Description("If 'true', wait for the release to be upgraded (accepted values: 'true', 'false')"),
-			// ),
+			},
 		), Handler: s.helmUpgradeRelease},
 	}
 }

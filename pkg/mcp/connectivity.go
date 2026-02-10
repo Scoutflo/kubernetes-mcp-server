@@ -13,19 +13,25 @@ import (
 
 func (s *Server) initConnectivity() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("check_service_connectivity",
-			mcp.WithDescription("Check connectivity to a Kubernetes service"),
-			mcp.WithString("service_name",
-				mcp.Description("Fully qualified service name with port number (e.g. my-service.my-namespace.svc.cluster.local:80)"),
-				mcp.Required(),
+		{Tool: WithMeta(
+			mcp.NewTool("check_service_connectivity",
+				mcp.WithDescription("Test network connectivity to a Kubernetes service endpoint. Returns connection status and response details. Use when you need to verify if a service is reachable, test service discovery, or diagnose network connectivity issues. Requires fully qualified service name with port (e.g., my-service.my-namespace.svc.cluster.local:80)."),
+				mcp.WithString("service_name",
+					mcp.Description("Fully qualified service name with port number (e.g. my-service.my-namespace.svc.cluster.local:80)"),
+					mcp.Required(),
+				),
 			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.checkServiceConnectivity},
-		{Tool: mcp.NewTool("check_ingress_connectivity",
-			mcp.WithDescription("Check connectivity to a Kubernetes ingress host"),
-			mcp.WithString("ingress_host",
-				mcp.Description("Ingress host to check connectivity to (e.g. example.com or https://example.com)"),
-				mcp.Required(),
+		{Tool: WithMeta(
+			mcp.NewTool("check_ingress_connectivity",
+				mcp.WithDescription("Test network connectivity to an ingress host endpoint. Returns connection status and HTTP response details. Use when you need to verify ingress routing works, test external access, or validate ingress configuration. Requires ingress host (e.g., example.com or https://example.com)."),
+				mcp.WithString("ingress_host",
+					mcp.Description("Ingress host to check connectivity to (e.g. example.com or https://example.com)"),
+					mcp.Required(),
+				),
 			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.checkIngressConnectivity},
 	}
 }

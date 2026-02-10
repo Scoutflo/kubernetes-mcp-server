@@ -80,6 +80,55 @@ func (h *HTTPClient) MakeRequest(method, endpoint string, body interface{}) ([]b
 	return responseBody, nil
 }
 
+// MakeRequestWithHeaders makes an HTTP request and returns both body and headers
+func (h *HTTPClient) MakeRequestWithHeaders(method, endpoint string, body interface{}) (*APIResponse, error) {
+	var reqBody io.Reader
+	var contentType string = "application/json"
+
+	if body != nil {
+		if rawBytes, ok := body.([]byte); ok {
+			reqBody = bytes.NewBuffer(rawBytes)
+			contentType = "application/yaml"
+		} else {
+			jsonBody, err := json.Marshal(body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal request body: %w", err)
+			}
+			reqBody = bytes.NewBuffer(jsonBody)
+		}
+	}
+
+	url := strings.TrimSuffix(h.BaseURL, "/") + "/" + strings.TrimPrefix(endpoint, "/")
+	req, err := http.NewRequest(method, url, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+h.Token)
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := h.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(responseBody))
+	}
+
+	return &APIResponse{
+		Body:    responseBody,
+		Headers: resp.Header,
+	}, nil
+}
+
 type Kubernetes struct {
 	// HTTP Client for K8s Dashboard API
 	HTTPClient *HTTPClient
@@ -138,4 +187,15 @@ func namespaceOrDefault(namespace string) string {
 // MakeAPIRequest is a convenience method to make API requests to K8s Dashboard API
 func (k *Kubernetes) MakeAPIRequest(method, endpoint string, body interface{}) ([]byte, error) {
 	return k.HTTPClient.MakeRequest(method, endpoint, body)
+}
+
+// APIResponse contains both the response body and headers
+type APIResponse struct {
+	Body    []byte
+	Headers http.Header
+}
+
+// MakeAPIRequestWithHeaders makes an API request and returns both body and headers
+func (k *Kubernetes) MakeAPIRequestWithHeaders(method, endpoint string, body interface{}) (*APIResponse, error) {
+	return k.HTTPClient.MakeRequestWithHeaders(method, endpoint, body)
 }

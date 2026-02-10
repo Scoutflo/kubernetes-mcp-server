@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -16,118 +17,201 @@ import (
 //
 // Example usage:
 // {
-//   "name": "pods_list",
+//   "name": "pods_get",
 //   "arguments": {
 //     "k8surl": "https://your-k8s-api-server:6443",
 //     "k8stoken": "your-auth-token"
 //   }
 // }
 
+type ListResourceToolOutput struct {
+	Data                interface{} `json:"data"`
+	ContinueToken       string      `json:"continueToken,omitempty"`
+	RemainingItemsCount int64       `json:"remainingItemsCount,omitempty"`
+}
+
 func (s *Server) initPods() []server.ServerTool {
 	return []server.ServerTool{
-		{Tool: mcp.NewTool("pods_list",
-			mcp.WithDescription("List all the Kubernetes pods in the current cluster from all namespaces"),
-		), Handler: s.podsListInAllNamespaces},
-		{Tool: mcp.NewTool("pods_list_in_namespace",
-			mcp.WithDescription("List all the Kubernetes pods in the specified namespace in the current cluster"),
-			mcp.WithString("namespace", mcp.Description("Namespace to list pods from"), mcp.Required()),
-		), Handler: s.podsListInNamespace},
-		{Tool: mcp.NewTool("pods_get",
-			mcp.WithDescription("Get a Kubernetes Pod in the current or provided namespace with the provided name"),
-			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
-			mcp.WithString("name", mcp.Description("Name of the Pod"), mcp.Required()),
-		), Handler: s.podsGet},
-		{Tool: mcp.NewTool("pods_delete",
-			mcp.WithDescription("Delete a Kubernetes Pod in the current or provided namespace with the provided name"),
-			mcp.WithString("namespace", mcp.Description("Namespace to delete the Pod from")),
-			mcp.WithString("name", mcp.Description("Name of the Pod to delete"), mcp.Required()),
-		), Handler: s.podsDelete},
-		{Tool: mcp.NewTool("pods_exec",
-			mcp.WithDescription("Execute a command in a Kubernetes Pod in the current or provided namespace with the provided name and command"),
-			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
-			mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
-			mcp.WithArray("command", mcp.Description("Command to execute in the Pod container. "+
-				"The first item is the command to be run, and the rest are the arguments to that command. "+
-				`Example: ["ls", "-l", "/tmp"]`),
-				func(schema map[string]interface{}) {
-					schema["type"] = "array"
-					schema["items"] = map[string]interface{}{
-						"type": "string",
-					}
-				},
-				mcp.Required(),
+		{Tool: WithMeta(
+			mcp.NewTool("pods_list",
+				mcp.WithDescription("List all Kubernetes pods across all namespaces in the cluster. Returns pod metadata including name, namespace, status, node assignment, and creation timestamps. Supports pagination with limit and continue token. Use when you need to discover pods cluster-wide, check pod distribution, or audit pod resources."),
+				mcp.WithNumber("limit", mcp.Description("Maximum number of items to return (default 10)")),
+				mcp.WithString("continue", mcp.Description("Continuation token for pagination from a previous response")),
 			),
+			map[string]any{"provider": ProviderKubernetes},
+		), Handler: s.podsListInAllNamespaces},
+		{Tool: WithMeta(
+			mcp.NewTool("pods_list_in_namespace",
+				mcp.WithDescription("List all Kubernetes pods in a specific namespace. Returns pod metadata including name, status, node assignment, container information, and creation timestamps. Supports pagination with limit and continue token. Use when you need to see pods in a particular namespace, check application deployments, or monitor namespace resources. Requires namespace name."),
+				mcp.WithString("namespace", mcp.Description("Namespace to list pods from"), mcp.Required()),
+				mcp.WithNumber("limit", mcp.Description("Maximum number of items to return (default 10)")),
+				mcp.WithString("continue", mcp.Description("Continuation token for pagination from a previous response")),
+			),
+			map[string]any{"provider": ProviderKubernetes},
+		), Handler: s.podsListInNamespace},
+		{Tool: WithMeta(
+			mcp.NewTool("pods_get",
+				mcp.WithDescription("Retrieve complete information about a Kubernetes Pod including status, containers, events, resource usage, and configuration. Returns pod state, container statuses, recent events, and resource requests/limits. Use when you need to inspect pod details, check health status, or gather information for troubleshooting. Requires pod name and optional namespace."),
+				mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
+				mcp.WithString("name", mcp.Description("Name of the Pod"), mcp.Required()),
+			),
+			map[string]any{"provider": ProviderKubernetes},
+		), Handler: s.podsGet},
+		{Tool: WithMeta(
+			mcp.NewTool("pods_delete",
+				mcp.WithDescription("Delete a Kubernetes Pod from the cluster. Removes the pod and terminates its containers. Use when you need to remove a pod, force recreation by a controller, or clean up resources. Deletion is immediate and cannot be undone. Requires pod name and optional namespace."),
+				mcp.WithString("namespace", mcp.Description("Namespace to delete the Pod from")),
+				mcp.WithString("name", mcp.Description("Name of the Pod to delete"), mcp.Required()),
+			),
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskCritical,
+					"approvalType": "single",
+					"message":      "This will delete a Kubernetes Pod. This may cause service interruption. Proceed?",
+				},
+			},
+		), Handler: s.podsDelete},
+		{Tool: WithMeta(
+			mcp.NewTool("pods_exec",
+				mcp.WithDescription("Execute commands inside running pod containers. Returns command output and exit status. Use when you need to run diagnostic commands, inspect container state, or perform administrative tasks inside a pod. Requires pod name, namespace, and command array (first item is command, remaining items are arguments)."),
+				mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
+				mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
+				mcp.WithArray("command", mcp.Description("Command to execute in the Pod container. "+
+					"The first item is the command to be run, and the rest are the arguments to that command. "+
+					`Example: ["ls", "-l", "/tmp"]`),
+					func(schema map[string]interface{}) {
+						schema["type"] = "array"
+						schema["items"] = map[string]interface{}{
+							"type": "string",
+						}
+					},
+					mcp.Required(),
+				),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsExec},
-		{Tool: mcp.NewTool("pods_log",
-			mcp.WithDescription("Get the logs of a Kubernetes Pod in the current or provided namespace with the provided name"),
-			mcp.WithString("namespace", mcp.Description("Namespace to get the Pod logs from")),
-			mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
-			mcp.WithNumber("tail_lines", mcp.Description("Number of lines to get from the end of the logs (Optional, default is 256)")),
+		{Tool: WithMeta(
+			mcp.NewTool("pods_log",
+				mcp.WithDescription("Retrieve container logs from a Kubernetes Pod. Returns log output from all containers or a specific container. Supports time-based filtering (start_time/end_time or time_window), tail lines limit, and container selection. Use when you need to view application logs, debug issues, or monitor runtime output. Requires pod name and optional namespace."),
+				mcp.WithString("namespace", mcp.Description("Namespace to get the Pod logs from")),
+				mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
+				mcp.WithNumber("tail_lines", mcp.Description("Number of lines to get from the end of the logs (Optional, default is 256)")),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsLog},
-		{Tool: mcp.NewTool("pods_run",
-			mcp.WithDescription("Run a Kubernetes Pod in the current or provided namespace with the provided container image and optional name"),
-			mcp.WithString("namespace", mcp.Description("Namespace to run the Pod in")),
-			mcp.WithString("name", mcp.Description("Name of the Pod (Optional, random name if not provided)")),
-			mcp.WithString("image", mcp.Description("Container Image to run in the Pod"), mcp.Required()),
-			mcp.WithNumber("port", mcp.Description("TCP/IP port to expose from the Pod container (Optional, no port exposed if not provided)")),
+		{Tool: WithMeta(
+			mcp.NewTool("pods_run",
+				mcp.WithDescription("Create and run a new Kubernetes Pod with a specified container image. Returns pod creation status and pod details. Use when you need to run a temporary pod for testing, debugging, or one-off tasks. Requires container image name and optional pod name, namespace, and port."),
+				mcp.WithString("namespace", mcp.Description("Namespace to run the Pod in")),
+				mcp.WithString("name", mcp.Description("Name of the Pod (Optional, random name if not provided)")),
+				mcp.WithString("image", mcp.Description("Container Image to run in the Pod"), mcp.Required()),
+				mcp.WithNumber("port", mcp.Description("TCP/IP port to expose from the Pod container (Optional, no port exposed if not provided)")),
+			),
+			map[string]any{
+				"provider": ProviderKubernetes,
+				"hitl": map[string]any{
+					"required":     true,
+					"riskLevel":    RiskMedium,
+					"approvalType": "single",
+					"message":      "This will create and run a new Kubernetes Pod. Proceed?",
+				},
+			},
 		), Handler: s.podsRun},
 	}
 }
 
 func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: pods_list - listing all pods in all namespaces - got called by session id: %s", sessionID)
-
-	// Get Kubernetes client from request parameters
 	k, err := s.getKubernetesClient(ctr)
 	if err != nil {
 		klog.Errorf("Tool call: pods_list failed to get Kubernetes client after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: pods_list - listing all pods in all namespaces - got called by session id: %s", sessionID)
 
-	ret, err := k.PodsListInAllNamespaces(ctx)
+	limit := ctr.GetInt("limit", 10)
+	continueToken := ctr.GetString("continue", "")
+
+	ret, freshContinueToken, remainingCount, err := k.PodsListInAllNamespaces(ctx, int64(limit), continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: pods_list failed after %v: %v", duration, err)
-		return NewTextResult("", fmt.Errorf("failed to list pods in all namespaces: %v", err)), nil
+		klog.Errorf("Tool call: pods_list failed after %v: %v by session id: %s", duration, err, sessionID)
+		return NewTextResult("", fmt.Errorf("failed to list pods: %v", err)), nil
+	}
+
+	var data interface{}
+	if err := json.Unmarshal(ret, &data); err != nil {
+		klog.Errorf("Tool call: pods_list failed to unmarshal response after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to unmarshal pod list: %v", err)), nil
+	}
+
+	response := ListResourceToolOutput{
+		Data:                data,
+		ContinueToken:       freshContinueToken,
+		RemainingItemsCount: remainingCount,
+	}
+
+	jsonBytes, err := json.Marshal(response)
+	if err != nil {
+		klog.Errorf("Tool call: pods_list failed to marshal result to JSON after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to marshal pod list: %v", err)), nil
 	}
 
 	klog.V(1).Infof("Tool call: pods_list completed successfully in %v by session id: %s", duration, sessionID)
-	return NewTextResult(ret, err), nil
+	return NewTextResult(string(jsonBytes), nil), nil
 }
 
 func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
-	ns := ctr.GetString("namespace", "")
-
-	sessionID := getSessionID(ctx)
-
-	klog.V(1).Infof("Tool: pods_list_in_namespace - listing all pods in namespace: %s - got called by session id: %s", ns, sessionID)
-
-	if ns == "" {
-		klog.Errorf("Tool call: pods_list_in_namespace failed after %v: missing namespace parameter", time.Since(start))
-		return NewTextResult("", errors.New("failed to list pods in namespace, missing argument namespace")), nil
-	}
-
-	// Get Kubernetes client from request parameters
 	k, err := s.getKubernetesClient(ctr)
 	if err != nil {
 		klog.Errorf("Tool call: pods_list_in_namespace failed to get Kubernetes client after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
+	namespace := ctr.GetString("namespace", "")
+	sessionID := getSessionID(ctx)
+	klog.V(1).Infof("Tool: pods_list_in_namespace - namespace: %s - got called by session id: %s", namespace, sessionID)
 
-	ret, err := k.PodsListInNamespace(ctx, ns)
+	if namespace == "" {
+		klog.Errorf("Tool call: pods_list_in_namespace failed after %v: missing namespace parameter by session id: %s", time.Since(start), sessionID)
+		return NewTextResult("", errors.New("missing required parameter: namespace")), nil
+	}
+
+	limit := ctr.GetInt("limit", 10)
+	continueToken := ctr.GetString("continue", "")
+
+	ret, freshContinueToken, remainingCount, err := k.PodsListInNamespace(ctx, namespace, int64(limit), continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
-		klog.Errorf("Tool call: pods_list_in_namespace failed after %v: %v", duration, err)
-		return NewTextResult("", fmt.Errorf("failed to list pods in namespace %s: %v", ns, err)), nil
+		klog.Errorf("Tool call: pods_list_in_namespace failed after %v: %v by session id: %s", duration, err, sessionID)
+		return NewTextResult("", fmt.Errorf("failed to list pods in namespace %s: %v", namespace, err)), nil
+	}
+
+	var data interface{}
+	if err := json.Unmarshal(ret, &data); err != nil {
+		klog.Errorf("Tool call: pods_list_in_namespace failed to unmarshal response after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to unmarshal pod list: %v", err)), nil
+	}
+
+	response := ListResourceToolOutput{
+		Data:                data,
+		ContinueToken:       freshContinueToken,
+		RemainingItemsCount: remainingCount,
+	}
+
+	jsonBytes, err := json.Marshal(response)
+	if err != nil {
+		klog.Errorf("Tool call: pods_list_in_namespace failed to marshal result to JSON after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to marshal pod list: %v", err)), nil
 	}
 
 	klog.V(1).Infof("Tool call: pods_list_in_namespace completed successfully in %v by session id: %s", duration, sessionID)
-	return NewTextResult(ret, err), nil
+	return NewTextResult(string(jsonBytes), nil), nil
 }
 
 func (s *Server) podsGet(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -262,12 +346,45 @@ func (s *Server) podsLog(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 	ns := ctr.GetString("namespace", "")
 	name := ctr.GetString("name", "")
 	tailLines := ctr.GetFloat("tail_lines", 256)
+	startTimeStr := ctr.GetString("start_time", "")
+	endTimeStr := ctr.GetString("end_time", "")
+	timeWindowStr := ctr.GetString("time_window", "")
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: pods_log - getting logs of pod: %s in namespace: %s with tail lines: %.0f - got called by session id: %s", name, ns, tailLines, sessionID)
 
 	if name == "" {
 		klog.Errorf("Tool call: pods_log failed after %v: missing name parameter", time.Since(start))
 		return NewTextResult("", errors.New("failed to get pod log, missing argument name")), nil
+	}
+
+	var startTime, endTime *time.Time
+	if timeWindowStr != "" {
+		duration, err := time.ParseDuration(timeWindowStr)
+		if err != nil {
+			klog.Errorf("Tool call: pods_log failed after %v: invalid time_window format: %v", time.Since(start), err)
+			return NewTextResult("", fmt.Errorf("invalid time_window format '%s': %v", timeWindowStr, err)), nil
+		}
+		now := time.Now()
+		start := now.Add(-duration)
+		startTime = &start
+		endTime = &now
+	} else if startTimeStr != "" || endTimeStr != "" {
+		if startTimeStr == "" || endTimeStr == "" {
+			klog.Errorf("Tool call: pods_log failed after %v: both start_time and end_time must be provided together", time.Since(start))
+			return NewTextResult("", errors.New("both start_time and end_time must be provided together, or use time_window")), nil
+		}
+		startParsed := parseTime(startTimeStr, time.Time{})
+		if startParsed.IsZero() {
+			klog.Errorf("Tool call: pods_log failed after %v: invalid start_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid start_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		endParsed := parseTime(endTimeStr, time.Time{})
+		if endParsed.IsZero() {
+			klog.Errorf("Tool call: pods_log failed after %v: invalid end_time format", time.Since(start))
+			return NewTextResult("", errors.New("invalid end_time format, use RFC3339 or Unix timestamp")), nil
+		}
+		startTime = &startParsed
+		endTime = &endParsed
 	}
 
 	// Get Kubernetes client from request parameters
@@ -277,7 +394,7 @@ func (s *Server) podsLog(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 
-	ret, err := k.PodsLog(ctx, ns, name, int(tailLines))
+	ret, err := k.PodsLog(ctx, ns, name, int(tailLines), startTime, endTime)
 	duration := time.Since(start)
 
 	if err != nil {

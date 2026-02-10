@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -13,8 +14,13 @@ import (
 func (s *Server) initNamespaces() []server.ServerTool {
 	ret := make([]server.ServerTool, 0)
 	ret = append(ret, server.ServerTool{
-		Tool: mcp.NewTool("namespaces_list",
-			mcp.WithDescription("List all the Kubernetes namespaces in the current cluster"),
+		Tool: WithMeta(
+			mcp.NewTool("namespaces_list",
+				mcp.WithDescription("List all Kubernetes namespaces in the cluster. Returns namespace names, status, labels, annotations, and creation timestamps. Use when you need to discover available namespaces, check namespace existence, or audit cluster organization."),
+				mcp.WithNumber("limit", mcp.Description("Maximum number of items to return (default 10)")),
+				mcp.WithString("continue", mcp.Description("Continuation token for pagination from a previous response")),
+			),
+			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.namespacesList,
 	})
 	return ret
@@ -30,7 +36,11 @@ func (s *Server) namespacesList(ctx context.Context, ctr mcp.CallToolRequest) (*
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: namespaces_list - listing all namespaces - got called by session id: %s", sessionID)
 
-	ret, err := k.NamespacesList(ctx)
+	limit := ctr.GetInt("limit", 10)
+
+	continueToken := ctr.GetString("continue", "")
+
+	ret, freshContinueToken, remainingCount, err := k.NamespacesList(ctx, int64(limit), continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -40,5 +50,23 @@ func (s *Server) namespacesList(ctx context.Context, ctr mcp.CallToolRequest) (*
 		klog.V(1).Infof("Tool call: namespaces_list completed successfully in %v by session id: %s", duration, sessionID)
 	}
 
-	return NewTextResult(ret, err), nil
+	var data interface{}
+	if err := json.Unmarshal(ret, &data); err != nil {
+		klog.Errorf("Tool call: namespaces_list failed to unmarshal response after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to unmarshal namespace list: %v", err)), nil
+	}
+
+	response := ListResourceToolOutput{
+		Data:                data,
+		ContinueToken:       freshContinueToken,
+		RemainingItemsCount: remainingCount,
+	}
+
+	jsonBytes, err := json.Marshal(response)
+	if err != nil {
+		klog.Errorf("Tool call: resources_list failed to marshal result to JSON after %v: %v", duration, err)
+		return NewTextResult("", fmt.Errorf("failed to marshal resource list: %v", err)), nil
+	}
+
+	return NewTextResult(string(jsonBytes), err), nil
 }
