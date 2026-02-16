@@ -13,6 +13,38 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// SkipSlimHeader is used to opt-out of slim mode for specific requests
+const SkipSlimHeader = "X-Skip-Slim-Fields"
+
+// SlimTransport wraps http.RoundTripper to add fields=slim to GET requests
+type SlimTransport struct {
+	Base http.RoundTripper
+}
+
+// RoundTrip implements http.RoundTripper and adds fields=slim to GET requests
+func (t *SlimTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Check for opt-out header and remove it before sending
+	skipSlim := req.Header.Get(SkipSlimHeader) != ""
+	if skipSlim {
+		req.Header.Del(SkipSlimHeader)
+	}
+
+	// Only add fields=slim to GET requests unless opted out
+	if req.Method == http.MethodGet && !skipSlim {
+		q := req.URL.Query()
+		if q.Get("fields") == "" {
+			q.Set("fields", "slim")
+			req.URL.RawQuery = q.Encode()
+		}
+	}
+
+	base := t.Base
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	return base.RoundTrip(req)
+}
+
 // HTTPClient represents an HTTP client for communicating with K8s Dashboard API
 type HTTPClient struct {
 	BaseURL string
@@ -26,7 +58,8 @@ func NewHTTPClient(baseURL, token string) *HTTPClient {
 		BaseURL: baseURL,
 		Token:   token,
 		Client: &http.Client{
-			Timeout: 300 * time.Second,
+			Timeout:   300 * time.Second,
+			Transport: &SlimTransport{Base: http.DefaultTransport},
 		},
 	}
 }
