@@ -10,16 +10,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func (k *Kubernetes) PodsListInAllNamespaces(ctx context.Context, limit int64, continueToken string) ([]byte, string, int64, error) {
-	return k.ResourcesList(ctx, &schema.GroupVersionKind{
+func (k *Kubernetes) PodsListInAllNamespaces(ctx context.Context, limit int64, continueToken string, slim bool) ([]byte, string, int64, error) {
+	return k.ResourcesListWithOptions(ctx, &schema.GroupVersionKind{
 		Group: "", Version: "v1", Kind: "Pod",
-	}, "", limit, continueToken)
+	}, "", limit, continueToken, slim)
 }
 
-func (k *Kubernetes) PodsListInNamespace(ctx context.Context, namespace string, limit int64, continueToken string) ([]byte, string, int64, error) {
-	return k.ResourcesList(ctx, &schema.GroupVersionKind{
+func (k *Kubernetes) PodsListInNamespace(ctx context.Context, namespace string, limit int64, continueToken string, slim bool) ([]byte, string, int64, error) {
+	return k.ResourcesListWithOptions(ctx, &schema.GroupVersionKind{
 		Group: "", Version: "v1", Kind: "Pod",
-	}, namespace, limit, continueToken)
+	}, namespace, limit, continueToken, slim)
 }
 
 func (k *Kubernetes) PodsGet(ctx context.Context, namespace, name string) (string, error) {

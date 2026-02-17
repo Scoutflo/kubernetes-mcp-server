@@ -286,6 +286,9 @@ func (k *Kubernetes) ListApplications(ctx context.Context, project, name, repo, 
 	endpoint := "/apis/v1/argocd/applications"
 
 	params := url.Values{}
+	// Add slim parameter for MCP to reduce payload size
+	params.Add("fields", "slim")
+
 	if project != "" {
 		params.Add("project", project)
 	}
@@ -299,9 +302,7 @@ func (k *Kubernetes) ListApplications(ctx context.Context, project, name, repo, 
 		params.Add("refresh", refresh)
 	}
 
-	if len(params) > 0 {
-		endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
-	}
+	endpoint = fmt.Sprintf("%s?%s", endpoint, params.Encode())
 
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {
@@ -392,12 +393,12 @@ func (k *Kubernetes) SyncApplication(ctx context.Context, name, revision string,
 // CreateApplicationRequest represents the request body for creating an application
 // This matches ArgoCD's native Application format (nested structure)
 type CreateApplicationRequest struct {
-	Kind       string            `json:"kind"`
-	APIVersion string            `json:"apiVersion"`
-	Metadata   Metadata          `json:"metadata"`
-	Spec       ApplicationSpec   `json:"spec"`
-	Validate   bool              `json:"validate,omitempty"`
-	Upsert     bool              `json:"upsert,omitempty"`
+	Kind       string          `json:"kind"`
+	APIVersion string          `json:"apiVersion"`
+	Metadata   Metadata        `json:"metadata"`
+	Spec       ApplicationSpec `json:"spec"`
+	Validate   bool            `json:"validate,omitempty"`
+	Upsert     bool            `json:"upsert,omitempty"`
 }
 
 // CreateApplication creates a new ArgoCD application
@@ -466,11 +467,11 @@ func (k *Kubernetes) CreateApplication(ctx context.Context, name, project, repoU
 // UpdateApplicationRequest represents the request body for updating an application
 // This matches ArgoCD's native Application format (nested structure)
 type UpdateApplicationRequest struct {
-	Kind       string            `json:"kind,omitempty"`
-	APIVersion string            `json:"apiVersion,omitempty"`
-	Metadata   Metadata          `json:"metadata,omitempty"`
-	Spec       *ApplicationSpec  `json:"spec,omitempty"`
-	Validate   bool              `json:"validate,omitempty"`
+	Kind       string           `json:"kind,omitempty"`
+	APIVersion string           `json:"apiVersion,omitempty"`
+	Metadata   Metadata         `json:"metadata,omitempty"`
+	Spec       *ApplicationSpec `json:"spec,omitempty"`
+	Validate   bool             `json:"validate,omitempty"`
 }
 
 // UpdateApplication updates an existing ArgoCD application

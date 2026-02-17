@@ -36,8 +36,8 @@ func (k *Kubernetes) AddRepository(ctx context.Context, name, url string) (strin
 
 // ListRepositories returns a list of configured Helm repositories via API call
 func (k *Kubernetes) ListRepositories(ctx context.Context) ([]*RepoEntry, error) {
-	// Make API call to K8s Dashboard
-	response, err := k.MakeAPIRequest("GET", "api/v1/helm/repositories", nil)
+	// Make API call to K8s Dashboard with slim response for MCP
+	response, err := k.MakeAPIRequest("GET", "api/v1/helm/repositories?fields=slim", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list repositories: %v", err)
 	}
@@ -149,6 +149,9 @@ func (k *Kubernetes) ListReleases(ctx context.Context, opts ListOptions) (string
 		queryParams.Add("output", opts.Output)
 	}
 
+	// Add slim parameter for MCP to reduce payload size
+	queryParams.Add("fields", "slim")
+
 	endpoint := "api/v1/helm/releases"
 	if len(queryParams) > 0 {
 		endpoint += "?" + queryParams.Encode()
@@ -236,13 +239,13 @@ func (k *Kubernetes) InstallRelease(ctx context.Context, name, chart string, opt
 	}
 
 	if opts.RepoURL != "" {
-		requestPayload["repoUrl"] = opts.RepoURL 
+		requestPayload["repoUrl"] = opts.RepoURL
 	}
 	if opts.RepoName != "" {
 		requestPayload["repoName"] = opts.RepoName
 	}
 	if opts.Version != "" {
-		requestPayload["chartVersion"] = opts.Version 
+		requestPayload["chartVersion"] = opts.Version
 	}
 	if opts.CreateNS {
 		requestPayload["createNamespace"] = opts.CreateNS

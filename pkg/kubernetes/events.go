@@ -14,6 +14,8 @@ func (k *Kubernetes) EventsList(ctx context.Context, namespace string, fieldSele
 
 	// Add query parameters
 	queryParams := url.Values{}
+	// Use slim response for MCP to reduce payload size
+	queryParams.Add("fields", "slim")
 
 	if namespace != "" {
 		queryParams.Add("namespace", namespace)

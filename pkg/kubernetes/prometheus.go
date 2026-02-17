@@ -136,6 +136,9 @@ func (k *Kubernetes) GetPrometheusTargets(state, scrapePool string) (string, err
 	endpoint := "/apis/v1/prometheus/targets"
 	var params []string
 
+	// Add slim parameter for MCP to reduce payload size
+	params = append(params, "fields=slim")
+
 	// Add state filter if provided
 	if state != "" {
 		params = append(params, fmt.Sprintf("state=%s", url.QueryEscape(state)))
@@ -146,10 +149,8 @@ func (k *Kubernetes) GetPrometheusTargets(state, scrapePool string) (string, err
 		params = append(params, fmt.Sprintf("scrape_pool=%s", url.QueryEscape(scrapePool)))
 	}
 
-	// Add query parameters if any
-	if len(params) > 0 {
-		endpoint = fmt.Sprintf("%s?%s", endpoint, strings.Join(params, "&"))
-	}
+	// Add query parameters
+	endpoint = fmt.Sprintf("%s?%s", endpoint, strings.Join(params, "&"))
 
 	// Make API request to K8s Dashboard
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
@@ -197,19 +198,16 @@ func (k *Kubernetes) GetPrometheusTargetMetadata(matchTarget, metric string, lim
 
 // GetPrometheusAlerts retrieves all currently firing alerts from Prometheus
 func (k *Kubernetes) GetPrometheusAlerts(startTime, endTime *time.Time) (string, error) {
-	endpoint := "/apis/v1/prometheus/alerts"
-	
+	// Start with slim parameter for MCP to reduce payload size
+	endpoint := "/apis/v1/prometheus/alerts?fields=slim"
+
 	if startTime != nil && !startTime.IsZero() {
-		endpoint = fmt.Sprintf("%s?start_time=%d", endpoint, startTime.Unix())
+		endpoint = fmt.Sprintf("%s&start_time=%d", endpoint, startTime.Unix())
 	}
 	if endTime != nil && !endTime.IsZero() {
-		if startTime != nil && !startTime.IsZero() {
-			endpoint = fmt.Sprintf("%s&end_time=%d", endpoint, endTime.Unix())
-		} else {
-			endpoint = fmt.Sprintf("%s?end_time=%d", endpoint, endTime.Unix())
-		}
+		endpoint = fmt.Sprintf("%s&end_time=%d", endpoint, endTime.Unix())
 	}
-	
+
 	// Make API request to K8s Dashboard
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {

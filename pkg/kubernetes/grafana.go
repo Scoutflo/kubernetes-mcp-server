@@ -75,14 +75,14 @@ func (k *Kubernetes) GetDashboardPanelQueries(ctx context.Context, uid string, s
 	}
 
 	endpoint := fmt.Sprintf("/apis/v1/grafana/dashboard-panel-queries?uid=%s", url.QueryEscape(uid))
-	
+
 	if startTime != nil && !startTime.IsZero() {
 		endpoint = fmt.Sprintf("%s&start_time=%d", endpoint, startTime.Unix())
 	}
 	if endTime != nil && !endTime.IsZero() {
 		endpoint = fmt.Sprintf("%s&end_time=%d", endpoint, endTime.Unix())
 	}
-	
+
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to get dashboard panel queries: %w", err)
@@ -92,9 +92,10 @@ func (k *Kubernetes) GetDashboardPanelQueries(ctx context.Context, uid string, s
 
 // ListDatasources lists all available datasources, optionally filtered by type
 func (k *Kubernetes) ListDatasources(ctx context.Context, dsType string) (string, error) {
-	endpoint := "/apis/v1/grafana/datasources"
+	// Start with slim parameter for MCP to reduce payload size
+	endpoint := "/apis/v1/grafana/datasources?fields=slim"
 	if dsType != "" {
-		endpoint = fmt.Sprintf("/apis/v1/grafana/datasources?type=%s", url.QueryEscape(dsType))
+		endpoint = fmt.Sprintf("%s&type=%s", endpoint, url.QueryEscape(dsType))
 	}
 
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
@@ -147,6 +148,9 @@ func (k *Kubernetes) ListAlertRules(ctx context.Context, limit, page int, labelS
 	endpoint := "/apis/v1/grafana/alert-rules"
 
 	var params []string
+
+	// Add slim parameter for MCP to reduce payload size
+	params = append(params, "fields=slim")
 
 	if limit > 0 {
 		params = append(params, fmt.Sprintf("limit=%d", limit))

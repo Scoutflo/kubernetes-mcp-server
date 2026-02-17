@@ -11,6 +11,7 @@ func (k *Kubernetes) NodesList(ctx context.Context) (string, error) {
 	requestBody := map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Node",
+		"slim":       true, // Use slim response for MCP to reduce payload size
 	}
 
 	// Make API request to the dedicated MCP endpoint

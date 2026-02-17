@@ -34,18 +34,20 @@ func (s *Server) initPods() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("pods_list",
-				mcp.WithDescription("List all Kubernetes pods across all namespaces in the cluster. Returns pod metadata including name, namespace, status, node assignment, and creation timestamps. Supports pagination with limit and continue token. Use when you need to discover pods cluster-wide, check pod distribution, or audit pod resources."),
+				mcp.WithDescription("List all Kubernetes pods across all namespaces in the cluster. Returns pod metadata including name, namespace, status, node assignment, and creation timestamps. Supports pagination with limit and continue token. Use slim=true for reduced payload with essential fields only (name, namespace, phase, ready, restarts, age). Use when you need to discover pods cluster-wide, check pod distribution, or audit pod resources."),
 				mcp.WithNumber("limit", mcp.Description("Maximum number of items to return (default 10)")),
 				mcp.WithString("continue", mcp.Description("Continuation token for pagination from a previous response")),
+				mcp.WithBoolean("slim", mcp.Description("Return slim response with essential fields only (name, namespace, phase, ready, restarts, age). Default: true")),
 			),
 			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsListInAllNamespaces},
 		{Tool: WithMeta(
 			mcp.NewTool("pods_list_in_namespace",
-				mcp.WithDescription("List all Kubernetes pods in a specific namespace. Returns pod metadata including name, status, node assignment, container information, and creation timestamps. Supports pagination with limit and continue token. Use when you need to see pods in a particular namespace, check application deployments, or monitor namespace resources. Requires namespace name."),
+				mcp.WithDescription("List all Kubernetes pods in a specific namespace. Returns pod metadata including name, status, node assignment, container information, and creation timestamps. Supports pagination with limit and continue token. Use slim=true for reduced payload with essential fields only (name, namespace, phase, ready, restarts, age). Use when you need to see pods in a particular namespace, check application deployments, or monitor namespace resources. Requires namespace name."),
 				mcp.WithString("namespace", mcp.Description("Namespace to list pods from"), mcp.Required()),
 				mcp.WithNumber("limit", mcp.Description("Maximum number of items to return (default 10)")),
 				mcp.WithString("continue", mcp.Description("Continuation token for pagination from a previous response")),
+				mcp.WithBoolean("slim", mcp.Description("Return slim response with essential fields only (name, namespace, phase, ready, restarts, age). Default: true")),
 			),
 			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.podsListInNamespace},
@@ -134,8 +136,9 @@ func (s *Server) podsListInAllNamespaces(ctx context.Context, ctr mcp.CallToolRe
 
 	limit := ctr.GetInt("limit", 10)
 	continueToken := ctr.GetString("continue", "")
+	slim := ctr.GetBool("slim", true) // Default to slim for MCP to reduce token usage
 
-	ret, freshContinueToken, remainingCount, err := k.PodsListInAllNamespaces(ctx, int64(limit), continueToken)
+	ret, freshContinueToken, remainingCount, err := k.PodsListInAllNamespaces(ctx, int64(limit), continueToken, slim)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -183,8 +186,9 @@ func (s *Server) podsListInNamespace(ctx context.Context, ctr mcp.CallToolReques
 
 	limit := ctr.GetInt("limit", 10)
 	continueToken := ctr.GetString("continue", "")
+	slim := ctr.GetBool("slim", true) // Default to slim for MCP to reduce token usage
 
-	ret, freshContinueToken, remainingCount, err := k.PodsListInNamespace(ctx, namespace, int64(limit), continueToken)
+	ret, freshContinueToken, remainingCount, err := k.PodsListInNamespace(ctx, namespace, int64(limit), continueToken, slim)
 	duration := time.Since(start)
 
 	if err != nil {
