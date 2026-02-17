@@ -189,4 +189,7 @@ func (s *Server) getKubernetesClient(ctr mcp.CallToolRequest) (*kubernetes.Kuber
 		// Create client with provided credentials
 		return kubernetes.NewKubernetesWithCredentials(k8sCredentials.K8sURL, k8sCredentials.K8sToken)
 	}
+
+	// Fallback to environment variables if no credentials provided in request
+	return nil, fmt.Errorf("no credentials provided in request")
 }
