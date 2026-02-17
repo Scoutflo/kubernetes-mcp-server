@@ -190,6 +190,9 @@ func (s *Server) getKubernetesClient(ctr mcp.CallToolRequest) (*kubernetes.Kuber
 		return kubernetes.NewKubernetesWithCredentials(k8sCredentials.K8sURL, k8sCredentials.K8sToken)
 	}
 
-	// Fallback to environment variables if no credentials provided in request
-	return nil, fmt.Errorf("no credentials provided in request")
+	// Fallback to hardcoded credentials for local development
+	// TODO: Remove before committing - for local testing only!
+	localK8sURL := "http://localhost:8080"                                                                                                                                                                                                                                                                                                                              // Your K8s Dashboard URL
+	localK8sToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6Ims4cy1hZ2VudF83YmE2MTUzMCIsImFnZW50SWQiOiJTbGljZURlbW9KVjRJSFAiLCJkZXBsb3ltZW50SWQiOiJhZ2VudC1kZXBsb3ltZW50LWI1YmRmZGQ1LTAzMWItNGVlZS05NWMxLWZjYjQ0MjAyODQ0NiIsInJvbGUiOiJXT1JLU1BBQ0VfT1dORVIiLCJleHAiOjE3NzE0MzcwODksImlhdCI6MTc3MTM1MDY4OX0.typnlw92BT40Tm1CQT6wRDOjH6r6zFCAeIbU9U9Jrpc" // Your Dashboard auth token
+	return kubernetes.NewKubernetesWithCredentials(localK8sURL, localK8sToken)
 }

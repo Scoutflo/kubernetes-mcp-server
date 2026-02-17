@@ -53,11 +53,12 @@ func (k *Kubernetes) GetNamespaceTLS(ctx context.Context, namespace string) (str
 
 // GetClustersServices gets services across clusters with optional namespace filtering
 func (k *Kubernetes) GetClustersServices(ctx context.Context, namespace string) (string, error) {
-	endpoint := "/apis/v1/kiali/clusters/services"
+	// Start with slim parameter for MCP to reduce payload size
+	endpoint := "/apis/v1/kiali/clusters/services?fields=slim"
 
 	// Add namespace filter if provided
 	if namespace != "" {
-		endpoint = fmt.Sprintf("%s?namespace=%s", endpoint, namespace)
+		endpoint = fmt.Sprintf("%s&namespace=%s", endpoint, namespace)
 	}
 
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
@@ -69,7 +70,8 @@ func (k *Kubernetes) GetClustersServices(ctx context.Context, namespace string) 
 
 // GetKialiIstioConfig gets Istio configuration objects
 func (k *Kubernetes) GetKialiIstioConfig(ctx context.Context) (string, error) {
-	response, err := k.MakeAPIRequest("GET", "/apis/v1/kiali/istio/config", nil)
+	// Use slim parameter for MCP to reduce payload size
+	response, err := k.MakeAPIRequest("GET", "/apis/v1/kiali/istio/config?fields=slim", nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to get Istio config: %w", err)
 	}
