@@ -193,7 +193,8 @@ func (s *Server) resourcesList(ctx context.Context, ctr mcp.CallToolRequest) (*m
 	sessionID := getSessionID(ctx)
 	klog.V(1).Infof("Tool: resources_list - apiVersion: %s, kind: %s, namespace: %s, view: %s - got called by session id: %s", gvk.Version, gvk.Kind, namespace, view, sessionID)
 
-	ret, freshContinueToken, remainingCount, err := k.ResourcesList(ctx, gvk, namespace, int64(limit), continueToken)
+	// Use slim response for MCP tools to reduce payload size
+	ret, freshContinueToken, remainingCount, err := k.ResourcesListSlim(ctx, gvk, namespace, int64(limit), continueToken)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -516,7 +517,8 @@ func (s *Server) resourcesYaml(ctx context.Context, ctr mcp.CallToolRequest) (*m
 		limit := ctr.GetInt("limit", 10)
 		continueToken := ctr.GetString("continue", "")
 
-		ret, freshContinueToken, remainingCount, err := k.ResourcesList(ctx, gvk, namespace, int64(limit), continueToken)
+		// Use slim response for MCP tools to reduce payload size
+		ret, freshContinueToken, remainingCount, err := k.ResourcesListSlim(ctx, gvk, namespace, int64(limit), continueToken)
 		duration := time.Since(start)
 
 		if err != nil {

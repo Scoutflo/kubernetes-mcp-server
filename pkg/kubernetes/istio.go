@@ -18,11 +18,10 @@ func (k *Kubernetes) IstioStatus(ctx context.Context) (string, error) {
 
 // GetVirtualServices returns all virtual services in the specified namespace
 func (k *Kubernetes) GetVirtualServices(ctx context.Context, namespace string) (string, error) {
-	var endpoint string
+	// Start with slim parameter for MCP to reduce payload size
+	endpoint := "/apis/v1/istio/virtualservices?fields=slim"
 	if namespace != "" {
-		endpoint = fmt.Sprintf("/apis/v1/istio/virtualservices?namespace=%s", namespace)
-	} else {
-		endpoint = "/apis/v1/istio/virtualservices"
+		endpoint = fmt.Sprintf("%s&namespace=%s", endpoint, namespace)
 	}
 
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
@@ -48,11 +47,10 @@ func (k *Kubernetes) GetVirtualService(ctx context.Context, namespace, name stri
 
 // GetDestinationRules returns all destination rules in the specified namespace
 func (k *Kubernetes) GetDestinationRules(ctx context.Context, namespace string) (string, error) {
-	var endpoint string
+	// Start with slim parameter for MCP to reduce payload size
+	endpoint := "/apis/v1/istio/destinationrules?fields=slim"
 	if namespace != "" {
-		endpoint = fmt.Sprintf("/apis/v1/istio/destinationrules?namespace=%s", namespace)
-	} else {
-		endpoint = "/apis/v1/istio/destinationrules"
+		endpoint = fmt.Sprintf("%s&namespace=%s", endpoint, namespace)
 	}
 
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
@@ -78,11 +76,10 @@ func (k *Kubernetes) GetDestinationRule(ctx context.Context, namespace, name str
 
 // GetGateways returns all gateways in the specified namespace
 func (k *Kubernetes) GetGateways(ctx context.Context, namespace string) (string, error) {
-	var endpoint string
+	// Start with slim parameter for MCP to reduce payload size
+	endpoint := "/apis/v1/istio/gateways?fields=slim"
 	if namespace != "" {
-		endpoint = fmt.Sprintf("/apis/v1/istio/gateways?namespace=%s", namespace)
-	} else {
-		endpoint = "/apis/v1/istio/gateways"
+		endpoint = fmt.Sprintf("%s&namespace=%s", endpoint, namespace)
 	}
 
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
@@ -108,11 +105,10 @@ func (k *Kubernetes) GetGateway(ctx context.Context, namespace, name string) (st
 
 // GetServiceEntries returns all service entries in the specified namespace
 func (k *Kubernetes) GetServiceEntries(ctx context.Context, namespace string) (string, error) {
-	var endpoint string
+	// Start with slim parameter for MCP to reduce payload size
+	endpoint := "/apis/v1/istio/serviceentries?fields=slim"
 	if namespace != "" {
-		endpoint = fmt.Sprintf("/apis/v1/istio/serviceentries?namespace=%s", namespace)
-	} else {
-		endpoint = "/apis/v1/istio/serviceentries"
+		endpoint = fmt.Sprintf("%s&namespace=%s", endpoint, namespace)
 	}
 
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
@@ -138,11 +134,10 @@ func (k *Kubernetes) GetServiceEntry(ctx context.Context, namespace, name string
 
 // GetPeerAuthentications returns all peer authentications in the specified namespace
 func (k *Kubernetes) GetPeerAuthentications(ctx context.Context, namespace string) (string, error) {
-	var endpoint string
+	// Start with slim parameter for MCP to reduce payload size
+	endpoint := "/apis/v1/istio/peerauthentications?fields=slim"
 	if namespace != "" {
-		endpoint = fmt.Sprintf("/apis/v1/istio/peerauthentications?namespace=%s", namespace)
-	} else {
-		endpoint = "/apis/v1/istio/peerauthentications"
+		endpoint = fmt.Sprintf("%s&namespace=%s", endpoint, namespace)
 	}
 
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
@@ -168,11 +163,10 @@ func (k *Kubernetes) GetPeerAuthentication(ctx context.Context, namespace, name 
 
 // GetAuthorizationPolicies returns all authorization policies in the specified namespace
 func (k *Kubernetes) GetAuthorizationPolicies(ctx context.Context, namespace string) (string, error) {
-	var endpoint string
+	// Start with slim parameter for MCP to reduce payload size
+	endpoint := "/apis/v1/istio/authorizationpolicies?fields=slim"
 	if namespace != "" {
-		endpoint = fmt.Sprintf("/apis/v1/istio/authorizationpolicies?namespace=%s", namespace)
-	} else {
-		endpoint = "/apis/v1/istio/authorizationpolicies"
+		endpoint = fmt.Sprintf("%s&namespace=%s", endpoint, namespace)
 	}
 
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
@@ -198,11 +192,10 @@ func (k *Kubernetes) GetAuthorizationPolicy(ctx context.Context, namespace, name
 
 // GetTelemetries returns all telemetries in the specified namespace
 func (k *Kubernetes) GetTelemetries(ctx context.Context, namespace string) (string, error) {
-	var endpoint string
+	// Start with slim parameter for MCP to reduce payload size
+	endpoint := "/apis/v1/istio/telemetries?fields=slim"
 	if namespace != "" {
-		endpoint = fmt.Sprintf("/apis/v1/istio/telemetries?namespace=%s", namespace)
-	} else {
-		endpoint = "/apis/v1/istio/telemetries"
+		endpoint = fmt.Sprintf("%s&namespace=%s", endpoint, namespace)
 	}
 
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
@@ -412,18 +405,12 @@ func (k *Kubernetes) GetRemoteClusters(ctx context.Context, revision string) (st
 // GetRequestAuthentications returns request authentications for all namespaces or a specific namespace
 func (k *Kubernetes) GetRequestAuthentications(ctx context.Context, namespace string) (string, error) {
 	// Build endpoint with query parameters
-	endpoint := "/apis/v1/istio/requestauthentications"
-
-	var params []string
+	// Start with slim parameter for MCP to reduce payload size
+	endpoint := "/apis/v1/istio/requestauthentications?fields=slim"
 
 	// Add namespace if provided
 	if namespace != "" {
-		params = append(params, fmt.Sprintf("namespace=%s", namespace))
-	}
-
-	// Add query parameters if any
-	if len(params) > 0 {
-		endpoint = fmt.Sprintf("%s?%s", endpoint, strings.Join(params, "&"))
+		endpoint = fmt.Sprintf("%s&namespace=%s", endpoint, namespace)
 	}
 
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)
@@ -463,18 +450,12 @@ func (k *Kubernetes) GetRequestAuthentication(ctx context.Context, namespace, na
 // GetWasmPlugins returns wasm plugins for all namespaces or a specific namespace
 func (k *Kubernetes) GetWasmPlugins(ctx context.Context, namespace string) (string, error) {
 	// Build endpoint with query parameters
-	endpoint := "/apis/v1/istio/wasmplugins"
-
-	var params []string
+	// Start with slim parameter for MCP to reduce payload size
+	endpoint := "/apis/v1/istio/wasmplugins?fields=slim"
 
 	// Add namespace if provided
 	if namespace != "" {
-		params = append(params, fmt.Sprintf("namespace=%s", namespace))
-	}
-
-	// Add query parameters if any
-	if len(params) > 0 {
-		endpoint = fmt.Sprintf("%s?%s", endpoint, strings.Join(params, "&"))
+		endpoint = fmt.Sprintf("%s&namespace=%s", endpoint, namespace)
 	}
 
 	response, err := k.MakeAPIRequest("GET", endpoint, nil)

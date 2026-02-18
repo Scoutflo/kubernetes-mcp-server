@@ -56,12 +56,21 @@ func getResourceTypeFromGVK(gvk *schema.GroupVersionKind) string {
 }
 
 func (k *Kubernetes) ResourcesList(ctx context.Context, gvk *schema.GroupVersionKind, namespace string, limit int64, continueToken string) ([]byte, string, int64, error) {
+	return k.ResourcesListWithOptions(ctx, gvk, namespace, limit, continueToken, false)
+}
+
+func (k *Kubernetes) ResourcesListSlim(ctx context.Context, gvk *schema.GroupVersionKind, namespace string, limit int64, continueToken string) ([]byte, string, int64, error) {
+	return k.ResourcesListWithOptions(ctx, gvk, namespace, limit, continueToken, true)
+}
+
+func (k *Kubernetes) ResourcesListWithOptions(ctx context.Context, gvk *schema.GroupVersionKind, namespace string, limit int64, continueToken string, slim bool) ([]byte, string, int64, error) {
 	// Create a JSON payload for the list-resources endpoint
 	requestBody := map[string]interface{}{
 		"apiVersion": gvk.GroupVersion().String(),
 		"kind":       gvk.Kind,
 		"limit":      limit,
 		"continue":   continueToken,
+		"slim":       slim,
 	}
 
 	// Add namespace if provided

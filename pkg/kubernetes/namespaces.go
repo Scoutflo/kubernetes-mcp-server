@@ -7,7 +7,8 @@ import (
 )
 
 func (k *Kubernetes) NamespacesList(ctx context.Context, limit int64, continueToken string) ([]byte, string, int64, error) {
-	return k.ResourcesList(ctx, &schema.GroupVersionKind{
+	// Use slim response for MCP to reduce payload size
+	return k.ResourcesListSlim(ctx, &schema.GroupVersionKind{
 		Group: "", Version: "v1", Kind: "Namespace",
 	}, "", limit, continueToken)
 }
