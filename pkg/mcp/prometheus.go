@@ -282,7 +282,7 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 		}
 	}
 
-	// Extract time parameter - either time or time_window must be provided, default to 24h if neither provided
+	// Extract time parameter - either time or time_window must be provided, default to 1h if neither provided
 	var queryTime *time.Time
 	if timeWindowStr != "" {
 		duration, err := time.ParseDuration(timeWindowStr)
@@ -303,11 +303,11 @@ func (s *Server) prometheusMetrics(ctx context.Context, ctr mcp.CallToolRequest)
 		}
 		queryTime = &parsedTime
 	} else {
-		// Default to 24 hours ago if neither time nor time_window is provided
+		// Default to 1 hour ago if neither time nor time_window is provided
 		now := time.Now()
-		defaultTime := now.Add(-24 * time.Hour)
+		defaultTime := now.Add(-1 * time.Hour)
 		queryTime = &defaultTime
-		klog.V(1).Infof("Tool call: prometheus_metrics_query - using default time_window of 24h by session id: %s", sessionID)
+		klog.V(1).Infof("Tool call: prometheus_metrics_query - using default time_window of 1h by session id: %s", sessionID)
 	}
 
 	// Execute the instant query with the provided parameters
@@ -390,14 +390,17 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 		endTime := time.Now()
 		startTime := endTime.Add(-rangeDuration)
 
-		// Auto-determine step based on range duration
+		// Auto-determine step based on range duration to limit data points
+		// Goal: Keep response size manageable by limiting to ~60-170 points per series
 		step := "1m" // default
 		if rangeDuration <= time.Hour {
-			step = "30s"
+			step = "1m" // 60 points max
+		} else if rangeDuration <= 6*time.Hour {
+			step = "5m" // 72 points max
 		} else if rangeDuration <= 24*time.Hour {
-			step = "5m"
+			step = "15m" // 96 points max
 		} else if rangeDuration <= 7*24*time.Hour {
-			step = "1h"
+			step = "1h" // 168 points max
 		} else {
 			step = "6h"
 		}
@@ -465,13 +468,13 @@ func (s *Server) prometheusMetricsRange(ctx context.Context, ctr mcp.CallToolReq
 	}
 
 	// validation for start/end/step when range is not provided
-	// If none are provided, default to 24h range
+	// If none are provided, default to 1h range (reduced from 24h to prevent large responses)
 	if startArg == "" && endArg == "" && stepArg == "" {
-		// Default to 24 hours ago to now
+		// Default to 1 hour ago to now
 		endTime := time.Now()
-		startTime := endTime.Add(-24 * time.Hour)
-		step := "5m" // Default step for 24h range
-		klog.V(1).Infof("Tool call: prometheus_metrics_query_range - using default range of 24h by session id: %s", sessionID)
+		startTime := endTime.Add(-1 * time.Hour)
+		step := "1m" // Default step for 1h range (60 data points max)
+		klog.V(1).Infof("Tool call: prometheus_metrics_query_range - using default range of 1h by session id: %s", sessionID)
 		ret, err := k.QueryPrometheusRange(queryArg, startTime, endTime, step, timeout)
 		if err != nil {
 			duration := time.Since(start)
@@ -758,7 +761,7 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 		}
 	}
 
-	// Extract time window parameters - either start/end or time_window must be provided, default to 24h if neither provided
+	// Extract time window parameters - either start/end or time_window must be provided, default to 1h if neither provided
 	timeWindowStr := ctr.GetString("time_window", "")
 	var startTime, endTime *time.Time
 
@@ -802,24 +805,24 @@ func (s *Server) prometheusSeries(ctx context.Context, ctr mcp.CallToolRequest) 
 			}
 		}
 
-		// If neither time_window nor start/end provided, default to 24h
+		// If neither time_window nor start/end provided, default to 1h (reduced from 24h to prevent large responses)
 		if startTime == nil && endTime == nil {
 			now := time.Now()
-			defaultStart := now.Add(-24 * time.Hour)
+			defaultStart := now.Add(-1 * time.Hour)
 			startTime = &defaultStart
 			endTime = &now
-			klog.V(1).Infof("Tool call: prometheus_series_query - using default time_window of 24h by session id: %s", sessionID)
+			klog.V(1).Infof("Tool call: prometheus_series_query - using default time_window of 1h by session id: %s", sessionID)
 		} else if startTime == nil || endTime == nil {
-			// If only one is provided, default the other to create 24h window
+			// If only one is provided, default the other to create 1h window
 			now := time.Now()
 			if startTime == nil {
-				defaultStart := now.Add(-24 * time.Hour)
+				defaultStart := now.Add(-1 * time.Hour)
 				startTime = &defaultStart
 			}
 			if endTime == nil {
 				endTime = &now
 			}
-			klog.V(1).Infof("Tool call: prometheus_series_query - using default time_window of 24h (one time parameter missing) by session id: %s", sessionID)
+			klog.V(1).Infof("Tool call: prometheus_series_query - using default time_window of 1h (one time parameter missing) by session id: %s", sessionID)
 		}
 
 		// Validate start < end
@@ -1245,12 +1248,12 @@ func (s *Server) prometheusGetAlerts(ctx context.Context, ctr mcp.CallToolReques
 			return NewTextResult("", fmt.Errorf("start_time (%s) must be before end_time (%s)", startTime.Format(time.RFC3339), endTime.Format(time.RFC3339))), nil
 		}
 	} else {
-		// Neither time_window nor start_time/end_time provided, default to 24h
+		// Neither time_window nor start_time/end_time provided, default to 1h (reduced from 24h to prevent large responses)
 		now := time.Now()
-		defaultStart := now.Add(-24 * time.Hour)
+		defaultStart := now.Add(-1 * time.Hour)
 		startTime = &defaultStart
 		endTime = &now
-		klog.V(1).Infof("Tool call: prometheus_get_alerts - using default time_window of 24h by session id: %s", getSessionID(ctx))
+		klog.V(1).Infof("Tool call: prometheus_get_alerts - using default time_window of 1h by session id: %s", getSessionID(ctx))
 	}
 
 	sessionID := getSessionID(ctx)
