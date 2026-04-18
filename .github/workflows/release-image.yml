@@ -6,7 +6,7 @@ on:
       - mainv2
       - release/dev
     tags:
-      - '*'
+      - "*"
 
 jobs:
   test:
@@ -38,7 +38,7 @@ jobs:
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
   build-pre-prod:
-    needs: [test]
+    needs: [ test ]
     name: Build and push the pre-prod image to the ECR registry
     runs-on: ubuntu-latest
     permissions:
@@ -95,7 +95,7 @@ jobs:
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
   build-prod:
-    needs: [test]
+    needs: [ test ]
     name: Build and push the production image to the ECR registry
     runs-on: ubuntu-latest
     permissions:
@@ -153,88 +153,130 @@ jobs:
 
   deploy-pre-prod:
     name: Deploy pre-prod image to GCP VM
-    needs: [build-pre-prod]
+    needs: [ build-pre-prod ]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     if: github.ref == 'refs/heads/release/dev'
     steps:
-      - name: Install SSH key
-        uses: webfactory/ssh-agent@v0.9.0
+      - id: "auth"
+        uses: "google-github-actions/auth@v2"
         with:
-          ssh-private-key: ${{ secrets.GCP_SSH_KEY }}
+          workload_identity_provider: "${{ secrets.GCP_WIF_PROVIDER }}"
+          service_account: "${{ secrets.GCP_SERVICE_ACCOUNT }}"
+
+      - name: Set up Cloud SDK
+        uses: "google-github-actions/setup-gcloud@v2"
+
       - name: Deploy to GCP VM
-        env:
-          ECR_IMAGE: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:pre-prod-${{ github.run_number }}
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.GCP_VM_USER }}@${{ secrets.GCP_VM_HOST }} <<EOF
-            export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-            export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            export AWS_REGION=${{ secrets.AWS_REGION }}
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
-            docker pull $ECR_IMAGE
-            docker stop kubernetes-mcp-server || true
-            docker rm kubernetes-mcp-server || true
-            docker network create k8s-mcp-network || true
-            docker run -d --name kubernetes-mcp-server \
-              --restart unless-stopped \
-              --network k8s-mcp-network \
-              -p 8081:8081 \
-              -p 8082:8082 \
-              -e AZURE_OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
-              -e AZURE_OPENAI_ENDPOINT=${{ secrets.OPENAI_ENDPOINT }} \
-              -e AZURE_OPENAI_DEPLOYMENT_NAME=${{ secrets.OPENAI_DEPLOYMENT_NAME }} \
-              -e OPENAI_API_VERSION=${{ secrets.OPENAI_API_VERSION }} \
-              -e AZURE_OPENAI_MAX_TOKENS=${{ secrets.OPENAI_MAX_TOKENS }} \
-              -e AZURE_OPENAI_TEMPERATURE=${{ secrets.OPENAI_TEMPERATURE }} \
-              -e AZURE_OPENAI_TOP_P=${{ secrets.OPENAI_TOP_P }} \
-              $ECR_IMAGE
-            echo "Container status:"
-            docker ps | grep kubernetes-mcp-server
-            echo "Port check:"
-            (ss -tuln || netstat -tuln) | grep 8081 || true
-            echo "Initial logs:"
-            docker logs --tail 50 kubernetes-mcp-server
-          EOF
+          gcloud compute ssh static-k8s-mcp-server \
+            --quiet \
+            --zone="asia-south2-a" \
+            --tunnel-through-iap \
+            --command="
+              # 1. Self-bootstrap environment
+              if ! command -v aws &>/dev/null; then
+                sudo apt-get update && sudo apt-get install -y unzip
+                curl -sS 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip' -o 'awscliv2.zip'
+                unzip -q awscliv2.zip
+                sudo ./aws/install
+                rm -rf aws awscliv2.zip
+              fi
+
+              # 2. Grant docker permissions
+              if ! groups | grep -q 'docker'; then
+                sudo usermod -aG docker \$USER
+              fi
+
+              export ECR_IMAGE='${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:pre-prod-${{ github.run_number }}'
+              export AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}'
+              export AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+              export AWS_REGION='${{ secrets.AWS_REGION }}'
+
+              # 3. Login to ECR and Deploy
+              aws ecr get-login-password --region \$AWS_REGION | sudo docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+              sudo docker pull \$ECR_IMAGE
+              sudo docker stop kubernetes-mcp-server || true
+              sudo docker rm kubernetes-mcp-server || true
+              sudo docker network create k8s-mcp-network || true
+              sudo docker run -d --name kubernetes-mcp-server \
+                --restart unless-stopped \
+                --network k8s-mcp-network \
+                -p 8081:8081 \
+                -p 8082:8082 \
+                -e AZURE_OPENAI_API_KEY='${{ secrets.OPENAI_API_KEY }}' \
+                -e AZURE_OPENAI_ENDPOINT='${{ secrets.OPENAI_ENDPOINT }}' \
+                -e AZURE_OPENAI_DEPLOYMENT_NAME='${{ secrets.OPENAI_DEPLOYMENT_NAME }}' \
+                -e OPENAI_API_VERSION='${{ secrets.OPENAI_API_VERSION }}' \
+                -e AZURE_OPENAI_MAX_TOKENS='${{ secrets.OPENAI_MAX_TOKENS }}' \
+                -e AZURE_OPENAI_TEMPERATURE='${{ secrets.OPENAI_TEMPERATURE }}' \
+                -e AZURE_OPENAI_TOP_P='${{ secrets.OPENAI_TOP_P }}' \
+                \$ECR_IMAGE
+            "
 
   deploy-prod:
     name: Deploy prod image to GCP VM
-    needs: [build-prod]
+    needs: [ build-prod ]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     if: github.ref == 'refs/heads/mainv2'
     steps:
-      - name: Install SSH key
-        uses: webfactory/ssh-agent@v0.9.0
+      - id: "auth"
+        uses: "google-github-actions/auth@v2"
         with:
-          ssh-private-key: ${{ secrets.GCP_SSH_KEY }}
+          workload_identity_provider: "${{ secrets.GCP_WIF_PROVIDER }}"
+          service_account: "${{ secrets.GCP_SERVICE_ACCOUNT }}"
+
+      - name: Set up Cloud SDK
+        uses: "google-github-actions/setup-gcloud@v2"
+
       - name: Deploy to GCP VM
-        env:
-            ECR_IMAGE: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY_PROD }}:production-${{ github.run_number }}
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.GCP_VM_USER }}@${{ secrets.GCP_VM_HOST_PROD }} <<EOF
-            export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-            export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            export AWS_REGION=${{ secrets.AWS_REGION }}
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
-            docker pull $ECR_IMAGE
-            docker stop kubernetes-mcp-server || true
-            docker rm kubernetes-mcp-server || true
-            docker network create k8s-mcp-network || true
-            docker run -d --name kubernetes-mcp-server \
-              --restart unless-stopped \
-              --network k8s-mcp-network \
-              -p 8081:8081 \
-              -p 8082:8082 \
-              -e AZURE_OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
-              -e AZURE_OPENAI_ENDPOINT=${{ secrets.OPENAI_ENDPOINT }} \
-              -e AZURE_OPENAI_DEPLOYMENT_NAME=${{ secrets.OPENAI_DEPLOYMENT_NAME }} \
-              -e OPENAI_API_VERSION=${{ secrets.OPENAI_API_VERSION }} \
-              -e AZURE_OPENAI_MAX_TOKENS=${{ secrets.OPENAI_MAX_TOKENS }} \
-              -e AZURE_OPENAI_TEMPERATURE=${{ secrets.OPENAI_TEMPERATURE }} \
-              -e AZURE_OPENAI_TOP_P=${{ secrets.OPENAI_TOP_P }} \
-              $ECR_IMAGE
-            echo "Container status:"
-            docker ps | grep kubernetes-mcp-server
-            echo "Port check:"
-            (ss -tuln || netstat -tuln) | grep 8081 || true
-            echo "Initial logs:"
-            docker logs --tail 50 kubernetes-mcp-server
-          EOF
+          gcloud compute ssh static-k8s-mcp-server-prod \
+            --quiet \
+            --zone="asia-south2-a" \
+            --tunnel-through-iap \
+            --command="
+              # 1. Self-bootstrap environment
+              if ! command -v aws &>/dev/null; then
+                sudo apt-get update && sudo apt-get install -y unzip
+                curl -sS 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip' -o 'awscliv2.zip'
+                unzip -q awscliv2.zip
+                sudo ./aws/install
+                rm -rf aws awscliv2.zip
+              fi
+
+              # 2. Grant docker permissions
+              if ! groups | grep -q 'docker'; then
+                sudo usermod -aG docker \$USER
+              fi
+
+              export ECR_IMAGE='${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY_PROD }}:production-${{ github.run_number }}'
+              export AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}'
+              export AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+              export AWS_REGION='${{ secrets.AWS_REGION }}'
+
+              # 3. Login to ECR and Deploy
+              aws ecr get-login-password --region \$AWS_REGION | sudo docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+              sudo docker pull \$ECR_IMAGE
+              sudo docker stop kubernetes-mcp-server || true
+              sudo docker rm kubernetes-mcp-server || true
+              sudo docker network create k8s-mcp-network || true
+              sudo docker run -d --name kubernetes-mcp-server \
+                --restart unless-stopped \
+                --network k8s-mcp-network \
+                -p 8081:8081 \
+                -p 8082:8082 \
+                -e AZURE_OPENAI_API_KEY='${{ secrets.OPENAI_API_KEY }}' \
+                -e AZURE_OPENAI_ENDPOINT='${{ secrets.OPENAI_ENDPOINT }}' \
+                -e AZURE_OPENAI_DEPLOYMENT_NAME='${{ secrets.OPENAI_DEPLOYMENT_NAME }}' \
+                -e OPENAI_API_VERSION='${{ secrets.OPENAI_API_VERSION }}' \
+                -e AZURE_OPENAI_MAX_TOKENS='${{ secrets.OPENAI_MAX_TOKENS }}' \
+                -e AZURE_OPENAI_TEMPERATURE='${{ secrets.OPENAI_TEMPERATURE }}' \
+                -e AZURE_OPENAI_TOP_P='${{ secrets.OPENAI_TOP_P }}' \
+                \$ECR_IMAGE
+            "
