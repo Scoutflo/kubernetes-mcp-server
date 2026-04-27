@@ -159,8 +159,8 @@ func (s *Server) initPrometheus() []server.ServerTool {
 						}
 					},
 				),
-				mcp.WithBoolean("exclude_alerts", mcp.Description("Exclude alerts flag")),
-				mcp.WithArray("match", mcp.Description("Label selectors"),
+				mcp.WithBoolean("exclude_alerts", mcp.Description("If true, exclude alerting rules from results and return only recording rules")),
+				mcp.WithArray("match", mcp.Description("Label matchers to filter rules, e.g. [\"severity=critical\", \"team=backend\"]"),
 					func(schema map[string]interface{}) {
 						schema["type"] = "array"
 						schema["items"] = map[string]interface{}{
@@ -168,7 +168,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 						}
 					},
 				),
-				mcp.WithNumber("group_limit", mcp.Description("Group limit")),
+				mcp.WithNumber("group_limit", mcp.Description("Maximum number of rule groups to return (0 for unlimited)")),
 			),
 			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusGetRules},
@@ -181,8 +181,8 @@ func (s *Server) initPrometheus() []server.ServerTool {
 				mcp.WithString("namespace", mcp.Description("Kubernetes namespace to create the alert in"), mcp.Required()),
 				mcp.WithString("interval", mcp.Description("Evaluation interval for the alert group (e.g., '30s', '1m', '5m')")),
 				mcp.WithString("for", mcp.Description("Duration for which the condition must be true before firing (e.g., '5m')")),
-				mcp.WithObject("annotations", mcp.Description("Map of annotations to add to the alert (description, summary, etc.)")),
-				mcp.WithObject("alertlabels", mcp.Description("Map of labels to attach to the alert")),
+				mcp.WithObject("annotations", mcp.Description("JSON object of alert annotations as string key-value pairs, e.g. {\"summary\": \"High CPU usage\", \"description\": \"CPU usage is above 80% for pod {{ $labels.pod }}\"}")),
+				mcp.WithObject("alertlabels", mcp.Description("JSON object of labels to attach to the fired alert as string key-value pairs, e.g. {\"severity\": \"critical\", \"team\": \"backend\"}")),
 			),
 			map[string]any{
 				"provider": ProviderPrometheus,
@@ -203,8 +203,8 @@ func (s *Server) initPrometheus() []server.ServerTool {
 				mcp.WithString("expression", mcp.Description("New PromQL expression for the alert condition")),
 				mcp.WithString("interval", mcp.Description("New evaluation interval for the alert group (e.g., '30s', '1m', '5m')")),
 				mcp.WithString("for", mcp.Description("New duration for which the condition must be true before firing (e.g., '5m')")),
-				mcp.WithObject("annotations", mcp.Description("New or updated annotations for the alert")),
-				mcp.WithObject("alertlabels", mcp.Description("New or updated labels for the alert")),
+				mcp.WithObject("annotations", mcp.Description("JSON object of new or updated alert annotations as string key-value pairs, e.g. {\"summary\": \"High CPU usage\", \"description\": \"CPU above threshold\"}")),
+				mcp.WithObject("alertlabels", mcp.Description("JSON object of new or updated labels for the alert as string key-value pairs, e.g. {\"severity\": \"warning\", \"team\": \"platform\"}")),
 			),
 			map[string]any{
 				"provider": ProviderPrometheus,

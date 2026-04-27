@@ -39,7 +39,7 @@ func (s *Server) initGrafana() []server.ServerTool {
 				mcp.WithDescription("Create or update a Grafana dashboard. Write operation. Always call grafana_get_dashboard_by_uid first to obtain the current dashboard JSON — the update requires the full model including the 'version' field for optimistic locking. Omitting version or sending a stale version will fail or overwrite concurrent changes."),
 
 				mcp.WithObject("dashboard",
-					mcp.Description(`Dashboard configuration. It should be a valid JSON object.`),
+					mcp.Description(`Full Grafana dashboard JSON model. Must include "title" and "panels" fields. Include "version" field from grafana_get_dashboard_by_uid for optimistic locking on updates. For new dashboards set "id" to null.`),
 					mcp.Required()),
 
 				mcp.WithString("folderUid",
