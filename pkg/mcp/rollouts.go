@@ -17,7 +17,7 @@ func (s *Server) initRollouts() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("rollout",
-					mcp.WithDescription("Perform rollout management operations on Kubernetes deployments, daemonsets, or statefulsets. Supports actions: history (view rollout history), pause (suspend rollout), restart (restart pods), resume (resume paused rollout), status (check rollout status), undo (rollback to previous revision). Returns operation result. Use when you need to manage rollout lifecycle, control deployment progress, or rollback to previous versions. Requires action, resource type, resource name, and optional namespace and revision."),
+					mcp.WithDescription("Manage rollout lifecycle for Kubernetes Deployments, DaemonSets, and StatefulSets. Actions: history (list revision history), status (check current rollout progress), pause (suspend ongoing rollout), resume (continue a paused rollout), restart (trigger rolling restart of pods), undo (rollback to a previous revision). Always call action='status' before 'undo' to confirm the current revision and identify the target revision. Write operations — pause, restart, resume, and undo — affect running workloads and cannot be undone cleanly without another rollout action. Provide revision only for 'undo'; omitting it rolls back to the immediately preceding revision."),
 					mcp.WithString("action", mcp.Description("The action to perform on the resource"), mcp.Required()),
 					mcp.WithString("resource_type", mcp.Description("The type of resource to rollout (deployment, daemonset, statefulset)"), mcp.Required()),
 					mcp.WithString("resource_name", mcp.Description("The name of the resource to rollout"), mcp.Required()),
