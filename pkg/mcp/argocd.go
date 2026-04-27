@@ -20,7 +20,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("argocd_list_applications",
-					mcp.WithDescription("List all ArgoCD-managed applications with their synchronization status and health for cluster-wide oversight"),
+					mcp.WithDescription("List all ArgoCD-managed applications with sync status and health. Use to discover application names when unknown — prefer argocd_get_application when the name is already known. Use project or name filters to narrow scope."),
 					mcp.WithString("project",
 						mcp.Description("Filter applications by project name (optional)"),
 					),
@@ -41,7 +41,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("argocd_get_application",
-					mcp.WithDescription("Retrieve detailed application configuration including sync state and resource status for deployment inspection"),
+					mcp.WithDescription("Retrieve detailed application configuration including sync state, health, and resource status. Prefer over argocd_list_applications when the application name is known. First step for inspecting a specific application's deployment state."),
 					mcp.WithString("name",
 						mcp.Description("Name of the application"),
 						mcp.Required(),
@@ -60,7 +60,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("argocd_get_application_events",
-					mcp.WithDescription("Access historical events for specific applications to track configuration changes and operational history"),
+					mcp.WithDescription("Retrieve historical Kubernetes events for a specific ArgoCD application. Use to identify sync failures, resource errors, or configuration changes correlated with incident timeframe. Scope with time_window or start_time/end_time."),
 					mcp.WithString("application_name",
 						mcp.Description("The name of the application"),
 						mcp.Required(),
@@ -76,7 +76,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("argocd_sync_application",
-					mcp.WithDescription("Trigger manual synchronization between Git definitions and cluster resources to enforce desired states"),
+					mcp.WithDescription("Trigger manual synchronization between Git and cluster resources. Write operation — active during execution and cannot be interrupted cleanly. Verify the application name with argocd_get_application before calling. Use dry_run='true' to preview changes first."),
 					mcp.WithString("name",
 						mcp.Description("Name of the application"),
 						mcp.Required(),
@@ -216,7 +216,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("argocd_delete_application",
-					mcp.WithDescription("Remove applications from ArgoCD management while preserving underlying Kubernetes resources"),
+					mcp.WithDescription("Remove an ArgoCD application from management. Write operation — irreversible. By default cascade=true deletes all managed Kubernetes resources. Set cascade=false to remove ArgoCD tracking while preserving cluster resources. Verify application name before calling."),
 					mcp.WithString("name",
 						mcp.Description("The name of the application to delete"),
 						mcp.Required(),
@@ -243,7 +243,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("argocd_get_application_resource_tree",
-					mcp.WithDescription("Retrieve hierarchical dependency relationships between resources within an application"),
+					mcp.WithDescription("Retrieve the hierarchical resource tree for an ArgoCD application — shows parent-child relationships between all managed Kubernetes resources. Use to understand application structure and find out-of-sync or degraded resources before deeper inspection."),
 					mcp.WithString("name",
 						mcp.Description("The name of the application"),
 						mcp.Required(),
@@ -256,7 +256,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("argocd_get_application_managed_resources",
-					mcp.WithDescription("List all Kubernetes resources currently managed under specific ArgoCD applications"),
+					mcp.WithDescription("List all Kubernetes resources currently managed by a specific ArgoCD application with their sync and health status. Use after argocd_get_application to enumerate exact resource identifiers needed for argocd_get_resource_events and argocd_get_resource_actions."),
 					mcp.WithString("name",
 						mcp.Description("The name of the application"),
 						mcp.Required(),
@@ -269,7 +269,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("argocd_get_application_workload_logs",
-					mcp.WithDescription("Access container logs from application workloads to monitor runtime behavior and outputs"),
+					mcp.WithDescription("Retrieve container logs for a workload managed by an ArgoCD application. Requires resource_ref with name, namespace, and kind. Use argocd_get_application_managed_resources first to discover valid resource identifiers. Scope with time_window for incident-aligned windows."),
 					mcp.WithString("application_name",
 						mcp.Description("The name of the application"),
 						mcp.Required(),
@@ -295,7 +295,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("argocd_get_resource_events",
-					mcp.WithDescription("Retrieve event history for individual Kubernetes resources managed by ArgoCD"),
+					mcp.WithDescription("Retrieve Kubernetes event history for an individual resource managed by ArgoCD. Use after identifying the resource via argocd_get_application_managed_resources — resource_ref requires name and namespace. Scope with time_window to narrow to incident period."),
 					mcp.WithString("application_name",
 						mcp.Description("The name of the application"),
 						mcp.Required(),
@@ -315,7 +315,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("argocd_get_resource_actions",
-					mcp.WithDescription("Discover available operations for specific resources like restart, rollback, or resource hooks"),
+					mcp.WithDescription("Discover available operations (restart, rollback, resource hooks) for a specific resource managed by ArgoCD. Call before argocd_run_resource_action to enumerate valid action names — do not guess action names."),
 					mcp.WithString("name",
 						mcp.Description("The name of the application"),
 						mcp.Required(),
@@ -332,7 +332,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("argocd_run_resource_action",
-					mcp.WithDescription("Execute resource-specific operations such as pod restarts or job retries within applications"),
+					mcp.WithDescription("Execute an action on a resource managed by ArgoCD (e.g., restart, rollback). Write operation — modifies running workloads. Always call argocd_get_resource_actions first to verify the action name is valid for the target resource."),
 					mcp.WithString("name",
 						mcp.Description("The name of the application"),
 						mcp.Required(),

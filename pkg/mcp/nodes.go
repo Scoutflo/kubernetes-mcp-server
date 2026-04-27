@@ -15,13 +15,13 @@ func (s *Server) initNodes() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("nodes_list",
-				mcp.WithDescription("List all Kubernetes nodes in the cluster. Returns node metadata including name, status, roles, labels, annotations, and system information. Use when you need to discover cluster nodes, check node availability, audit cluster infrastructure, or verify node configuration. No parameters required."),
+				mcp.WithDescription("List all Kubernetes nodes in the cluster. Returns node names, status, roles, labels, and system information. Call to discover node names when unknown — use as a prerequisite for nodes_get or nodes_metrics when the node name has not been established. Also use to audit cluster composition or check which nodes are Ready versus NotReady during infrastructure incidents."),
 			),
 			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.nodesList},
 		{Tool: WithMeta(
 			mcp.NewTool("nodes_get",
-				mcp.WithDescription("Retrieve complete information about a Kubernetes node. Returns node capacity, allocatable resources, conditions, labels, annotations, and system information. Use when you need to inspect node configuration, check resource availability, verify node health, or troubleshoot scheduling problems. Requires node name."),
+				mcp.WithDescription("Retrieve full details for a specific Kubernetes node. Returns capacity, allocatable resources, conditions (Ready, MemoryPressure, DiskPressure, PIDPressure), taints, labels, annotations, and system info. Prefer over nodes_list when the node name is already known — yields richer detail in one call. Use to troubleshoot scheduling failures (check taints and allocatable resources), investigate NotReady conditions, or verify node capacity before scaling workloads."),
 				mcp.WithString("name", mcp.Description("Name of the node"), mcp.Required()),
 			),
 			map[string]any{"provider": ProviderKubernetes},
