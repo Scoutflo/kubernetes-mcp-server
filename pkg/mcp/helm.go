@@ -44,10 +44,6 @@ func (s *Server) initHelm() []server.ServerTool {
 		{Tool: WithMeta(
 			mcp.NewTool("helm_list_repositories",
 				mcp.WithDescription("List all configured Helm chart repositories with names, URLs, and status. Call before helm_install_release to verify the required repository is already configured — if missing, add it with helm_add_repository first."),
-				mcp.WithString("random_string",
-					mcp.Description("Dummy parameter for no-parameter tools"),
-					mcp.Required(),
-				),
 			),
 			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.helmListRepositories},
