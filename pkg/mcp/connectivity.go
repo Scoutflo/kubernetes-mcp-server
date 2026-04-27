@@ -15,7 +15,7 @@ func (s *Server) initConnectivity() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("check_service_connectivity",
-				mcp.WithDescription("Test network connectivity to a Kubernetes service endpoint. Returns connection status and response details. Use when you need to verify if a service is reachable, test service discovery, or diagnose network connectivity issues. Requires fully qualified service name with port (e.g., my-service.my-namespace.svc.cluster.local:80)."),
+				mcp.WithDescription("Test TCP/HTTP connectivity to a Kubernetes service endpoint from within the cluster. Returns reachability status and response details. Use to confirm whether a service is actually reachable after verifying the Service resource exists with resources_get. Requires the fully qualified FQDN with port (e.g., my-service.my-namespace.svc.cluster.local:80) — do not use short names alone. Use after ruling out DNS and service-existence issues to isolate network-policy or sidecar-proxy failures."),
 				mcp.WithString("service_name",
 					mcp.Description("Fully qualified service name with port number (e.g. my-service.my-namespace.svc.cluster.local:80)"),
 					mcp.Required(),
@@ -25,7 +25,7 @@ func (s *Server) initConnectivity() []server.ServerTool {
 		), Handler: s.checkServiceConnectivity},
 		{Tool: WithMeta(
 			mcp.NewTool("check_ingress_connectivity",
-				mcp.WithDescription("Test network connectivity to an ingress host endpoint. Returns connection status and HTTP response details. Use when you need to verify ingress routing works, test external access, or validate ingress configuration. Requires ingress host (e.g., example.com or https://example.com)."),
+				mcp.WithDescription("Test HTTP/HTTPS reachability of a Kubernetes ingress host from outside the cluster. Returns connection status and response details including HTTP status code. Use after confirming the Ingress resource exists and has a valid host rule via resources_get — this tool validates that traffic actually reaches the backend, not just that the config is present. Use to distinguish DNS resolution failures, TLS certificate errors, and 502/503 backend errors. Accepts host-only (example.com) or scheme-prefixed (https://example.com) format."),
 				mcp.WithString("ingress_host",
 					mcp.Description("Ingress host to check connectivity to (e.g. example.com or https://example.com)"),
 					mcp.Required(),

@@ -17,7 +17,7 @@ func (s *Server) initHelm() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("helm_add_repository",
-				mcp.WithDescription("Add a Helm chart repository to the Helm configuration. Enables access to charts from the specified repository for installation and upgrade operations. Returns repository addition status. Use when you need to make charts from a repository available for deployment. Requires repository name and URL."),
+				mcp.WithDescription("Add a Helm chart repository. Write operation — required before helm_install_release if the chart is from a repository not already in helm_list_repositories. Call helm_update_repositories after adding to fetch the latest chart metadata."),
 				mcp.WithString("name",
 					mcp.Description("Repository name"),
 					mcp.Required(),
@@ -43,7 +43,7 @@ func (s *Server) initHelm() []server.ServerTool {
 
 		{Tool: WithMeta(
 			mcp.NewTool("helm_list_repositories",
-				mcp.WithDescription("List all Helm chart repositories configured in the Helm installation. Returns repository names, URLs, and status. Use when you need to see what chart sources are available or verify repository configuration."),
+				mcp.WithDescription("List all configured Helm chart repositories with names, URLs, and status. Call before helm_install_release to verify the required repository is already configured — if missing, add it with helm_add_repository first."),
 				mcp.WithString("random_string",
 					mcp.Description("Dummy parameter for no-parameter tools"),
 					mcp.Required(),
@@ -72,7 +72,7 @@ func (s *Server) initHelm() []server.ServerTool {
 
 		{Tool: WithMeta(
 			mcp.NewTool("helm_get_release",
-				mcp.WithDescription("Retrieve detailed information about a Helm release. Returns release data including manifest (YAML of all resources), values (configuration values), notes (release notes), hooks (lifecycle hooks), or all combined. Use when you need to inspect what was deployed, check configuration values, or review release details. Requires release name and optional namespace and resource type (all, hooks, manifest, notes, values)."),
+				mcp.WithDescription("Retrieve details for a specific Helm release. Prefer over helm_list_releases when release name is known. Use resource='values' to inspect configuration, resource='manifest' to see deployed Kubernetes resources, resource='all' for full picture. Essential for correlating a Helm release with an incident."),
 				mcp.WithString("name",
 					mcp.Description("The name of the release"),
 					mcp.Required(),
@@ -89,7 +89,7 @@ func (s *Server) initHelm() []server.ServerTool {
 
 		{Tool: WithMeta(
 			mcp.NewTool("helm_list_releases",
-				mcp.WithDescription("List Helm releases in a namespace or across all namespaces. Returns release names, charts, versions, status, and update timestamps. Supports filtering by regex pattern, status (deployed, failed, pending, etc.), and namespace. Use when you need to see what Helm releases are installed, check their status, or find specific releases."),
+				mcp.WithDescription("List Helm releases in a namespace or cluster-wide. Use to discover release names before calling helm_get_release. Filter by status (failed=true, deployed=true) for quick health triage. Use all_namespaces=true for cluster-wide incident scope."),
 				mcp.WithString("namespace",
 					mcp.Description("The namespace to list the helm charts from (optional)"),
 				),
@@ -126,7 +126,7 @@ func (s *Server) initHelm() []server.ServerTool {
 
 		{Tool: WithMeta(
 			mcp.NewTool("helm_install_release",
-				mcp.WithDescription("Install a Helm chart as a named release in the cluster. Deploys all resources defined in the chart. Returns installation status and release information. Use when you need to deploy applications or services using Helm charts. Requires chart reference (repository/chart or path), release name, and optional namespace and values."),
+				mcp.WithDescription("Install a Helm chart as a named release. Write operation — deploys real cluster resources. Verify the repository is configured with helm_list_repositories and call helm_update_repositories first if needed. Always specify namespace to avoid deploying to the wrong namespace."),
 				mcp.WithString("name",
 					mcp.Description("The name of the release"),
 					mcp.Required(),
@@ -179,7 +179,7 @@ func (s *Server) initHelm() []server.ServerTool {
 
 		{Tool: WithMeta(
 			mcp.NewTool("helm_uninstall_release",
-				mcp.WithDescription("Uninstall a Helm release and remove all associated resources from the cluster. Returns uninstallation status. Use when you need to remove a Helm-managed deployment. Deletion is permanent and removes all resources created by the release. Requires release name and namespace."),
+				mcp.WithDescription("Uninstall a Helm release and remove all associated cluster resources. Write operation — irreversible. Use dry_run=true to preview what will be removed before executing. Verify the release name and namespace with helm_list_releases before calling."),
 				mcp.WithString("name",
 					mcp.Description("The name of the release"),
 					mcp.Required(),
@@ -208,7 +208,7 @@ func (s *Server) initHelm() []server.ServerTool {
 
 		{Tool: WithMeta(
 			mcp.NewTool("helm_upgrade_release",
-				mcp.WithDescription("Upgrade an existing Helm release to a new chart version or with updated values. Updates resources in the cluster to match the new chart version or configuration. Returns upgrade status. Use when you need to update a deployed release with a new version or changed configuration. Requires release name, chart reference, and optional values."),
+				mcp.WithDescription("Upgrade an existing Helm release to a new chart version or updated values. Write operation. Verify the release exists with helm_list_releases first. Use helm_get_release with resource='values' to inspect current values before overriding. Specify version explicitly to avoid upgrading to an unintended chart version."),
 				mcp.WithString("name",
 					mcp.Description("The name of the release"),
 					mcp.Required(),

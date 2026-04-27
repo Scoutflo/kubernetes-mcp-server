@@ -14,14 +14,14 @@ func (s *Server) initMetricsServer() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("nodes_metrics",
-				mcp.WithDescription("Retrieve CPU and memory usage metrics for Kubernetes nodes. Returns current resource consumption, capacity, and allocatable resources. Use when you need to monitor node resource utilization, check capacity, or analyze resource constraints. Optional node name parameter to filter to a specific node."),
+				mcp.WithDescription("Retrieve live CPU and memory usage for Kubernetes nodes from the metrics-server. Returns current consumption as absolute values and percentages. Pair with nodes_get to correlate live usage against node capacity and allocatable resources — metrics-server gives utilization, nodes_get gives limits. Use nodes_list first when the node name is unknown. For historical trends or custom queries, prefer prometheus_metrics_query_range over this tool."),
 				mcp.WithString("name", mcp.Description("Name of the node (optional, if not provided will return metrics for all nodes)")),
 			),
 			map[string]any{"provider": ProviderKubernetes},
 		), Handler: s.nodesMetrics},
 		{Tool: WithMeta(
 			mcp.NewTool("pods_metrics",
-				mcp.WithDescription("Retrieve CPU and memory usage metrics for pods in a namespace. Returns current resource consumption for each pod and container. Use when you need to monitor pod resource utilization, check if pods are using resources efficiently, or identify resource bottlenecks. Requires namespace and optional pod name."),
+				mcp.WithDescription("Retrieve live CPU and memory usage for pods in a namespace from the metrics-server. Returns per-pod and per-container current consumption. Pair with pods_get to compare live usage against resource requests and limits — pods_metrics gives utilization, pods_get gives configured limits. Use when diagnosing OOMKilled containers or throttling. For historical trends or PromQL-based analysis, prefer prometheus_metrics_query_range. Use namespaces_list first when the namespace name is unknown."),
 				mcp.WithString("namespace", mcp.Description("Namespace to get pod metrics from (optional, if not provided will use default namespace)")),
 				mcp.WithString("name", mcp.Description("Name of the pod (optional, if not provided will return metrics for all pods in the namespace)")),
 			),
