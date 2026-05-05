@@ -17,7 +17,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("create_argo_rollout_config",
-					mcp.WithDescription("Generate rollout configuration manifests with progressive delivery strategies for controlled deployments"),
+					mcp.WithDescription("Generate an Argo Rollout manifest for canary or blueGreen progressive delivery. Returns YAML — apply with resources_create_or_update. For canary, stable_service and canary_service are required when traffic_routing_provider is set. For blueGreen, active_service is required."),
 					// Required parameters
 					mcp.WithString("name",
 						mcp.Description("Name of the rollout"),
@@ -110,7 +110,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("promote_argo_rollout",
-					mcp.WithDescription("Advance rollout progression to subsequent stages after verifying current phase stability"),
+					mcp.WithDescription("Promote an Argo Rollout to advance to the next canary step or fully promote a blue-green rollout. Write operation. Verify rollout state with get_argo_rollout first. Use full=true for blue-green to skip the preview phase and immediately promote to active."),
 					mcp.WithString("name",
 						mcp.Description("Name of the rollout to promote"),
 						mcp.Required(),
@@ -138,7 +138,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("abort_argo_rollout",
-					mcp.WithDescription("Terminate active rollouts and revert to previous stable versions upon detecting issues"),
+					mcp.WithDescription("Abort an in-progress Argo Rollout and revert traffic to the stable version. Write operation — use immediately when a canary or blue-green rollout is causing errors. Verify rollout name and namespace with get_argo_rollout first."),
 					mcp.WithString("name",
 						mcp.Description("Name of the rollout to abort"),
 						mcp.Required(),
@@ -163,7 +163,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("get_argo_rollout",
-					mcp.WithDescription("Retrieve rollout status including current phase, progress metrics, and verification results"),
+					mcp.WithDescription("Retrieve the current status of an Argo Rollout — phase, canary weight, step index, and analysis results. Call before promote_argo_rollout, abort_argo_rollout, or set_argo_rollout_weight to verify the current state first."),
 					mcp.WithString("name",
 						mcp.Description("Name of the rollout"),
 						mcp.Required(),
@@ -183,7 +183,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("set_argo_rollout_weight",
-					mcp.WithDescription("Adjust traffic distribution percentages between canary and stable deployment versions"),
+					mcp.WithDescription("Set the canary traffic weight for an Argo Rollout (0-100). Write operation. Use to manually override the canary step weight during an active rollout. Verify current state with get_argo_rollout before adjusting."),
 					mcp.WithString("name",
 						mcp.Description("Name of the rollout"),
 						mcp.Required(),
@@ -212,7 +212,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("pause_argo_rollout",
-					mcp.WithDescription("Temporarily suspend rollout progression for configuration verification or manual checks"),
+					mcp.WithDescription("Pause an Argo Rollout to hold at the current canary step for manual verification. Write operation. Pair with get_argo_rollout to confirm state, then use promote_argo_rollout to continue or abort_argo_rollout to roll back."),
 					mcp.WithString("name",
 						mcp.Description("Name of the rollout to pause"),
 						mcp.Required(),
@@ -237,7 +237,7 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("set_argo_rollout_image",
-					mcp.WithDescription("Update container image versions within rollouts to deploy new application releases"),
+					mcp.WithDescription("Update the container image for an Argo Rollout to trigger a new progressive delivery. Write operation — starts a new rollout immediately. Specify container name if the rollout has multiple containers; defaults to the first container."),
 					mcp.WithString("name",
 						mcp.Description("Name of the rollout"),
 						mcp.Required(),

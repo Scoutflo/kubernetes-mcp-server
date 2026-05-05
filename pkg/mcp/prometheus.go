@@ -17,14 +17,14 @@ func (s *Server) initPrometheus() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_generate_query",
-				mcp.WithDescription("Convert natural language descriptions into valid PromQL queries for efficient metric investigation"),
+				mcp.WithDescription("Convert natural language descriptions into valid PromQL queries. Use when the correct metric name or query structure is unknown — generates a query to validate with prometheus_metrics_query or prometheus_metrics_query_range."),
 				mcp.WithString("description", mcp.Description("Natural language description of the metric you want to query"), mcp.Required()),
 			),
 			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusGenerateQuery},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_metrics_query",
-				mcp.WithDescription("Retrieve current metric values through instant queries to monitor real-time system performance"),
+				mcp.WithDescription("Execute an instant PromQL query returning current metric values. Validate the metric name with prometheus_metric_info before querying if uncertain. Use prometheus_metrics_query_range for trend analysis over time."),
 				mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
 				mcp.WithString("time", mcp.Description("Evaluation timestamp in RFC3339 or unix timestamp format (optional)")),
 				mcp.WithString("timeout", mcp.Description("Evaluation timeout (optional)")),
@@ -33,7 +33,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusMetrics},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_metrics_query_range",
-				mcp.WithDescription("Obtain historical metric data using range queries to analyze trends and performance patterns"),
+				mcp.WithDescription("Execute a PromQL range query returning time-series data. Always narrow to the incident window first — use range (e.g., '1h') or explicit start/end to avoid oversized responses. Step is auto-selected when using range; specify explicitly when start/end are provided. Validate metric names with prometheus_metric_info before querying if uncertain."),
 				mcp.WithString("query", mcp.Description("Prometheus PromQL expression query string"), mcp.Required()),
 				mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format")),
 				mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format")),
@@ -45,13 +45,13 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusMetricsRange},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_list_metrics",
-				mcp.WithDescription("List all available metric names to verify monitoring coverage and discoverability"),
+				mcp.WithDescription("List all available metric names in Prometheus. Use to discover exact metric names before querying — metric names must be exact; guessed names will return no data. Call before prometheus_metric_info when the metric name is completely unknown."),
 			),
 			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusListMetrics},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_metric_info",
-				mcp.WithDescription("Retrieve metadata and statistics for specific metrics to understand their characteristics"),
+				mcp.WithDescription("Retrieve metadata (type, help text, unit) and optional statistics for a specific metric. Use to validate a metric name before querying and to understand its label set. Prefer over prometheus_list_metrics when the approximate metric name is already known."),
 				mcp.WithString("metric", mcp.Description("Name of the metric to get information about"), mcp.Required()),
 				mcp.WithBoolean("include_statistics", mcp.Description("Include count, min, max, and avg statistics for this metric. May be slower for metrics with many time series.")),
 			),
@@ -59,7 +59,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusMetricInfo},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_series_query",
-				mcp.WithDescription("Find time series matching label selectors to isolate relevant metrics for analysis"),
+				mcp.WithDescription("Find time series matching label selectors. Use to discover which label combinations exist for a metric before constructing targeted PromQL queries. Call prometheus_list_label_names first when label key names are unknown."),
 				mcp.WithArray("match", mcp.Description("Series selector arguments"),
 					func(schema map[string]interface{}) {
 						schema["type"] = "array"
@@ -76,7 +76,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusSeries},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_targets",
-				mcp.WithDescription("List active scrape targets with health status to verify data collection integrity"),
+				mcp.WithDescription("List active Prometheus scrape targets with health status and last scrape error. Use to diagnose missing metrics — if a target is down or has scrape errors, queries for its metrics will return no data. Filter by state='active' to focus on healthy targets."),
 				mcp.WithString("state", mcp.Description("Target state filter, must be one of: active, dropped, any (optional)")),
 				mcp.WithString("scrape_pool", mcp.Description("Scrape pool name (optional)")),
 			),
@@ -93,7 +93,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusTargetMetadata},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_list_label_names",
-				mcp.WithDescription("List all label names across metrics to understand dimensional structure"),
+				mcp.WithDescription("List all label names available in Prometheus. Call before prometheus_list_label_values to discover valid label key names — do not guess label keys. Use matches filter to scope to a specific metric."),
 				mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the time range to filter the results by")),
 				mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the time range to filter the results by")),
 				mcp.WithNumber("limit", mcp.Description("Optionally, the maximum number of results to return")),
@@ -110,7 +110,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusListLabelNames},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_list_label_values",
-				mcp.WithDescription("List values for specific labels to identify monitored instances and dimensions"),
+				mcp.WithDescription("List all values for a specific label name. Call after prometheus_list_label_names to confirm the label key exists. Essential for resolving pod, namespace, service, or instance identifiers before constructing incident-scoped PromQL queries."),
 				mcp.WithString("labelName", mcp.Description("The name of the label to query"), mcp.Required()),
 				mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the query")),
 				mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the query")),
@@ -128,13 +128,13 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusListLabelValues},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_get_alerts",
-				mcp.WithDescription("List currently firing alerts to identify active issues requiring attention"),
+				mcp.WithDescription("List currently firing Prometheus alerts. First call for any incident — reveals active alert names, labels (pod/namespace/service), severity, and active duration. Use these labels to scope subsequent metric queries."),
 			),
 			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusGetAlerts},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_get_rules",
-				mcp.WithDescription("Retrieve configured alerting and recording rules to verify their definitions"),
+				mcp.WithDescription("Retrieve configured alerting and recording rules. Use to inspect the PromQL expression, 'for' duration, and threshold behind a firing alert — essential for understanding why an alert triggered. Filter by rule_name when the alert name is known."),
 				mcp.WithArray("rule_name", mcp.Description("Rule names filter"),
 					func(schema map[string]interface{}) {
 						schema["type"] = "array"
@@ -159,8 +159,8 @@ func (s *Server) initPrometheus() []server.ServerTool {
 						}
 					},
 				),
-				mcp.WithBoolean("exclude_alerts", mcp.Description("Exclude alerts flag")),
-				mcp.WithArray("match", mcp.Description("Label selectors"),
+				mcp.WithBoolean("exclude_alerts", mcp.Description("If true, exclude alerting rules from results and return only recording rules")),
+				mcp.WithArray("match", mcp.Description("Label matchers to filter rules, e.g. [\"severity=critical\", \"team=backend\"]"),
 					func(schema map[string]interface{}) {
 						schema["type"] = "array"
 						schema["items"] = map[string]interface{}{
@@ -168,21 +168,21 @@ func (s *Server) initPrometheus() []server.ServerTool {
 						}
 					},
 				),
-				mcp.WithNumber("group_limit", mcp.Description("Group limit")),
+				mcp.WithNumber("group_limit", mcp.Description("Maximum number of rule groups to return (0 for unlimited)")),
 			),
 			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusGetRules},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_create_alert",
-				mcp.WithDescription("Define new alert rules to monitor specific metric conditions and thresholds"),
+				mcp.WithDescription("Create a new Prometheus alert rule as a PrometheusRule CRD in Kubernetes. Write operation. Always validate the PromQL expression with prometheus_metrics_query before creating — use prometheus_generate_query if the expression is uncertain. Requires namespace and applabel."),
 				mcp.WithString("alertname", mcp.Description("Name of the alert to create"), mcp.Required()),
 				mcp.WithString("expression", mcp.Description("PromQL expression that defines the alert condition, If not provided, please generate a query using prometheus_generate_query tool"), mcp.Required()),
 				mcp.WithString("applabel", mcp.Description("Application label used to identify the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
 				mcp.WithString("namespace", mcp.Description("Kubernetes namespace to create the alert in"), mcp.Required()),
 				mcp.WithString("interval", mcp.Description("Evaluation interval for the alert group (e.g., '30s', '1m', '5m')")),
 				mcp.WithString("for", mcp.Description("Duration for which the condition must be true before firing (e.g., '5m')")),
-				mcp.WithObject("annotations", mcp.Description("Map of annotations to add to the alert (description, summary, etc.)")),
-				mcp.WithObject("alertlabels", mcp.Description("Map of labels to attach to the alert")),
+				mcp.WithObject("annotations", mcp.Description("JSON object of alert annotations as string key-value pairs, e.g. {\"summary\": \"High CPU usage\", \"description\": \"CPU usage is above 80% for pod {{ $labels.pod }}\"}")),
+				mcp.WithObject("alertlabels", mcp.Description("JSON object of labels to attach to the fired alert as string key-value pairs, e.g. {\"severity\": \"critical\", \"team\": \"backend\"}")),
 			),
 			map[string]any{
 				"provider": ProviderPrometheus,
@@ -196,15 +196,15 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusCreateAlert},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_update_alert",
-				mcp.WithDescription("Modify existing alert rules to refine conditions, thresholds, or notification settings"),
+				mcp.WithDescription("Update an existing Prometheus alert rule. Write operation. Validate the new PromQL expression with prometheus_metrics_query before updating. Only provide fields you want to change — omitted fields retain their current values."),
 				mcp.WithString("alertname", mcp.Description("Name of the alert to update"), mcp.Required()),
 				mcp.WithString("applabel", mcp.Description("Application label that identifies the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
 				mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert"), mcp.Required()),
 				mcp.WithString("expression", mcp.Description("New PromQL expression for the alert condition")),
 				mcp.WithString("interval", mcp.Description("New evaluation interval for the alert group (e.g., '30s', '1m', '5m')")),
 				mcp.WithString("for", mcp.Description("New duration for which the condition must be true before firing (e.g., '5m')")),
-				mcp.WithObject("annotations", mcp.Description("New or updated annotations for the alert")),
-				mcp.WithObject("alertlabels", mcp.Description("New or updated labels for the alert")),
+				mcp.WithObject("annotations", mcp.Description("JSON object of new or updated alert annotations as string key-value pairs, e.g. {\"summary\": \"High CPU usage\", \"description\": \"CPU above threshold\"}")),
+				mcp.WithObject("alertlabels", mcp.Description("JSON object of new or updated labels for the alert as string key-value pairs, e.g. {\"severity\": \"warning\", \"team\": \"platform\"}")),
 			),
 			map[string]any{
 				"provider": ProviderPrometheus,
@@ -218,7 +218,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusUpdateAlert},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_delete_alert",
-				mcp.WithDescription("Remove alert rules to deactivate notifications and simplify monitoring"),
+				mcp.WithDescription("Delete a Prometheus alert rule. Write operation — irreversible. Deletes the entire PrometheusRule resource identified by applabel and namespace unless alertname is specified (which removes only that alert from the group)."),
 				mcp.WithString("applabel", mcp.Description("Application label that identifies the PrometheusRule resource, use alertname if applabel is not provided"), mcp.Required()),
 				mcp.WithString("namespace", mcp.Description("Kubernetes namespace of the alert"), mcp.Required()),
 				mcp.WithString("alertname", mcp.Description("Name of the specific alert to delete within the rule group (optional)")),
@@ -235,7 +235,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusDeleteAlert},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_runtimeinfo",
-				mcp.WithDescription("Retrieve server performance metrics to monitor Prometheus instance health"),
+				mcp.WithDescription("Retrieve Prometheus server runtime information including version, storage path, retention settings, and uptime. Use to diagnose Prometheus health issues or verify configuration state when targets or queries behave unexpectedly."),
 			),
 			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusRuntimeInfo},

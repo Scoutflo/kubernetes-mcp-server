@@ -14,13 +14,13 @@ func (s *Server) initIstio() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("istio_status",
-				mcp.WithDescription("Verify operational health of Istio control plane components and data plane proxies to ensure service mesh functionality"),
+				mcp.WithDescription("Verify Istio control plane and data plane health. Call first when mesh behavior is suspect — distinguishes a control plane outage from a misconfiguration before inspecting virtual services or destination rules."),
 			),
 			map[string]any{"provider": ProviderIstio},
 		), Handler: s.istioStatus},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_get_virtual_services",
-				mcp.WithDescription("Retrieve virtual service configurations to inspect traffic routing rules and destination specifications"),
+				mcp.WithDescription("Retrieve Istio VirtualService configurations including routing rules, retries, timeouts, and fault injections. Provide name when the virtual service is known; omit to list all. Use namespace to scope to an incident's service namespace."),
 				mcp.WithString("name",
 					mcp.Description("Name of the specific virtual service to get (optional, if not provided will list all virtual services)"),
 				),
@@ -32,7 +32,7 @@ func (s *Server) initIstio() []server.ServerTool {
 		), Handler: s.istioGetVirtualServices},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_get_destination_rules",
-				mcp.WithDescription("Access destination rule configurations defining traffic policies including load balancing and TLS settings"),
+				mcp.WithDescription("Retrieve Istio DestinationRule configurations including traffic policy, load balancing, connection pool, and TLS settings. Use to diagnose connection failures, circuit breaker trips, or mTLS policy mismatches between services."),
 				mcp.WithString("name",
 					mcp.Description("Name of the specific destination rule to get (optional, if not provided will list all destination rules)"),
 				),
@@ -44,7 +44,7 @@ func (s *Server) initIstio() []server.ServerTool {
 		), Handler: s.istioGetDestinationRules},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_get_gateways",
-				mcp.WithDescription("Retrieve gateway configurations managing ingress/egress traffic and external access points"),
+				mcp.WithDescription("Retrieve Istio Gateway configurations managing ingress and egress traffic. Use to diagnose external access failures — inspect port, protocol, and TLS configuration. Pair with istio_get_virtual_services to trace the full inbound traffic path."),
 				mcp.WithString("name",
 					mcp.Description("Name of the specific gateway to get (optional, if not provided will list all gateways)"),
 				),
@@ -56,7 +56,7 @@ func (s *Server) initIstio() []server.ServerTool {
 		), Handler: s.istioGetGateways},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_get_service_entries",
-				mcp.WithDescription("Obtain service entry configurations for external service integration and mesh expansion"),
+				mcp.WithDescription("Retrieve Istio ServiceEntry configurations registering external services into the mesh. Use when a service fails to reach an external endpoint — ServiceEntry absence or misconfiguration blocks external traffic in strict mode."),
 				mcp.WithString("name",
 					mcp.Description("Name of the specific service entry to get (optional, if not provided will list all service entries)"),
 				),
@@ -68,7 +68,7 @@ func (s *Server) initIstio() []server.ServerTool {
 		), Handler: s.istioGetServiceEntries},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_get_peer_authentications",
-				mcp.WithDescription("Retrieve peer authentication policies enforcing mutual TLS between services"),
+				mcp.WithDescription("Retrieve Istio PeerAuthentication policies defining mTLS mode (STRICT/PERMISSIVE/DISABLE) per namespace or workload. Use when connections fail with TLS errors — policy mismatch between PeerAuthentication and DestinationRule is a common cause."),
 				mcp.WithString("name",
 					mcp.Description("Name of the specific peer authentication to get (optional, if not provided will list all peer authentications)"),
 				),
@@ -80,7 +80,7 @@ func (s *Server) initIstio() []server.ServerTool {
 		), Handler: s.istioGetPeerAuthentications},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_get_request_authentications",
-				mcp.WithDescription("Access request authentication configurations managing JWT validation and origin verification"),
+				mcp.WithDescription("Retrieve Istio RequestAuthentication policies for JWT validation and origin verification. Use to diagnose 401/403 errors — missing or misconfigured JWT issuer/JWKS URI causes request rejection at the proxy."),
 				mcp.WithString("name",
 					mcp.Description("Name of the specific request authentication to get (optional, if not provided will list all request authentications)"),
 				),
@@ -104,7 +104,7 @@ func (s *Server) initIstio() []server.ServerTool {
 		), Handler: s.istioGetWasmPlugins},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_get_authorization_policies",
-				mcp.WithDescription("Obtain authorization policies defining access control rules between services"),
+				mcp.WithDescription("Retrieve Istio AuthorizationPolicy rules defining which services can communicate. Use to diagnose unexpected 403 errors — a missing or overly restrictive policy is a common cause of service-to-service access failures."),
 				mcp.WithString("name",
 					mcp.Description("Name of the specific authorization policy to get (optional, if not provided will list all authorization policies)"),
 				),
@@ -116,7 +116,7 @@ func (s *Server) initIstio() []server.ServerTool {
 		), Handler: s.istioGetAuthorizationPolicies},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_get_telemetries",
-				mcp.WithDescription("Retrieve telemetry configurations governing metric collection and observability settings"),
+				mcp.WithDescription("Retrieve Istio Telemetry configurations governing metric, tracing, and access log collection. Use when observability data (metrics or traces) is unexpectedly missing — a telemetry override may be suppressing collection for the affected namespace or workload."),
 				mcp.WithString("name",
 					mcp.Description("Name of the specific telemetry to get (optional, if not provided will list all telemetries)"),
 				),
@@ -160,7 +160,7 @@ func (s *Server) initIstio() []server.ServerTool {
 		), Handler: s.waypoint},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_get_proxy_config",
-				mcp.WithDescription("Obtain Envoy proxy configurations for specific workloads to analyze traffic handling logic"),
+				mcp.WithDescription("Retrieve the Envoy proxy configuration for a specific pod — listeners, routes, clusters, endpoints. Use to diagnose routing failures or missing upstream clusters that are not explained by high-level Istio config objects. Prefer config_type='listener' or 'route' for traffic path issues."),
 				mcp.WithString("pod_name",
 					mcp.Description("The name of the pod to get proxy configuration for"),
 					mcp.Required(),
@@ -176,7 +176,7 @@ func (s *Server) initIstio() []server.ServerTool {
 		), Handler: s.proxyConfig},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_get_proxy_status",
-				mcp.WithDescription("Verify synchronization status between control plane and proxies to ensure configuration consistency"),
+				mcp.WithDescription("Verify configuration sync status between the Istio control plane and Envoy sidecars. Use when routing changes are not taking effect — a STALE or NOT SENT status means the proxy has not received the latest config. Filter by pod_name to check a specific workload."),
 				mcp.WithString("pod_name",
 					mcp.Description("The name of the pod to get Envoy proxy status for (optional, if not provided gets status for all pods)"),
 				),
@@ -188,7 +188,7 @@ func (s *Server) initIstio() []server.ServerTool {
 		), Handler: s.proxyStatus},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_analyze_cluster_configuration",
-				mcp.WithDescription("Analyze Istio configurations across clusters to identify potential misconfigurations or optimization opportunities"),
+				mcp.WithDescription("Analyze Istio configuration across the cluster for misconfigurations. Returns issues at Info/Warning/Error severity. Use as a broad diagnostic pass when mesh behavior is degraded but the specific misconfigured object is unknown — cheaper than inspecting all resource types individually."),
 				mcp.WithString("namespace",
 					mcp.Description("Namespace to analyze (optional, analyzes all namespaces if not specified)"),
 				),
@@ -209,7 +209,7 @@ func (s *Server) initIstio() []server.ServerTool {
 		), Handler: s.analyzeClusterConfiguration},
 		{Tool: WithMeta(
 			mcp.NewTool("istio_get_remote_clusters",
-				mcp.WithDescription("List remote clusters connected to the control plane to verify multi-cluster mesh topology"),
+				mcp.WithDescription("List remote clusters connected to the Istio control plane. Use to verify multi-cluster mesh topology — missing remote clusters indicate connectivity or trust configuration failures affecting cross-cluster traffic."),
 				mcp.WithString("revision",
 					mcp.Description("Control plane revision to check (optional, defaults to default)"),
 				),
