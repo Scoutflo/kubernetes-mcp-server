@@ -442,7 +442,10 @@ func (s *Server) grafanaListAlertRules(ctx context.Context, ctr mcp.CallToolRequ
 	}
 
 	// Extract optional parameters
-	args := ctr.GetRawArguments().(map[string]interface{})
+	args := ctr.GetArguments()
+	if args == nil {
+		args = map[string]interface{}{}
+	}
 
 	limit := 100 // default
 	if limitArg, exists := args["limit"]; exists && limitArg != nil {
