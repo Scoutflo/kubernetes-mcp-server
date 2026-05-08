@@ -6,7 +6,7 @@ on:
       - mainv2
       - release/dev
     tags:
-      - "*"
+      - '*'
 
 jobs:
   test:
@@ -38,7 +38,7 @@ jobs:
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
   build-pre-prod:
-    needs: [ test ]
+    needs: [test]
     name: Build and push the pre-prod image to the ECR registry
     runs-on: ubuntu-latest
     permissions:
@@ -95,7 +95,7 @@ jobs:
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
   build-prod:
-    needs: [ test ]
+    needs: [test]
     name: Build and push the production image to the ECR registry
     runs-on: ubuntu-latest
     permissions:
@@ -153,21 +153,21 @@ jobs:
 
   deploy-pre-prod:
     name: Deploy pre-prod image to GCP VM
-    needs: [ build-pre-prod ]
+    needs: [build-pre-prod]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     if: github.ref == 'refs/heads/release/dev'
     steps:
-      - id: "auth"
-        uses: "google-github-actions/auth@v2"
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
         with:
-          workload_identity_provider: "${{ secrets.GCP_WIF_PROVIDER }}"
-          service_account: "${{ secrets.GCP_SERVICE_ACCOUNT }}"
+          workload_identity_provider: '${{ secrets.GCP_WIF_PROVIDER }}'
+          service_account: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
 
       - name: Set up Cloud SDK
-        uses: "google-github-actions/setup-gcloud@v2"
+        uses: 'google-github-actions/setup-gcloud@v2'
 
       - name: Deploy to GCP VM
         run: |
@@ -218,21 +218,21 @@ jobs:
 
   deploy-prod:
     name: Deploy prod image to GCP VM
-    needs: [ build-prod ]
+    needs: [build-prod]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     if: github.ref == 'refs/heads/mainv2'
     steps:
-      - id: "auth"
-        uses: "google-github-actions/auth@v2"
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
         with:
-          workload_identity_provider: "${{ secrets.GCP_WIF_PROVIDER }}"
-          service_account: "${{ secrets.GCP_SERVICE_ACCOUNT }}"
+          workload_identity_provider: '${{ secrets.GCP_WIF_PROVIDER }}'
+          service_account: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
 
       - name: Set up Cloud SDK
-        uses: "google-github-actions/setup-gcloud@v2"
+        uses: 'google-github-actions/setup-gcloud@v2'
 
       - name: Deploy to GCP VM
         run: |

@@ -52,13 +52,16 @@ func (k *Kubernetes) PodsDelete(ctx context.Context, namespace, name string) (st
 	return "Pod deleted successfully", nil
 }
 
-func (k *Kubernetes) PodsLog(ctx context.Context, namespace, name string, tailLines int, startTime, endTime *time.Time) (string, error) {
+func (k *Kubernetes) PodsLog(ctx context.Context, namespace, name, container string, tailLines int, startTime, endTime *time.Time) (string, error) {
 	queryParams := url.Values{}
-	queryParams.Add("namespace", namespace)
+	queryParams.Add("namespace", namespaceOrDefault(namespace))
 	queryParams.Add("pod_name", name)
 	// Use the provided tailLines parameter
 	queryParams.Add("tail_lines", fmt.Sprintf("%d", tailLines))
 
+	if container != "" {
+		queryParams.Add("container", container)
+	}
 	if startTime != nil && !startTime.IsZero() {
 		queryParams.Add("start_time", fmt.Sprintf("%d", startTime.Unix()))
 	}

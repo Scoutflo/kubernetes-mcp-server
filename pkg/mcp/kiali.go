@@ -14,7 +14,7 @@ func (s *Server) initKiali() []server.ServerTool {
 	return []server.ServerTool{
 		{Tool: WithMeta(
 			mcp.NewTool("kiali_health_check",
-				mcp.WithDescription("Check whether the Kiali service is accessible and responding. Call first before any other kiali_* tool when Kiali-based investigation is required — if this returns unhealthy, all other Kiali tools will fail and you should fall back to raw Istio tools (get_virtual_services, get_proxy_config, etc.)."),
+				mcp.WithDescription("Check whether the Kiali service is accessible and responding. Call first before any other kiali_* tool when Kiali-based investigation is required — if this returns unhealthy, all other Kiali tools will fail and you should fall back to raw Istio tools such as istio_get_virtual_services or istio_get_proxy_config."),
 			),
 			map[string]any{"provider": ProviderKiali},
 		), Handler: s.kialiHealthCheck},
@@ -27,14 +27,14 @@ func (s *Server) initKiali() []server.ServerTool {
 		), Handler: s.kialiNamespaceValidations},
 		{Tool: WithMeta(
 			mcp.NewTool("kiali_namespace_tls",
-				mcp.WithDescription("Audit the effective mTLS status (STRICT/PERMISSIVE/DISABLED) for all workloads in a namespace. Synthesizes PeerAuthentication and DestinationRule state into a single view. Use when diagnosing mTLS-related connection failures — call this before get_peer_authentications or get_destination_rules to confirm whether the issue is a mode mismatch rather than a config syntax error. Also use for compliance checks requiring all traffic to be STRICT."),
+				mcp.WithDescription("Audit the effective mTLS status (STRICT/PERMISSIVE/DISABLED) for all workloads in a namespace. Synthesizes PeerAuthentication and DestinationRule state into a single view. Use when diagnosing mTLS-related connection failures — call this before istio_get_peer_authentications or istio_get_destination_rules to confirm whether the issue is a mode mismatch rather than a config syntax error. Also use for compliance checks requiring all traffic to be STRICT."),
 				mcp.WithString("namespace", mcp.Description("Namespace to get TLS status for"), mcp.Required()),
 			),
 			map[string]any{"provider": ProviderKiali},
 		), Handler: s.kialiNamespaceTLS},
 		{Tool: WithMeta(
 			mcp.NewTool("kiali_clusters_services",
-				mcp.WithDescription("List all services across clusters with their Istio sidecar injection status. Returns service metadata, labels, and whether each service participates in the mesh. Use to discover service names and namespaces when unknown — required as a prerequisite before kiali_service_metrics or kiali_service_metrics when the service name is not established. Also use to identify services missing sidecar injection that should be in the mesh."),
+				mcp.WithDescription("List all services across clusters with their Istio sidecar injection status. Returns service metadata, labels, and whether each service participates in the mesh. Use to discover service names and namespaces when unknown — required as a prerequisite before kiali_service_metrics when the service name is not established. Also use to identify services missing sidecar injection that should be in the mesh."),
 				mcp.WithString("namespace", mcp.Description("Filter by specific namespace (optional)")),
 			),
 			map[string]any{"provider": ProviderKiali},

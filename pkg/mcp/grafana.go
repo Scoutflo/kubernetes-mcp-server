@@ -36,10 +36,10 @@ func (s *Server) initGrafana() []server.ServerTool {
 		), Handler: s.grafanaSearchDashboards},
 		{Tool: WithMeta(
 			mcp.NewTool("grafana_update_dashboard",
-				mcp.WithDescription("Create or update a Grafana dashboard. Write operation. Always call grafana_get_dashboard_by_uid first to obtain the current dashboard JSON — the update requires the full model including the 'version' field for optimistic locking. Omitting version or sending a stale version will fail or overwrite concurrent changes."),
+				mcp.WithDescription("Create or update a Grafana dashboard. Write operation. For a new dashboard, send a dashboard JSON model with id=null, title, panels, and optionally uid. For an existing dashboard, call grafana_get_dashboard_by_uid first and update the returned full dashboard model including its uid and version for optimistic locking."),
 
 				mcp.WithObject("dashboard",
-					mcp.Description(`Full Grafana dashboard JSON model. Must include "title" and "panels" fields. Include "version" field from grafana_get_dashboard_by_uid for optimistic locking on updates. For new dashboards set "id" to null.`),
+					mcp.Description(`Full Grafana dashboard JSON model. Must include "title" and "panels" fields. For new dashboards set "id" to null. For updates include the existing "uid" and "version" returned by grafana_get_dashboard_by_uid.`),
 					mcp.Required()),
 
 				mcp.WithString("folderUid",
@@ -48,6 +48,9 @@ func (s *Server) initGrafana() []server.ServerTool {
 				mcp.WithString("message",
 					mcp.Description("Commit message for version history")),
 
+				mcp.WithBoolean("overwrite",
+					mcp.Description("Whether Grafana should overwrite an existing dashboard with the same uid/title. Default: true")),
+
 				mcp.WithNumber("userId",
 					mcp.Description("User ID for audit trail")),
 			),
@@ -55,8 +58,11 @@ func (s *Server) initGrafana() []server.ServerTool {
 		), Handler: s.grafanaUpdateDashboard},
 		{Tool: WithMeta(
 			mcp.NewTool("grafana_get_dashboard_panel_queries",
-				mcp.WithDescription("Retrieve the data source queries for all panels in a specific dashboard. Use to diagnose broken panels — reveals which datasource uid each panel queries and the exact query expression. More targeted than grafana_get_dashboard_by_uid when only panel query details are needed."),
+				mcp.WithDescription("Retrieve the data source queries for all panels in a specific dashboard. Use to diagnose broken panels — reveals which datasource uid each panel queries and the exact query expression. Use time_window or start_time/end_time when query context should match an incident window."),
 				mcp.WithString("uid", mcp.Description("The UID of the dashboard — short alphanumeric string, not the display title"), mcp.Required()),
+				mcp.WithString("start_time", mcp.Description("Start time in RFC3339 format or Unix timestamp. Required if end_time is provided.")),
+				mcp.WithString("end_time", mcp.Description("End time in RFC3339 format or Unix timestamp. Required if start_time is provided.")),
+				mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') — alternative to start_time/end_time.")),
 			),
 			map[string]any{"provider": ProviderGrafana},
 		), Handler: s.grafanaGetDashboardPanelQueries},
@@ -90,7 +96,23 @@ func (s *Server) initGrafana() []server.ServerTool {
 					func(schema map[string]interface{}) {
 						schema["type"] = "array"
 						schema["items"] = map[string]interface{}{
-							"type": "string",
+							"type": "object",
+							"properties": map[string]interface{}{
+								"name": map[string]interface{}{
+									"type":        "string",
+									"description": "Alert label name to match",
+								},
+								"type": map[string]interface{}{
+									"type":        "string",
+									"enum":        []string{"=", "!="},
+									"description": "Matcher operator",
+								},
+								"value": map[string]interface{}{
+									"type":        "string",
+									"description": "Alert label value to match",
+								},
+							},
+							"required": []string{"name", "type", "value"},
 						}
 					},
 				),
@@ -442,7 +464,10 @@ func (s *Server) grafanaListAlertRules(ctx context.Context, ctr mcp.CallToolRequ
 	}
 
 	// Extract optional parameters
-	args := ctr.GetRawArguments().(map[string]interface{})
+	args := ctr.GetArguments()
+	if args == nil {
+		args = map[string]interface{}{}
+	}
 
 	limit := 100 // default
 	if limitArg, exists := args["limit"]; exists && limitArg != nil {
@@ -464,6 +489,13 @@ func (s *Server) grafanaListAlertRules(ctx context.Context, ctr mcp.CallToolRequ
 			for _, selectorInterface := range selectorsArray {
 				if selector, ok := selectorInterface.(map[string]interface{}); ok {
 					labelSelectors = append(labelSelectors, selector)
+					continue
+				}
+				if selectorJSON, ok := selectorInterface.(string); ok && selectorJSON != "" {
+					var selector map[string]interface{}
+					if err := json.Unmarshal([]byte(selectorJSON), &selector); err == nil {
+						labelSelectors = append(labelSelectors, selector)
+					}
 				}
 			}
 		}
