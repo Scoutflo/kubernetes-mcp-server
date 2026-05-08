@@ -79,7 +79,8 @@ func (s *Server) initPods() []server.ServerTool {
 			mcp.NewTool("pods_exec",
 				mcp.WithDescription("Execute a command inside a running pod container. Use for active diagnostics (e.g., curl, cat, ls) when pods_log is insufficient. Prefer pods_log for read-only log inspection. Requires pod name, namespace, and command array — first element is the executable, remaining elements are arguments."),
 				mcp.WithString("namespace", mcp.Description("Namespace to get the Pod from")),
-				mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
+				mcp.WithString("name", mcp.Description("Name of the Pod to execute the command in"), mcp.Required()),
+				mcp.WithString("container", mcp.Description("Container name when the pod has multiple containers. If omitted, Kubernetes uses the pod's default/first container.")),
 				mcp.WithArray("command", mcp.Description("Command to execute in the Pod container. "+
 					"The first item is the command to be run, and the rest are the arguments to that command. "+
 					`Example: ["ls", "-l", "/tmp"]`),
@@ -100,6 +101,7 @@ func (s *Server) initPods() []server.ServerTool {
 				mcp.WithString("namespace", mcp.Description("Namespace to get the Pod logs from")),
 				mcp.WithString("name", mcp.Description("Name of the Pod to get the logs from"), mcp.Required()),
 				mcp.WithNumber("tail_lines", mcp.Description("Number of lines to get from the end of the logs (Optional, default is 256)")),
+				mcp.WithString("container", mcp.Description("Container name when the pod has multiple containers. If omitted, Kubernetes uses the pod's default/first container.")),
 				mcp.WithString("start_time", mcp.Description("Start time for log retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
 				mcp.WithString("end_time", mcp.Description("End time for log retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
 				mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') — alternative to start_time/end_time.")),
@@ -291,6 +293,7 @@ func (s *Server) podsExec(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Ca
 	start := time.Now()
 	ns := ctr.GetString("namespace", "")
 	name := ctr.GetString("name", "")
+	container := ctr.GetString("container", "")
 
 	if name == "" {
 		klog.Errorf("Tool call: pods_exec failed after %v: missing name parameter", time.Since(start))
@@ -325,7 +328,7 @@ func (s *Server) podsExec(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Ca
 
 	sessionID := getSessionID(ctx)
 
-	klog.V(1).Infof("Tool: pods_exec - executing command: %v in pod: %s in namespace: %s - got called by session id: %s", command, name, ns, sessionID)
+	klog.V(1).Infof("Tool: pods_exec - executing command: %v in pod: %s, container: %s, namespace: %s - got called by session id: %s", command, name, container, ns, sessionID)
 
 	// Get Kubernetes client from request parameters
 	k, err := s.getKubernetesClient(ctr)
@@ -334,7 +337,7 @@ func (s *Server) podsExec(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Ca
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 
-	ret, err := k.PodsExec(ctx, ns, name, "", command)
+	ret, err := k.PodsExec(ctx, ns, name, container, command)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -352,12 +355,13 @@ func (s *Server) podsLog(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 	start := time.Now()
 	ns := ctr.GetString("namespace", "")
 	name := ctr.GetString("name", "")
+	container := ctr.GetString("container", "")
 	tailLines := ctr.GetFloat("tail_lines", 256)
 	startTimeStr := ctr.GetString("start_time", "")
 	endTimeStr := ctr.GetString("end_time", "")
 	timeWindowStr := ctr.GetString("time_window", "")
 	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: pods_log - getting logs of pod: %s in namespace: %s with tail lines: %.0f - got called by session id: %s", name, ns, tailLines, sessionID)
+	klog.V(1).Infof("Tool: pods_log - getting logs of pod: %s, container: %s in namespace: %s with tail lines: %.0f - got called by session id: %s", name, container, ns, tailLines, sessionID)
 
 	if name == "" {
 		klog.Errorf("Tool call: pods_log failed after %v: missing name parameter", time.Since(start))
@@ -401,7 +405,7 @@ func (s *Server) podsLog(ctx context.Context, ctr mcp.CallToolRequest) (*mcp.Cal
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 
-	ret, err := k.PodsLog(ctx, ns, name, int(tailLines), startTime, endTime)
+	ret, err := k.PodsLog(ctx, ns, name, container, int(tailLines), startTime, endTime)
 	duration := time.Since(start)
 
 	if err != nil {

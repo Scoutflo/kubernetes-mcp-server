@@ -70,6 +70,7 @@ func (s *Server) initPrometheus() []server.ServerTool {
 					mcp.Required()),
 				mcp.WithString("start", mcp.Description("Start timestamp in RFC3339 or Unix timestamp format (optional)")),
 				mcp.WithString("end", mcp.Description("End timestamp in RFC3339 or Unix timestamp format (optional)")),
+				mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') — alternative to start/end")),
 				mcp.WithNumber("limit", mcp.Description("Maximum number of returned items (optional)")),
 			),
 			map[string]any{"provider": ProviderPrometheus},
@@ -94,8 +95,8 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_list_label_names",
 				mcp.WithDescription("List all label names available in Prometheus. Call before prometheus_list_label_values to discover valid label key names — do not guess label keys. Use matches filter to scope to a specific metric."),
-				mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the time range to filter the results by")),
-				mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the time range to filter the results by")),
+				mcp.WithString("start", mcp.Description("Optionally, the start time of the time range to filter the results by in RFC3339 or Unix timestamp format")),
+				mcp.WithString("end", mcp.Description("Optionally, the end time of the time range to filter the results by in RFC3339 or Unix timestamp format")),
 				mcp.WithNumber("limit", mcp.Description("Optionally, the maximum number of results to return")),
 				mcp.WithArray("matches", mcp.Description("Optionally, a list of label matchers to filter the results by"),
 					func(schema map[string]interface{}) {
@@ -112,8 +113,8 @@ func (s *Server) initPrometheus() []server.ServerTool {
 			mcp.NewTool("prometheus_list_label_values",
 				mcp.WithDescription("List all values for a specific label name. Call after prometheus_list_label_names to confirm the label key exists. Essential for resolving pod, namespace, service, or instance identifiers before constructing incident-scoped PromQL queries."),
 				mcp.WithString("labelName", mcp.Description("The name of the label to query"), mcp.Required()),
-				mcp.WithString("startRfc3339", mcp.Description("Optionally, the start time of the query")),
-				mcp.WithString("endRfc3339", mcp.Description("Optionally, the end time of the query")),
+				mcp.WithString("start", mcp.Description("Optionally, the start time of the query in RFC3339 or Unix timestamp format")),
+				mcp.WithString("end", mcp.Description("Optionally, the end time of the query in RFC3339 or Unix timestamp format")),
 				mcp.WithNumber("limit", mcp.Description("Optionally, the maximum number of results to return")),
 				mcp.WithArray("matches", mcp.Description("Optionally, a list of selectors to filter the results by"),
 					func(schema map[string]interface{}) {
@@ -128,13 +129,16 @@ func (s *Server) initPrometheus() []server.ServerTool {
 		), Handler: s.prometheusListLabelValues},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_get_alerts",
-				mcp.WithDescription("List currently firing Prometheus alerts. First call for any incident — reveals active alert names, labels (pod/namespace/service), severity, and active duration. Use these labels to scope subsequent metric queries."),
+				mcp.WithDescription("List currently firing Prometheus alerts. First call for any incident — reveals active alert names, labels (pod/namespace/service), severity, and active duration. Use these labels to scope subsequent metric queries. Scope with time_window or start_time/end_time to match an incident window; defaults to the last 1h."),
+				mcp.WithString("start_time", mcp.Description("Start time in RFC3339 format or Unix timestamp. Required if end_time is provided.")),
+				mcp.WithString("end_time", mcp.Description("End time in RFC3339 format or Unix timestamp. Required if start_time is provided.")),
+				mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') — alternative to start_time/end_time.")),
 			),
 			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusGetAlerts},
 		{Tool: WithMeta(
 			mcp.NewTool("prometheus_get_rules",
-				mcp.WithDescription("Retrieve configured alerting and recording rules. Use to inspect the PromQL expression, 'for' duration, and threshold behind a firing alert — essential for understanding why an alert triggered. Filter by rule_name when the alert name is known."),
+				mcp.WithDescription("Retrieve configured alerting and recording rules. Use to inspect the PromQL expression, 'for' duration, and threshold behind a firing alert — essential for understanding why an alert triggered. Filter by rule_name when the alert name is known. Scope with time_window or start_time/end_time to match an incident window; defaults to the last 1h."),
 				mcp.WithArray("rule_name", mcp.Description("Rule names filter"),
 					func(schema map[string]interface{}) {
 						schema["type"] = "array"
@@ -169,6 +173,9 @@ func (s *Server) initPrometheus() []server.ServerTool {
 					},
 				),
 				mcp.WithNumber("group_limit", mcp.Description("Maximum number of rule groups to return (0 for unlimited)")),
+				mcp.WithString("start_time", mcp.Description("Start time in RFC3339 format or Unix timestamp. Required if end_time is provided.")),
+				mcp.WithString("end_time", mcp.Description("End time in RFC3339 format or Unix timestamp. Required if start_time is provided.")),
+				mcp.WithString("time_window", mcp.Description("Time range from now (e.g., '1h', '24h', '7d') — alternative to start_time/end_time.")),
 			),
 			map[string]any{"provider": ProviderPrometheus},
 		), Handler: s.prometheusGetRules},
@@ -619,19 +626,19 @@ func (s *Server) prometheusMetricInfo(ctx context.Context, ctr mcp.CallToolReque
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 	metric := ctr.GetString("metric", "")
-	includeStatsArg := ctr.GetString("include_statistics", "")
+	includeStats := ctr.GetBool("include_statistics", false)
+	if !includeStats && ctr.GetString("include_statistics", "") == "true" {
+		includeStats = true
+	}
 
 	sessionID := getSessionID(ctx)
-	klog.V(1).Infof("Tool: prometheus_metric_info - metric=%s, include_statistics=%s - got called by session id: %s", metric, includeStatsArg, sessionID)
+	klog.V(1).Infof("Tool: prometheus_metric_info - metric=%s, include_statistics=%t - got called by session id: %s", metric, includeStats, sessionID)
 
 	if metric == "" {
 		duration := time.Since(start)
 		klog.Errorf("Tool call: prometheus_metric_info failed after %v: missing required parameter: metric by session id: %s", duration, sessionID)
 		return NewTextResult("", errors.New("missing required parameter: metric")), nil
 	}
-
-	// Check if statistics are requested
-	includeStats := includeStatsArg == "true"
 
 	ret, err := k.GetPrometheusMetricInfo(metric, includeStats)
 	if err != nil {
@@ -1458,8 +1465,8 @@ func (s *Server) prometheusListLabelNames(ctx context.Context, ctr mcp.CallToolR
 		klog.Errorf("Tool call: prometheus_list_label_names failed to get Kubernetes client after %v: %v", time.Since(start), err)
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
-	startRfc3339 := ctr.GetString("start", "")
-	endRfc3339 := ctr.GetString("end", "")
+	startRfc3339 := ctr.GetString("start", ctr.GetString("startRfc3339", ""))
+	endRfc3339 := ctr.GetString("end", ctr.GetString("endRfc3339", ""))
 	limit := int(ctr.GetFloat("limit", 0))
 
 	// Extract matches parameter using GetRawArguments
@@ -1503,8 +1510,8 @@ func (s *Server) prometheusListLabelValues(ctx context.Context, ctr mcp.CallTool
 		return NewTextResult("", fmt.Errorf("failed to initialize Kubernetes client: %v", err)), nil
 	}
 	labelName := ctr.GetString("labelName", "")
-	startRfc3339 := ctr.GetString("start", "")
-	endRfc3339 := ctr.GetString("end", "")
+	startRfc3339 := ctr.GetString("start", ctr.GetString("startRfc3339", ""))
+	endRfc3339 := ctr.GetString("end", ctr.GetString("endRfc3339", ""))
 	limit := int(ctr.GetFloat("limit", 0))
 
 	// Extract matches parameter using GetRawArguments
