@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -76,7 +75,7 @@ func (s *Server) initArgoCD() []server.ServerTool {
 		{
 			Tool: WithMeta(
 				mcp.NewTool("argocd_sync_application",
-					mcp.WithDescription("Trigger manual synchronization between Git and cluster resources. Write operation — active during execution and cannot be interrupted cleanly. Verify the application name with argocd_get_application before calling. Use dry_run='true' to preview changes first."),
+					mcp.WithDescription("Trigger manual synchronization between Git and cluster resources. Write operation — active during execution and cannot be interrupted cleanly. Verify the application name with argocd_get_application before calling. Use dry_run=true to preview changes first."),
 					mcp.WithString("name",
 						mcp.Description("Name of the application"),
 						mcp.Required(),
@@ -84,11 +83,11 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.WithString("revision",
 						mcp.Description("Revision to sync to (e.g., a branch, tag, or commit SHA)"),
 					),
-					mcp.WithString("prune",
-						mcp.Description("If 'true', prune resources that are no longer defined in Git (accepted values: 'true', 'false')"),
+					mcp.WithBoolean("prune",
+						mcp.Description("If true, prune resources that are no longer defined in Git"),
 					),
-					mcp.WithString("dry_run",
-						mcp.Description("If 'true', preview the sync without making changes (accepted values: 'true', 'false')"),
+					mcp.WithBoolean("dry_run",
+						mcp.Description("If true, preview the sync without making changes"),
 					),
 				),
 				map[string]any{
@@ -134,20 +133,20 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.WithString("revision",
 						mcp.Description("Git revision to sync (string, optional). Can be branch name, tag, or commit SHA. Default: 'HEAD'. Example: 'main', 'v1.0.0', or 'abc123def'"),
 					),
-					mcp.WithString("automated_sync",
-						mcp.Description("Enable automated sync policy (string, optional). Accepted values: 'true' or 'false'. Default: 'false'. When 'true', ArgoCD will automatically sync when Git changes are detected"),
+					mcp.WithBoolean("automated_sync",
+						mcp.Description("Enable automated sync policy. Default: false. When true, ArgoCD will automatically sync when Git changes are detected"),
 					),
-					mcp.WithString("prune",
-						mcp.Description("Enable auto-prune for resources (string, optional). Accepted values: 'true' or 'false'. Default: 'false'. When 'true', resources removed from Git will be automatically deleted from cluster"),
+					mcp.WithBoolean("prune",
+						mcp.Description("Enable auto-prune for resources. Default: false. When true, resources removed from Git will be automatically deleted from cluster"),
 					),
-					mcp.WithString("self_heal",
-						mcp.Description("Enable self-healing (string, optional). Accepted values: 'true' or 'false'. Default: 'false'. When 'true', ArgoCD will automatically revert manual changes to match Git state"),
+					mcp.WithBoolean("self_heal",
+						mcp.Description("Enable self-healing. Default: false. When true, ArgoCD will automatically revert manual changes to match Git state"),
 					),
-					mcp.WithString("validate",
-						mcp.Description("Whether to validate the application before creation (string, optional). Accepted values: 'true' or 'false'. Default: 'true'"),
+					mcp.WithBoolean("validate",
+						mcp.Description("Whether to validate the application before creation. Default: true"),
 					),
-					mcp.WithString("upsert",
-						mcp.Description("Whether to update the application if it already exists (string, optional). Accepted values: 'true' or 'false'. Default: 'false'"),
+					mcp.WithBoolean("upsert",
+						mcp.Description("Whether to update the application if it already exists. Default: false"),
 					),
 				),
 				map[string]any{
@@ -188,17 +187,17 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.WithString("revision",
 						mcp.Description("New Git revision to sync (string, optional). Can be branch, tag, or commit SHA. Example: 'develop' or 'v2.0.0'"),
 					),
-					mcp.WithString("automated_sync",
-						mcp.Description("Enable/disable automated sync (string, optional). Accepted values: 'true' or 'false'"),
+					mcp.WithBoolean("automated_sync",
+						mcp.Description("Enable or disable automated sync. Optional; omit to leave unchanged"),
 					),
-					mcp.WithString("prune",
-						mcp.Description("Enable/disable auto-pruning resources (string, optional). Accepted values: 'true' or 'false'"),
+					mcp.WithBoolean("prune",
+						mcp.Description("Enable or disable auto-pruning resources. Optional; omit to leave unchanged"),
 					),
-					mcp.WithString("self_heal",
-						mcp.Description("Enable/disable self-healing (string, optional). Accepted values: 'true' or 'false'"),
+					mcp.WithBoolean("self_heal",
+						mcp.Description("Enable or disable self-healing. Optional; omit to leave unchanged"),
 					),
-					mcp.WithString("validate",
-						mcp.Description("Whether to validate the application (string, optional). Accepted values: 'true' or 'false'. Default: 'true'"),
+					mcp.WithBoolean("validate",
+						mcp.Description("Whether to validate the application. Default: true"),
 					),
 				),
 				map[string]any{
@@ -221,8 +220,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 						mcp.Description("The name of the application to delete"),
 						mcp.Required(),
 					),
-					mcp.WithString("cascade",
-						mcp.Description("Whether to delete application resources as well (accepted values: 'true', 'false', default: 'true')"),
+					mcp.WithBoolean("cascade",
+						mcp.Description("Whether to delete application resources as well. Default: true"),
 					),
 					mcp.WithString("propagation_policy",
 						mcp.Description("The propagation policy ('foreground', 'background', or 'orphan')"),
@@ -281,8 +280,8 @@ func (s *Server) initArgoCD() []server.ServerTool {
 					mcp.WithString("tail",
 						mcp.Description("Number of lines to show from the end of the logs (default: '100')"),
 					),
-					mcp.WithString("follow",
-						mcp.Description("Follow logs (accepted values: 'true', 'false', default: 'false')"),
+					mcp.WithBoolean("follow",
+						mcp.Description("Follow logs. Default: false"),
 					),
 					mcp.WithString("start_time", mcp.Description("Start time for log retrieval in RFC3339 format (e.g., '2024-01-01T00:00:00Z') or Unix timestamp. Required if end_time is provided.")),
 					mcp.WithString("end_time", mcp.Description("End time for log retrieval in RFC3339 format (e.g., '2024-01-01T23:59:59Z') or Unix timestamp. Required if start_time is provided.")),
@@ -575,28 +574,28 @@ func (s *Server) argocdUpdateApplication(ctx context.Context, ctr mcp.CallToolRe
 	destServer := ctr.GetString("dest_server", "")
 	destNamespace := ctr.GetString("dest_namespace", "")
 	revision := ctr.GetString("revision", "")
-	validateStr := ctr.GetString("validate", "")
+	args := ctr.GetArguments()
 
 	// Parse and convert boolean parameters that might be optional
 	var automatedSync, prune, selfHeal *bool
 
-	if automatedSyncStr := ctr.GetString("automated_sync", ""); automatedSyncStr != "" {
-		autoSyncVal := strings.ToLower(automatedSyncStr) == "true"
+	if _, ok := args["automated_sync"]; ok {
+		autoSyncVal := ctr.GetBool("automated_sync", false)
 		automatedSync = &autoSyncVal
 	}
 
-	if pruneStr := ctr.GetString("prune", ""); pruneStr != "" {
-		pruneVal := strings.ToLower(pruneStr) == "true"
+	if _, ok := args["prune"]; ok {
+		pruneVal := ctr.GetBool("prune", false)
 		prune = &pruneVal
 	}
 
-	if selfHealStr := ctr.GetString("self_heal", ""); selfHealStr != "" {
-		selfHealVal := strings.ToLower(selfHealStr) == "true"
+	if _, ok := args["self_heal"]; ok {
+		selfHealVal := ctr.GetBool("self_heal", false)
 		selfHeal = &selfHealVal
 	}
 
 	// Default validate to true if not specified
-	validate := validateStr == "" || strings.ToLower(validateStr) == "true"
+	validate := ctr.GetBool("validate", true)
 
 	klog.V(1).Infof("Tool: argocd_update_application - name: %s, project: %s, repo_url: %s, path: %s, dest_server: %s, dest_namespace: %s, revision: %s, validate: %t - got called",
 		name, project, repoURL, path, destServer, destNamespace, revision, validate)
@@ -614,7 +613,7 @@ func (s *Server) argocdUpdateApplication(ctx context.Context, ctr mcp.CallToolRe
 	if selfHeal != nil {
 		selfHealStr = fmt.Sprintf("%t", *selfHeal)
 	}
-	validateStr = fmt.Sprintf("%t", validate)
+	validateStr := fmt.Sprintf("%t", validate)
 
 	var result string
 	result, err = k.UpdateApplication(ctx, name, project, repoURL, path, destServer, destNamespace,
@@ -829,9 +828,7 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 		tailStr = "100" // Default to 100 lines
 	}
 
-	// Get follow parameter if provided
-	followStr := ctr.GetString("follow", "false")
-	follow := strings.ToLower(followStr) == "true"
+	follow := ctr.GetBool("follow", false)
 
 	startTimeStr := ctr.GetString("start_time", "")
 	endTimeStr := ctr.GetString("end_time", "")
@@ -871,7 +868,7 @@ func (s *Server) argocdGetApplicationWorkloadLogs(ctx context.Context, ctr mcp.C
 		name, resourceRef.Kind, resourceRef.Namespace, resourceRef.Name, tailStr, follow)
 
 	// Get workload logs using the K8s Dashboard API
-	followStr = fmt.Sprintf("%t", follow)
+	followStr := fmt.Sprintf("%t", follow)
 	resourceRefJSON, _ := json.Marshal(resourceRef)
 
 	result, err := k.GetApplicationWorkloadLogs(ctx, name, string(resourceRefJSON), followStr, tailStr, startTime, endTime)

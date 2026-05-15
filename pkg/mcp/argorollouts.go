@@ -119,8 +119,8 @@ func (s *Server) initArgoRollouts() []server.ServerTool {
 						mcp.Description("Namespace of the rollout"),
 						mcp.Required(),
 					),
-					mcp.WithString("full",
-						mcp.Description("If 'true', fully promote the rollout instead of just advancing by one step (blue-green strategy only)"),
+					mcp.WithBoolean("full",
+						mcp.Description("If true, fully promote the rollout instead of just advancing by one step (blue-green strategy only)"),
 					),
 				),
 				map[string]any{

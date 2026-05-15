@@ -89,26 +89,26 @@ func (s *Server) initHelm() []server.ServerTool {
 				mcp.WithString("namespace",
 					mcp.Description("The namespace to list the helm charts from (optional)"),
 				),
-				mcp.WithString("all_namespaces",
-					mcp.Description("If 'true', list releases from all namespaces (accepted values: 'true', 'false')"),
+				mcp.WithBoolean("all_namespaces",
+					mcp.Description("If true, list releases from all namespaces"),
 				),
-				mcp.WithString("all",
-					mcp.Description("If 'true', show all releases without any filter applied (accepted values: 'true', 'false')"),
+				mcp.WithBoolean("all",
+					mcp.Description("If true, show all releases without any filter applied"),
 				),
-				mcp.WithString("uninstalled",
-					mcp.Description("If 'true', list uninstalled releases (accepted values: 'true', 'false')"),
+				mcp.WithBoolean("uninstalled",
+					mcp.Description("If true, list uninstalled releases"),
 				),
-				mcp.WithString("uninstalling",
-					mcp.Description("If 'true', list uninstalling releases (accepted values: 'true', 'false')"),
+				mcp.WithBoolean("uninstalling",
+					mcp.Description("If true, list uninstalling releases"),
 				),
-				mcp.WithString("failed",
-					mcp.Description("If 'true', list failed releases (accepted values: 'true', 'false')"),
+				mcp.WithBoolean("failed",
+					mcp.Description("If true, list failed releases"),
 				),
-				mcp.WithString("deployed",
-					mcp.Description("If 'true', list deployed releases (accepted values: 'true', 'false')"),
+				mcp.WithBoolean("deployed",
+					mcp.Description("If true, list deployed releases"),
 				),
-				mcp.WithString("pending",
-					mcp.Description("If 'true', list pending releases (accepted values: 'true', 'false')"),
+				mcp.WithBoolean("pending",
+					mcp.Description("If true, list pending releases"),
 				),
 				mcp.WithString("filter",
 					mcp.Description("A regular expression (Perl compatible). Any releases that match the expression will be included in the results"),
@@ -158,8 +158,8 @@ func (s *Server) initHelm() []server.ServerTool {
 				mcp.WithString("version",
 					mcp.Description("Specify a version constraint for the chart version to use"),
 				),
-				// mcp.WithString("wait",
-				// 	mcp.Description("If 'true', wait for the release to be installed (accepted values: 'true', 'false')"),
+				// mcp.WithBoolean("wait",
+				// 	mcp.Description("If true, wait for the release to be installed"),
 				// ),
 			),
 			map[string]any{
@@ -184,11 +184,11 @@ func (s *Server) initHelm() []server.ServerTool {
 					mcp.Description("The namespace to uninstall the release from"),
 					mcp.Required(),
 				),
-				mcp.WithString("dry_run",
-					mcp.Description("If 'true', show which releases will be uninstalled without actually uninstalling them (accepted values: 'true', 'false')"),
+				mcp.WithBoolean("dry_run",
+					mcp.Description("If true, show which releases will be uninstalled without actually uninstalling them"),
 				),
-				mcp.WithString("wait",
-					mcp.Description("If 'true', wait for the release to be uninstalled (accepted values: 'true', 'false')"),
+				mcp.WithBoolean("wait",
+					mcp.Description("If true, wait for the release to be uninstalled"),
 				),
 			),
 			map[string]any{
@@ -240,8 +240,8 @@ func (s *Server) initHelm() []server.ServerTool {
 				mcp.WithString("version",
 					mcp.Description("Specify a version constraint for the chart version to use"),
 				),
-				// mcp.WithString("wait",
-				// 	mcp.Description("If 'true', wait for the release to be upgraded (accepted values: 'true', 'false')"),
+				// mcp.WithBoolean("wait",
+				// 	mcp.Description("If true, wait for the release to be upgraded"),
 				// ),
 			),
 			map[string]any{
@@ -406,20 +406,20 @@ func (s *Server) helmListReleases(ctx context.Context, ctr mcp.CallToolRequest) 
 	// Build the list options
 	opts := kubernetes.ListOptions{}
 
-	// Boolean options (as strings)
-	opts.AllNamespaces = strings.ToLower(ctr.GetString("all_namespaces", "false")) == "true"
+	// Boolean options
+	opts.AllNamespaces = ctr.GetBool("all_namespaces", false)
 
-	opts.All = strings.ToLower(ctr.GetString("all", "false")) == "true"
+	opts.All = ctr.GetBool("all", false)
 
-	opts.Uninstalled = strings.ToLower(ctr.GetString("uninstalled", "false")) == "true"
+	opts.Uninstalled = ctr.GetBool("uninstalled", false)
 
-	opts.Uninstalling = strings.ToLower(ctr.GetString("uninstalling", "false")) == "true"
+	opts.Uninstalling = ctr.GetBool("uninstalling", false)
 
-	opts.Failed = strings.ToLower(ctr.GetString("failed", "false")) == "true"
+	opts.Failed = ctr.GetBool("failed", false)
 
-	opts.Deployed = strings.ToLower(ctr.GetString("deployed", "false")) == "true"
+	opts.Deployed = ctr.GetBool("deployed", false)
 
-	opts.Pending = strings.ToLower(ctr.GetString("pending", "false")) == "true"
+	opts.Pending = ctr.GetBool("pending", false)
 
 	// String options
 	opts.Filter = ctr.GetString("filter", "")
@@ -466,10 +466,10 @@ func (s *Server) helmUninstallRelease(ctx context.Context, ctr mcp.CallToolReque
 	// Build the uninstall options
 	opts := kubernetes.UninstallReleaseOptions{}
 
-	// Boolean options (as strings)
-	opts.DryRun = strings.ToLower(ctr.GetString("dry_run", "false")) == "true"
+	// Boolean options
+	opts.DryRun = ctr.GetBool("dry_run", false)
 
-	opts.Wait = strings.ToLower(ctr.GetString("wait", "false")) == "true"
+	opts.Wait = ctr.GetBool("wait", false)
 
 	klog.V(1).Infof("Tool: helm_uninstall_release - name: %s, namespace: %s, dry_run: %t, wait: %t - got called by session id: %s",
 		name, namespace, opts.DryRun, opts.Wait, sessionID)
