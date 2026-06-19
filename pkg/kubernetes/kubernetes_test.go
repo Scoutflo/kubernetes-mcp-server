@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -169,10 +170,10 @@ func TestGetPrometheusRules_SendsStringTimes(t *testing.T) {
 		t.Fatalf("GetPrometheusRules failed: %v", err)
 	}
 
-	if got, ok := body["start_time"].(string); !ok || got != "2026-06-19T12:01:24Z" {
-		t.Fatalf("start_time = %#v, want RFC3339 string", body["start_time"])
+	if got, ok := body["start_time"].(string); !ok || got != strconv.FormatInt(start.Unix(), 10) {
+		t.Fatalf("start_time = %#v, want Unix timestamp string", body["start_time"])
 	}
-	if got, ok := body["end_time"].(string); !ok || got != "2026-06-19T12:16:24Z" {
-		t.Fatalf("end_time = %#v, want RFC3339 string", body["end_time"])
+	if got, ok := body["end_time"].(string); !ok || got != strconv.FormatInt(end.Unix(), 10) {
+		t.Fatalf("end_time = %#v, want Unix timestamp string", body["end_time"])
 	}
 }
