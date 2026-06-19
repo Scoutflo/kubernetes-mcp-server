@@ -248,10 +248,10 @@ func (k *Kubernetes) GetPrometheusRules(groupLimit int, ruleNames, ruleGroups, f
 	}
 
 	if startTime != nil && !startTime.IsZero() {
-		reqBody["start_time"] = startTime.Unix()
+		reqBody["start_time"] = startTime.Format(time.RFC3339)
 	}
 	if endTime != nil && !endTime.IsZero() {
-		reqBody["end_time"] = endTime.Unix()
+		reqBody["end_time"] = endTime.Format(time.RFC3339)
 	}
 
 	// Make API request to K8s Dashboard
